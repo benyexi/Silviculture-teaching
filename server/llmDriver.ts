@@ -155,7 +155,8 @@ async function invokeBuiltinEmbedding(text: string): Promise<number[]> {
     throw new Error("内置 Forge API 未配置，请在教师端配置 LLM 模型");
   }
 
-  const response = await fetch(`${apiUrl}/embeddings`, {
+  const embeddingUrl = `${apiUrl.replace(/\/$/, '')}/v1/embeddings`;
+  const response = await fetch(embeddingUrl, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

@@ -5,8 +5,7 @@
 import { getDb } from "./db";
 import { materials, materialChunks } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
-import { getEmbedding } from "./llmDriver";
-import { storeChunkVector, forceRefreshCache } from "./vectorSearch";
+import { storeChunkVector } from "./vectorSearch";
 
 // ─── 文本块类型 ───────────────────────────────────────────────────────────────
 type TextChunk = {
@@ -57,28 +56,20 @@ export async function processMaterial(
       insertedChunks.push(Number((result as any).insertId));
     }
 
-    // 4. 向量化并存储（批量处理，避免 API 超限）
-    console.log(`[PDF] 开始向量化 ${chunks.length} 个块...`);
-    const BATCH_SIZE = 10;
-    for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
-      const batch = chunks.slice(i, i + BATCH_SIZE);
+    // 4. 全文检索模式：标记所有 chunks 为已处理（无需向量化）
+    console.log(`[PDF] 全文检索模式，标记 ${insertedChunks.length} 个块为已处理...`);
+    const BATCH_SIZE = 50;
+    for (let i = 0; i < insertedChunks.length; i += BATCH_SIZE) {
       const batchIds = insertedChunks.slice(i, i + BATCH_SIZE);
-
       await Promise.all(
-        batch.map(async (chunk, idx) => {
+        batchIds.map(async (chunkId) => {
           try {
-            const vector = await getEmbedding(chunk.content);
-            await storeChunkVector(batchIds[idx], vector);
+            await storeChunkVector(chunkId, []); // fulltext 模式，vector 为空数组
           } catch (err) {
-            console.error(`[PDF] 向量化块 ${batchIds[idx]} 失败:`, err);
+            console.error(`[PDF] 标记块 ${chunkId} 失败:`, err);
           }
         })
       );
-
-      // 避免 API 速率限制
-      if (i + BATCH_SIZE < chunks.length) {
-        await sleep(500);
-      }
     }
 
     // 5. 更新教材状态为已发布
@@ -86,9 +77,6 @@ export async function processMaterial(
       .update(materials)
       .set({ status: "published", totalChunks: chunks.length })
       .where(eq(materials.id, materialId));
-
-    // 6. 刷新向量缓存
-    await forceRefreshCache();
 
     console.log(`[PDF] 教材 ${materialId} 处理完成！`);
   } catch (error) {
