@@ -1,0 +1,48 @@
+{
+  "query": "SELECT * FROM materials; SELECT * FROM upload_sessions ORDER BY createdAt DESC LIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 8rPJmd9j9G2jHn3.root --database UwcsU6Nu9y4z2Keggtu7BV --execute SELECT * FROM materials; SELECT * FROM upload_sessions ORDER BY createdAt DESC LIMIT 5;",
+  "rows": [
+    {
+      "id": "1",
+      "title": "森林培育学（第四版）",
+      "author": "翟明普 马履一",
+      "publisher": "NULL",
+      "publishYear": "NULL",
+      "edition": "NULL",
+      "fileKey": "materials/lcr3qDPZ8M_CW7k7KkZNV-森林培育学第四版-定稿-交出版社.pdf",
+      "fileUrl": "https://d2xsxph8kpxj0f.cloudfront.net/310519663401618844/UwcsU6Nu9y4z2Keggtu7BV/materials/lcr3qDPZ8M_CW7k7KkZNV-森林培育学第四版-定稿-交出版社.pdf",
+      "fileSizeBytes": "15984801",
+      "status": "processing",
+      "errorMessage": "NULL",
+      "totalChunks": "0",
+      "uploadedBy": "1",
+      "createdAt": "2026-03-17 06:33:30",
+      "updatedAt": "2026-03-17 06:33:30"
+    },
+    {
+      "id": "2",
+      "title": "森林培育学（第四版）",
+      "author": "翟明普 马履一",
+      "publisher": "NULL",
+      "publishYear": "NULL",
+      "edition": "NULL",
+      "fileKey": "materials/PRHIcxPZSQpKu88TGIC82-森林培育学第四版-定稿-交出版社.pdf",
+      "fileUrl": "https://d2xsxph8kpxj0f.cloudfront.net/310519663401618844/UwcsU6Nu9y4z2Keggtu7BV/materials/PRHIcxPZSQpKu88TGIC82-森林培育学第四版-定稿-交出版社.pdf",
+      "fileSizeBytes": "15984801",
+      "status": "processing",
+      "errorMessage": "NULL",
+      "totalChunks": "0",
+      "uploadedBy": "1",
+      "createdAt": "2026-03-17 06:34:59",
+      "updatedAt": "2026-03-17 06:34:59"
+    }
+  ],
+  "messages": [
+    "id\tmaterialId\tfilename\ttotalSize\ttotalChunks\tuploadedChunks\ts3UploadId\ts3Parts\tstatus\tcreatedBy\tcreatedAt\tupdatedAt",
+    "m9IIgbGx-SrtVngTqggQR\tNULL\t森林培育学第四版-定稿-交出版社.pdf\t15984801\t4\t4\tNULL\tNULL\tactive\t1\t2026-03-17 06:34:17\t2026-03-17 06:34:45",
+    "z-06JKcFL4fvbcuxPcAgJ\tNULL\t森林培育学第四版-定稿-交出版社.pdf\t15984801\t4\t4\tNULL\tNULL\tactive\t1\t2026-03-17 06:32:37\t2026-03-17 06:33:15"
+  ],
+  "stdout": "id\ttitle\tauthor\tpublisher\tpublishYear\tedition\tfileKey\tfileUrl\tfileSizeBytes\tstatus\terrorMessage\ttotalChunks\tuploadedBy\tcreatedAt\tupdatedAt\n1\t森林培育学（第四版）\t翟明普 马履一\tNULL\tNULL\tNULL\tmaterials/lcr3qDPZ8M_CW7k7KkZNV-森林培育学第四版-定稿-交出版社.pdf\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663401618844/UwcsU6Nu9y4z2Keggtu7BV/materials/lcr3qDPZ8M_CW7k7KkZNV-森林培育学第四版-定稿-交出版社.pdf\t15984801\tprocessing\tNULL\t0\t1\t2026-03-17 06:33:30\t2026-03-17 06:33:30\n2\t森林培育学（第四版）\t翟明普 马履一\tNULL\tNULL\tNULL\tmaterials/PRHIcxPZSQpKu88TGIC82-森林培育学第四版-定稿-交出版社.pdf\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663401618844/UwcsU6Nu9y4z2Keggtu7BV/materials/PRHIcxPZSQpKu88TGIC82-森林培育学第四版-定稿-交出版社.pdf\t15984801\tprocessing\tNULL\t0\t1\t2026-03-17 06:34:59\t2026-03-17 06:34:59\nid\tmaterialId\tfilename\ttotalSize\ttotalChunks\tuploadedChunks\ts3UploadId\ts3Parts\tstatus\tcreatedBy\tcreatedAt\tupdatedAt\nm9IIgbGx-SrtVngTqggQR\tNULL\t森林培育学第四版-定稿-交出版社.pdf\t15984801\t4\t4\tNULL\tNULL\tactive\t1\t2026-03-17 06:34:17\t2026-03-17 06:34:45\nz-06JKcFL4fvbcuxPcAgJ\tNULL\t森林培育学第四版-定稿-交出版社.pdf\t15984801\t4\t4\tNULL\tNULL\tactive\t1\t2026-03-17 06:32:37\t2026-03-17 06:33:15\n",
+  "stderr": "",
+  "execution_time_ms": 1790
+}

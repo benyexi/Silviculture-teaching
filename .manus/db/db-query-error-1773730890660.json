@@ -1,0 +1,11 @@
+{
+  "query": "SELECT id, title, status, fileUrl, createdAt FROM materials; SELECT id, materialId, status, totalChunks, processedChunks, errorMessage FROM upload_sessions ORDER BY createdAt DESC LIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 8rPJmd9j9G2jHn3.root --database UwcsU6Nu9y4z2Keggtu7BV --execute SELECT id, title, status, fileUrl, createdAt FROM materials; SELECT id, materialId, status, totalChunks, processedChunks, errorMessage FROM upload_sessions ORDER BY createdAt DESC LIMIT 5;",
+  "returncode": 1,
+  "logs": [
+    "id\ttitle\tstatus\tfileUrl\tcreatedAt",
+    "1\t森林培育学（第四版）\tprocessing\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663401618844/UwcsU6Nu9y4z2Keggtu7BV/materials/lcr3qDPZ8M_CW7k7KkZNV-森林培育学第四版-定稿-交出版社.pdf\t2026-03-17 06:33:30",
+    "2\t森林培育学（第四版）\tprocessing\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663401618844/UwcsU6Nu9y4z2Keggtu7BV/materials/PRHIcxPZSQpKu88TGIC82-森林培育学第四版-定稿-交出版社.pdf\t2026-03-17 06:34:59",
+    "ERROR 1054 (42S22) at line 1: Unknown column 'processedchunks' in 'field list'"
+  ]
+}

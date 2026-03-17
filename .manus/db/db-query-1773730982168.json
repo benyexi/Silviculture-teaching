@@ -1,0 +1,9 @@
+{
+  "query": "DELETE FROM upload_sessions WHERE materialId IS NULL AND status = 'active'; DELETE FROM materials WHERE status = 'processing';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 8rPJmd9j9G2jHn3.root --database UwcsU6Nu9y4z2Keggtu7BV --execute DELETE FROM upload_sessions WHERE materialId IS NULL AND status = 'active'; DELETE FROM materials WHERE status = 'processing';",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 1851
+}
