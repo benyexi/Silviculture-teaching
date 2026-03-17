@@ -61,3 +61,7 @@
 
 ## Bug 修复
 - [x] 修复上传完成时 materialId = NaN 的错误（Drizzle mysql2 驱动 insertId 在 result[0] 中，已用 extractInsertId 助手函数修复）
+
+## UI 优化
+- [x] 扩大学生端首页查询框，增加占页面比例
+- [x] 替换首页背景为带透明度的森林照片
