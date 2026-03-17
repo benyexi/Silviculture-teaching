@@ -1,0 +1,272 @@
+/**
+ * PDF 处理管道
+ * 上传 PDF → 提取文本 → 智能分块（按章节/段落）→ 向量化 → 存储
+ */
+import { getDb } from "./db";
+import { materials, materialChunks } from "../drizzle/schema";
+import { eq } from "drizzle-orm";
+import { getEmbedding } from "./llmDriver";
+import { storeChunkVector, forceRefreshCache } from "./vectorSearch";
+
+// ─── 文本块类型 ───────────────────────────────────────────────────────────────
+type TextChunk = {
+  content: string;
+  chapter: string | null;
+  pageStart: number | null;
+  pageEnd: number | null;
+  tokenCount: number;
+};
+
+// ─── 主处理函数 ───────────────────────────────────────────────────────────────
+export async function processMaterial(
+  materialId: number,
+  pdfBuffer: Buffer
+): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("数据库不可用");
+
+  try {
+    // 更新状态为处理中
+    await db
+      .update(materials)
+      .set({ status: "processing" })
+      .where(eq(materials.id, materialId));
+
+    // 1. 提取 PDF 文本
+    console.log(`[PDF] 开始提取教材 ${materialId} 的文本...`);
+    const { text, pageTexts } = await extractPdfText(pdfBuffer);
+
+    // 2. 智能分块
+    console.log(`[PDF] 开始分块，总文本长度: ${text.length} 字符`);
+    const chunks = splitIntoChunks(text, pageTexts);
+    console.log(`[PDF] 分块完成，共 ${chunks.length} 个块`);
+
+    // 3. 存储文本块到数据库
+    const insertedChunks: number[] = [];
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      const result = await db.insert(materialChunks).values({
+        materialId,
+        chunkIndex: i,
+        content: chunk.content,
+        chapter: chunk.chapter,
+        pageStart: chunk.pageStart,
+        pageEnd: chunk.pageEnd,
+        tokenCount: chunk.tokenCount,
+      });
+      insertedChunks.push(Number((result as any).insertId));
+    }
+
+    // 4. 向量化并存储（批量处理，避免 API 超限）
+    console.log(`[PDF] 开始向量化 ${chunks.length} 个块...`);
+    const BATCH_SIZE = 10;
+    for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
+      const batch = chunks.slice(i, i + BATCH_SIZE);
+      const batchIds = insertedChunks.slice(i, i + BATCH_SIZE);
+
+      await Promise.all(
+        batch.map(async (chunk, idx) => {
+          try {
+            const vector = await getEmbedding(chunk.content);
+            await storeChunkVector(batchIds[idx], vector);
+          } catch (err) {
+            console.error(`[PDF] 向量化块 ${batchIds[idx]} 失败:`, err);
+          }
+        })
+      );
+
+      // 避免 API 速率限制
+      if (i + BATCH_SIZE < chunks.length) {
+        await sleep(500);
+      }
+    }
+
+    // 5. 更新教材状态为已发布
+    await db
+      .update(materials)
+      .set({ status: "published", totalChunks: chunks.length })
+      .where(eq(materials.id, materialId));
+
+    // 6. 刷新向量缓存
+    await forceRefreshCache();
+
+    console.log(`[PDF] 教材 ${materialId} 处理完成！`);
+  } catch (error) {
+    console.error(`[PDF] 教材 ${materialId} 处理失败:`, error);
+    await db
+      .update(materials)
+      .set({
+        status: "error",
+        errorMessage: error instanceof Error ? error.message : String(error),
+      })
+      .where(eq(materials.id, materialId));
+    throw error;
+  }
+}
+
+// ─── PDF 文本提取 ─────────────────────────────────────────────────────────────
+async function extractPdfText(
+  pdfBuffer: Buffer
+): Promise<{ text: string; pageTexts: string[] }> {
+  // 动态导入 pdf-parse（避免 ESM 兼容问题）
+  const pdfParseModule = await import("pdf-parse");
+  const pdfParse = (pdfParseModule as any).default ?? pdfParseModule;
+
+  const pageTexts: string[] = [];
+  let pageCount = 0;
+
+  const data = await pdfParse(pdfBuffer, {
+    pagerender: (pageData: any) => {
+      return pageData.getTextContent().then((textContent: any) => {
+        const pageText = textContent.items
+          .map((item: any) => item.str)
+          .join(" ");
+        pageTexts.push(pageText);
+        pageCount++;
+        return pageText;
+      });
+    },
+  });
+
+  // 如果 pagerender 没有触发，使用 data.text
+  if (pageTexts.length === 0 && data.text) {
+    // 按换页符分割
+    const pages = data.text.split(/\f/);
+    pageTexts.push(...pages.filter((p: string) => p.trim().length > 0));
+  }
+
+  return { text: data.text, pageTexts };
+}
+
+// ─── 智能文本分块 ─────────────────────────────────────────────────────────────
+function splitIntoChunks(text: string, pageTexts: string[]): TextChunk[] {
+  const chunks: TextChunk[] = [];
+  const MAX_CHUNK_SIZE = 800;  // 每块最大字符数
+  const MIN_CHUNK_SIZE = 100;  // 每块最小字符数
+  const OVERLAP = 100;         // 块间重叠字符数
+
+  // 章节检测正则（中文教材常见格式）
+  const chapterRegex = /^(第[一二三四五六七八九十百\d]+[章节篇][\s\S]{0,50}|[\d]+[\.、]\s*[\S]{2,30})/m;
+
+  // 按页面处理，保留页码信息
+  if (pageTexts.length > 0) {
+    let currentChapter: string | null = null;
+
+    for (let pageIdx = 0; pageIdx < pageTexts.length; pageIdx++) {
+      const pageText = pageTexts[pageIdx].trim();
+      if (pageText.length < MIN_CHUNK_SIZE) continue;
+
+      const pageNum = pageIdx + 1;
+
+      // 检测章节标题
+      const chapterMatch = pageText.match(chapterRegex);
+      if (chapterMatch) {
+        currentChapter = chapterMatch[0].trim().substring(0, 100);
+      }
+
+      // 按段落分割页面文本
+      const paragraphs = pageText
+        .split(/\n{2,}|\r\n{2,}/)
+        .map((p) => p.trim())
+        .filter((p) => p.length >= MIN_CHUNK_SIZE);
+
+      if (paragraphs.length === 0) {
+        // 整页作为一个块
+        if (pageText.length <= MAX_CHUNK_SIZE) {
+          chunks.push({
+            content: pageText,
+            chapter: currentChapter,
+            pageStart: pageNum,
+            pageEnd: pageNum,
+            tokenCount: estimateTokens(pageText),
+          });
+        } else {
+          // 超长页面按固定大小分割
+          const subChunks = slidingWindowSplit(pageText, MAX_CHUNK_SIZE, OVERLAP);
+          subChunks.forEach((sc) => {
+            chunks.push({
+              content: sc,
+              chapter: currentChapter,
+              pageStart: pageNum,
+              pageEnd: pageNum,
+              tokenCount: estimateTokens(sc),
+            });
+          });
+        }
+        continue;
+      }
+
+      // 合并短段落，分割长段落
+      let buffer = "";
+      for (const para of paragraphs) {
+        if (buffer.length + para.length > MAX_CHUNK_SIZE) {
+          if (buffer.length >= MIN_CHUNK_SIZE) {
+            chunks.push({
+              content: buffer.trim(),
+              chapter: currentChapter,
+              pageStart: pageNum,
+              pageEnd: pageNum,
+              tokenCount: estimateTokens(buffer),
+            });
+          }
+          buffer = para.length > MAX_CHUNK_SIZE
+            ? para.substring(0, MAX_CHUNK_SIZE)
+            : para;
+        } else {
+          buffer = buffer ? `${buffer}\n${para}` : para;
+        }
+      }
+      if (buffer.trim().length >= MIN_CHUNK_SIZE) {
+        chunks.push({
+          content: buffer.trim(),
+          chapter: currentChapter,
+          pageStart: pageNum,
+          pageEnd: pageNum,
+          tokenCount: estimateTokens(buffer),
+        });
+      }
+    }
+  } else {
+    // 无页面信息时，直接对全文分块
+    const subChunks = slidingWindowSplit(text, MAX_CHUNK_SIZE, OVERLAP);
+    subChunks.forEach((sc, idx) => {
+      chunks.push({
+        content: sc,
+        chapter: null,
+        pageStart: null,
+        pageEnd: null,
+        tokenCount: estimateTokens(sc),
+      });
+    });
+  }
+
+  return chunks.filter((c) => c.content.trim().length >= MIN_CHUNK_SIZE);
+}
+
+// ─── 滑动窗口分割 ─────────────────────────────────────────────────────────────
+function slidingWindowSplit(
+  text: string,
+  maxSize: number,
+  overlap: number
+): string[] {
+  const chunks: string[] = [];
+  let start = 0;
+  while (start < text.length) {
+    const end = Math.min(start + maxSize, text.length);
+    chunks.push(text.slice(start, end));
+    start += maxSize - overlap;
+    if (start >= text.length) break;
+  }
+  return chunks;
+}
+
+// ─── Token 估算（中文约 1.5 字符/token，英文约 4 字符/token）────────────────
+function estimateTokens(text: string): number {
+  const chineseChars = (text.match(/[\u4e00-\u9fff]/g) || []).length;
+  const otherChars = text.length - chineseChars;
+  return Math.ceil(chineseChars / 1.5 + otherChars / 4);
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}

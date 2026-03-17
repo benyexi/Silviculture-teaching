@@ -5,31 +5,58 @@ import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
+import TeacherLayout from "./pages/teacher/TeacherLayout";
+import TeacherDashboard from "./pages/teacher/TeacherDashboard";
+import TeacherMaterials from "./pages/teacher/TeacherMaterials";
+import TeacherQueries from "./pages/teacher/TeacherQueries";
+import TeacherLlmConfig from "./pages/teacher/TeacherLlmConfig";
 
 function Router() {
-  // make sure to consider if you need authentication for certain routes
   return (
     <Switch>
-      <Route path={"/"} component={Home} />
-      <Route path={"/404"} component={NotFound} />
-      {/* Final fallback route */}
+      {/* 学生端（公开） */}
+      <Route path="/" component={Home} />
+
+      {/* 教师端（需要 admin 角色） */}
+      <Route path="/teacher">
+        {() => (
+          <TeacherLayout>
+            <TeacherDashboard />
+          </TeacherLayout>
+        )}
+      </Route>
+      <Route path="/teacher/materials">
+        {() => (
+          <TeacherLayout>
+            <TeacherMaterials />
+          </TeacherLayout>
+        )}
+      </Route>
+      <Route path="/teacher/queries">
+        {() => (
+          <TeacherLayout>
+            <TeacherQueries />
+          </TeacherLayout>
+        )}
+      </Route>
+      <Route path="/teacher/llm-config">
+        {() => (
+          <TeacherLayout>
+            <TeacherLlmConfig />
+          </TeacherLayout>
+        )}
+      </Route>
+
+      <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>
   );
 }
 
-// NOTE: About Theme
-// - First choose a default theme according to your design style (dark or light bg), than change color palette in index.css
-//   to keep consistent foreground/background color across components
-// - If you want to make theme switchable, pass `switchable` ThemeProvider and use `useTheme` hook
-
 function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider
-        defaultTheme="light"
-        // switchable
-      >
+      <ThemeProvider defaultTheme="light">
         <TooltipProvider>
           <Toaster />
           <Router />

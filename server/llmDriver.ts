@@ -1,0 +1,189 @@
+/**
+ * LLM 驱动层 — 支持 OpenAI / DeepSeek / 通义千问 / Ollama / 自定义端点
+ * 配置从数据库动态读取，修改后立即生效，无需重启服务。
+ */
+import OpenAI from "openai";
+import { getDb } from "./db";
+import { llmConfigs } from "../drizzle/schema";
+import { eq } from "drizzle-orm";
+
+// ─── 类型定义 ─────────────────────────────────────────────────────────────────
+export type LLMMessage = {
+  role: "system" | "user" | "assistant";
+  content: string;
+};
+
+export type LLMResponse = {
+  content: string;
+  model: string;
+  promptTokens?: number;
+  completionTokens?: number;
+};
+
+export type EmbeddingResponse = {
+  embedding: number[];
+  model: string;
+};
+
+// ─── 获取当前激活的 LLM 配置 ─────────────────────────────────────────────────
+export async function getActiveLlmConfig() {
+  const db = await getDb();
+  if (!db) throw new Error("数据库不可用");
+
+  const configs = await db
+    .select()
+    .from(llmConfigs)
+    .where(eq(llmConfigs.isActive, true))
+    .limit(1);
+
+  if (configs.length === 0) {
+    // 回退到内置 Forge API
+    return null;
+  }
+  return configs[0];
+}
+
+// ─── 构建 OpenAI 兼容客户端 ───────────────────────────────────────────────────
+function buildOpenAIClient(apiKey: string, baseURL?: string | null): OpenAI {
+  return new OpenAI({
+    apiKey,
+    baseURL: baseURL || undefined,
+  });
+}
+
+// ─── 获取各 Provider 的默认 Base URL ─────────────────────────────────────────
+function getProviderBaseUrl(provider: string, customUrl?: string | null): string | undefined {
+  if (customUrl) return customUrl;
+  switch (provider) {
+    case "deepseek":
+      return "https://api.deepseek.com/v1";
+    case "qwen":
+      return "https://dashscope.aliyuncs.com/compatible-mode/v1";
+    case "ollama":
+      return "http://localhost:11434/v1";
+    default:
+      return undefined; // OpenAI 默认
+  }
+}
+
+// ─── 主推理接口 ───────────────────────────────────────────────────────────────
+export async function invokeLLMWithConfig(
+  messages: LLMMessage[],
+  systemPrompt?: string
+): Promise<LLMResponse> {
+  const config = await getActiveLlmConfig();
+
+  // 如果没有自定义配置，使用内置 Forge API
+  if (!config) {
+    return invokeBuiltinLLM(messages, systemPrompt);
+  }
+
+  const allMessages: LLMMessage[] = [];
+  if (systemPrompt) {
+    allMessages.push({ role: "system", content: systemPrompt });
+  }
+  allMessages.push(...messages);
+
+  const baseURL = getProviderBaseUrl(config.provider, config.apiBaseUrl);
+  const apiKey = config.apiKey || "ollama"; // Ollama 不需要真实 key
+
+  const client = buildOpenAIClient(apiKey, baseURL);
+
+  const response = await client.chat.completions.create({
+    model: config.modelName,
+    messages: allMessages,
+    temperature: config.temperature ?? 0.1,
+    max_tokens: config.maxTokens ?? 4096,
+  });
+
+  const content = response.choices[0]?.message?.content || "";
+  return {
+    content,
+    model: config.modelName,
+    promptTokens: response.usage?.prompt_tokens,
+    completionTokens: response.usage?.completion_tokens,
+  };
+}
+
+// ─── 内置 Forge API 回退 ──────────────────────────────────────────────────────
+async function invokeBuiltinLLM(
+  messages: LLMMessage[],
+  systemPrompt?: string
+): Promise<LLMResponse> {
+  const { invokeLLM } = await import("./_core/llm");
+
+  const allMessages: Array<{ role: string; content: string }> = [];
+  if (systemPrompt) {
+    allMessages.push({ role: "system", content: systemPrompt });
+  }
+  allMessages.push(...messages);
+
+  const response = await invokeLLM({ messages: allMessages as Array<{ role: "system" | "user" | "assistant"; content: string }> });
+  const rawContent = response.choices[0]?.message?.content;
+  const content = typeof rawContent === "string" ? rawContent : "";
+  return {
+    content,
+    model: "built-in",
+  };
+}
+
+// ─── Embedding 接口 ───────────────────────────────────────────────────────────
+export async function getEmbedding(text: string): Promise<number[]> {
+  const config = await getActiveLlmConfig();
+
+  // 优先使用配置中的 Embedding 设置
+  if (config?.embeddingModel && config?.embeddingApiKey) {
+    const baseURL = getProviderBaseUrl(config.provider, config.embeddingBaseUrl);
+    const client = buildOpenAIClient(config.embeddingApiKey, baseURL);
+
+    const response = await client.embeddings.create({
+      model: config.embeddingModel,
+      input: text,
+    });
+    return response.data[0].embedding;
+  }
+
+  // 回退：使用内置 Forge API 的 Embedding
+  return invokeBuiltinEmbedding(text);
+}
+
+async function invokeBuiltinEmbedding(text: string): Promise<number[]> {
+  const apiUrl = process.env.BUILT_IN_FORGE_API_URL;
+  const apiKey = process.env.BUILT_IN_FORGE_API_KEY;
+
+  if (!apiUrl || !apiKey) {
+    throw new Error("内置 Forge API 未配置，请在教师端配置 LLM 模型");
+  }
+
+  const response = await fetch(`${apiUrl}/embeddings`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: "text-embedding-3-small",
+      input: text,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Embedding API 请求失败: ${response.statusText}`);
+  }
+
+  const data = await response.json() as any;
+  return data.data[0].embedding as number[];
+}
+
+// ─── 余弦相似度计算 ───────────────────────────────────────────────────────────
+export function cosineSimilarity(a: number[], b: number[]): number {
+  if (a.length !== b.length) return 0;
+  let dot = 0, normA = 0, normB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    normA += a[i] * a[i];
+    normB += b[i] * b[i];
+  }
+  if (normA === 0 || normB === 0) return 0;
+  return dot / (Math.sqrt(normA) * Math.sqrt(normB));
+}

@@ -43,39 +43,40 @@
 }
 
 :root {
-  --primary: var(--color-blue-700);
-  --primary-foreground: var(--color-blue-50);
-  --sidebar-primary: var(--color-blue-600);
-  --sidebar-primary-foreground: var(--color-blue-50);
-  --chart-1: var(--color-blue-300);
-  --chart-2: var(--color-blue-500);
-  --chart-3: var(--color-blue-600);
-  --chart-4: var(--color-blue-700);
-  --chart-5: var(--color-blue-800);
-  --radius: 0.65rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.235 0.015 65);
+  --radius: 0.625rem;
+  /* 森林绿学术主题 */
+  --background: oklch(0.98 0.005 145);
+  --foreground: oklch(0.18 0.02 145);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.235 0.015 65);
+  --card-foreground: oklch(0.18 0.02 145);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.235 0.015 65);
-  --secondary: oklch(0.98 0.001 286.375);
-  --secondary-foreground: oklch(0.4 0.015 65);
-  --muted: oklch(0.967 0.001 286.375);
-  --muted-foreground: oklch(0.552 0.016 285.938);
-  --accent: oklch(0.967 0.001 286.375);
-  --accent-foreground: oklch(0.141 0.005 285.823);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.92 0.004 286.32);
-  --input: oklch(0.92 0.004 286.32);
-  --ring: oklch(0.623 0.214 259.815);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.235 0.015 65);
-  --sidebar-accent: oklch(0.967 0.001 286.375);
-  --sidebar-accent-foreground: oklch(0.141 0.005 285.823);
-  --sidebar-border: oklch(0.92 0.004 286.32);
-  --sidebar-ring: oklch(0.623 0.214 259.815);
+  --popover-foreground: oklch(0.18 0.02 145);
+  --primary: oklch(0.38 0.12 145);
+  --primary-foreground: oklch(0.98 0.005 145);
+  --secondary: oklch(0.94 0.02 145);
+  --secondary-foreground: oklch(0.28 0.08 145);
+  --muted: oklch(0.94 0.01 145);
+  --muted-foreground: oklch(0.52 0.04 145);
+  --accent: oklch(0.90 0.04 145);
+  --accent-foreground: oklch(0.28 0.08 145);
+  --destructive: oklch(0.55 0.22 25);
+  --destructive-foreground: oklch(0.98 0 0);
+  --border: oklch(0.88 0.02 145);
+  --input: oklch(0.88 0.02 145);
+  --ring: oklch(0.38 0.12 145);
+  --chart-1: oklch(0.38 0.12 145);
+  --chart-2: oklch(0.52 0.14 180);
+  --chart-3: oklch(0.65 0.16 200);
+  --chart-4: oklch(0.72 0.12 100);
+  --chart-5: oklch(0.58 0.18 60);
+  --sidebar: oklch(0.22 0.06 145);
+  --sidebar-foreground: oklch(0.92 0.02 145);
+  --sidebar-primary: oklch(0.62 0.14 145);
+  --sidebar-primary-foreground: oklch(0.98 0.005 145);
+  --sidebar-accent: oklch(0.30 0.08 145);
+  --sidebar-accent-foreground: oklch(0.92 0.02 145);
+  --sidebar-border: oklch(0.32 0.06 145);
+  --sidebar-ring: oklch(0.62 0.14 145);
 }
 
 .dark {
@@ -119,6 +120,10 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  }
+  h1, h2, h3 {
+    font-family: "Noto Serif SC", "SimSun", serif;
   }
   button:not(:disabled),
   [role="button"]:not([aria-disabled="true"]),
