@@ -104,38 +104,41 @@ export async function processMaterial(
   }
 }
 
-// ─── PDF 文本提取 ─────────────────────────────────────────────────────────────
+// ─── PDF 文本提取（pdf-parse v1.1.1，支持 Buffer 输入）──────────────────────────
 async function extractPdfText(
   pdfBuffer: Buffer
 ): Promise<{ text: string; pageTexts: string[] }> {
-  // 动态导入 pdf-parse（避免 ESM 兼容问题）
-  const pdfParseModule = await import("pdf-parse");
-  const pdfParse = (pdfParseModule as any).default ?? pdfParseModule;
+  // 使用 createRequire 在 ESM 环境中加载 CJS 模块
+  const { createRequire } = await import("module");
+  const require = createRequire(import.meta.url);
+  // 直接加载 lib/pdf-parse.js 避免 index.js 的测试代码问题
+  const pdfParse = require("pdf-parse/lib/pdf-parse.js") as (buf: Buffer, opts?: any) => Promise<{ text: string; numpages: number }>;
 
   const pageTexts: string[] = [];
-  let pageCount = 0;
 
   const data = await pdfParse(pdfBuffer, {
+    // 逐页回调，收集每页文本
     pagerender: (pageData: any) => {
       return pageData.getTextContent().then((textContent: any) => {
-        const pageText = textContent.items
-          .map((item: any) => item.str)
-          .join(" ");
+        const items: any[] = textContent.items || [];
+        const pageText = items
+          .map((item: any) => item.str || "")
+          .join(" ")
+          .replace(/\s+/g, " ")
+          .trim();
         pageTexts.push(pageText);
-        pageCount++;
         return pageText;
       });
     },
   });
 
-  // 如果 pagerender 没有触发，使用 data.text
+  // 如果 pagerender 没有触发（某些 PDF 格式），使用 data.text 按换页符分割
   if (pageTexts.length === 0 && data.text) {
-    // 按换页符分割
     const pages = data.text.split(/\f/);
     pageTexts.push(...pages.filter((p: string) => p.trim().length > 0));
   }
 
-  return { text: data.text, pageTexts };
+  return { text: data.text || pageTexts.join("\n"), pageTexts };
 }
 
 // ─── 智能文本分块 ─────────────────────────────────────────────────────────────

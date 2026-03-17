@@ -71,3 +71,4 @@
 - [x] 拉取 CODEX commit bf43f69，集成 qaService.ts 改动（手动集成，commit未在GitHub上找到）
 - [x] 运行测试验证通过（20/20）
 - [x] 调查教材“处理中”卡住原因：finalizeUpload在修复前失败，已清理旧记录，需重新上传教材
+- [x] 修复 pdfParse is not a function 错误（降级至 pdf-parse@1.1.1，使用 createRequire 在 ESM 中加载 CJS）
