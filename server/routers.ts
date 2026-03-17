@@ -117,6 +117,7 @@ export const appRouter = router({
           publisher: z.string().optional(),
           publishYear: z.string().optional(),
           edition: z.string().optional(),
+          language: z.enum(["zh", "en"]).optional(),
         })
       )
       .mutation(async ({ input, ctx }) => {
@@ -180,6 +181,7 @@ export const appRouter = router({
           publisher: z.string().optional(),
           publishYear: z.string().optional(),
           edition: z.string().optional(),
+          language: z.enum(["zh", "en"]).optional(),
         })
       )
       .mutation(async ({ input, ctx }) => {
@@ -211,6 +213,7 @@ export const appRouter = router({
           publisher: input.publisher,
           publishYear: input.publishYear,
           edition: input.edition,
+          language: input.language ?? "zh",
           fileKey,
           fileUrl,
           fileSizeBytes: fullBuffer.length,

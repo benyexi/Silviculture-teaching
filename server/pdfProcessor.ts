@@ -6,6 +6,7 @@ import { getDb } from "./db";
 import { materials, materialChunks } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
 import { storeChunkVector } from "./vectorSearch";
+import { detectDocumentLanguage } from "./languageDetect";
 
 // ─── 文本块类型 ───────────────────────────────────────────────────────────────
 type TextChunk = {
@@ -37,6 +38,8 @@ export async function processMaterial(
     // 1. 提取 PDF 文本
     console.log(`[PDF] 开始提取教材 ${materialId} 的文本...`);
     const { text, pageTexts } = await extractPdfText(pdfBuffer);
+    const detectedLanguage = detectDocumentLanguage(text);
+    console.log(`[PDF] 检测到教材语言: ${detectedLanguage}`);
 
     // 2. 智能分块
     console.log(`[PDF] 开始分块，总文本长度: ${text.length} 字符`);
@@ -78,7 +81,7 @@ export async function processMaterial(
     // 5. 更新教材状态为已发布
     await db
       .update(materials)
-      .set({ status: "published", totalChunks: chunks.length })
+      .set({ status: "published", totalChunks: chunks.length, language: detectedLanguage })
       .where(eq(materials.id, materialId));
 
     console.log(`[PDF] 教材 ${materialId} 处理完成！`);

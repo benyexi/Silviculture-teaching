@@ -18,6 +18,9 @@ type AnswerResult = {
   responseTimeMs: number;
   queryId: number;
   foundInMaterials: boolean;
+  questionLanguage: "zh" | "en";
+  enAnswer?: string;
+  enSources?: QuerySource[];
 };
 
 export default function Home() {
@@ -254,6 +257,31 @@ export default function Home() {
                           </Button>
                           {feedbackSubmitted && (
                             <span className="text-sm text-muted-foreground">感谢反馈！</span>
+                          )}
+                        </div>
+                      )}
+
+                      {result.questionLanguage === "zh" && result.enAnswer && (
+                        <div className="mt-4 pt-4 border-t border-border">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
+                              英文教材补充
+                            </span>
+                          </div>
+                          <div className="prose prose-sm max-w-none text-foreground leading-relaxed">
+                            <Streamdown>{result.enAnswer}</Streamdown>
+                          </div>
+                          {result.enSources && result.enSources.length > 0 && (
+                            <div className="mt-3 space-y-2">
+                              {result.enSources.map((source, idx) => (
+                                <SourceCard
+                                  key={`en-${idx}`}
+                                  source={source}
+                                  index={idx + 1}
+                                  keywords={extractHighlightKeywords(askedQuestion)}
+                                />
+                              ))}
+                            </div>
                           )}
                         </div>
                       )}

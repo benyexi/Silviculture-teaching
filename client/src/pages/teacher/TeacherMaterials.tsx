@@ -7,6 +7,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -173,6 +180,7 @@ function UploadForm({ onSuccess }: { onSuccess: () => void }) {
   const [publisher, setPublisher] = useState("");
   const [publishYear, setPublishYear] = useState("");
   const [edition, setEdition] = useState("");
+  const [language, setLanguage] = useState<"zh" | "en">("zh");
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [statusText, setStatusText] = useState("");
@@ -216,6 +224,7 @@ function UploadForm({ onSuccess }: { onSuccess: () => void }) {
         publisher,
         publishYear,
         edition,
+        language,
       });
 
       // 2. 分块上传
@@ -252,6 +261,7 @@ function UploadForm({ onSuccess }: { onSuccess: () => void }) {
         publisher: publisher || undefined,
         publishYear: publishYear || undefined,
         edition: edition || undefined,
+        language,
       });
 
       setProgress(100);
@@ -354,6 +364,21 @@ function UploadForm({ onSuccess }: { onSuccess: () => void }) {
             disabled={uploading}
             className="mt-1"
           />
+        </div>
+        <div className="col-span-2">
+          <Label className="text-sm font-medium">教材语言</Label>
+          <Select value={language} onValueChange={(v) => setLanguage(v as "zh" | "en")}>
+            <SelectTrigger className="mt-1">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="zh">中文</SelectItem>
+              <SelectItem value="en">English</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground mt-1">
+            也可上传后由系统自动检测
+          </p>
         </div>
       </div>
 

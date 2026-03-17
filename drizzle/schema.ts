@@ -44,6 +44,7 @@ export const materials = mysqlTable("materials", {
     .notNull(),
   errorMessage: text("errorMessage"),
   totalChunks: int("totalChunks").default(0),
+  language: mysqlEnum("language", ["zh", "en"]).default("zh").notNull(),
   uploadedBy: int("uploadedBy"),                             // FK → users.id
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),

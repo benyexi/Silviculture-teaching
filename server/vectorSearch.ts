@@ -11,6 +11,7 @@
 import { getDb } from "./db";
 import { materialChunks, materials } from "../drizzle/schema";
 import { eq, inArray, and, like, or } from "drizzle-orm";
+import { detectLanguage } from "./languageDetect";
 
 // ─── 检索结果类型 ─────────────────────────────────────────────────────────────
 export type SearchResult = {
@@ -153,6 +154,40 @@ export function extractKeywords(text: string): string[] {
   return Array.from(new Set(keywords)).filter(k => !stopWords.has(k) && k.length >= 2);
 }
 
+const EN_STOP_WORDS = new Set([
+  "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for",
+  "of", "with", "by", "from", "is", "are", "was", "were", "be", "been",
+  "being", "have", "has", "had", "do", "does", "did", "will", "would",
+  "could", "should", "may", "might", "shall", "can", "this", "that",
+  "these", "those", "it", "its", "what", "which", "who", "how", "when",
+  "where", "why", "not", "no", "nor", "so", "yet", "both", "either",
+]);
+
+export function extractKeywordsEn(text: string): string[] {
+  const words = text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length >= 3 && !EN_STOP_WORDS.has(w));
+
+  const keywords = [...new Set(words)];
+
+  const wordArr = text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length >= 3 && !EN_STOP_WORDS.has(w));
+
+  for (let i = 0; i < wordArr.length - 1; i++) {
+    const bigram = `${wordArr[i]} ${wordArr[i + 1]}`;
+    if (!EN_STOP_WORDS.has(wordArr[i]) && !EN_STOP_WORDS.has(wordArr[i + 1])) {
+      keywords.push(bigram);
+    }
+  }
+
+  return [...new Set(keywords)].slice(0, 15);
+}
+
 // ─── 计算文本与关键词的匹配分数（改进版 TF-IDF 启发式）──────────────────────
 function scoreChunk(content: string, keywords: string[], originalQuestion: string, chapter?: string): number {
   if (keywords.length === 0) return 0;
@@ -208,17 +243,20 @@ function scoreChunk(content: string, keywords: string[], originalQuestion: strin
 // ─── 关键词检索 Top-K ─────────────────────────────────────────────────────────
 export async function semanticSearch(
   question: string,
+  materialIds?: number[],
   topK: number = 8,
-  materialIds?: number[]
+  languageFilter: "zh" | "en" | "all" = "all"
 ): Promise<SearchResult[]> {
   const db = await getDb();
   if (!db) throw new Error("数据库不可用");
 
-  const rawKeywords = extractKeywords(question);
+  const questionLang = detectLanguage(question);
+  const rawKeywords =
+    questionLang === "en" ? extractKeywordsEn(question) : extractKeywords(question);
   if (rawKeywords.length === 0) return [];
 
   // 同义词扩展：增加检索召回率
-  const keywords = expandWithSynonyms(rawKeywords);
+  const keywords = questionLang === "en" ? rawKeywords : expandWithSynonyms(rawKeywords);
 
   // 从数据库获取所有已发布教材的 chunks
   // 策略：使用所有关键词（包括长词和同义词）做 SQL 过滤，OR 条件
@@ -232,6 +270,7 @@ export async function semanticSearch(
 
   const baseWhere = and(
     eq(materials.status, 'published'),
+    languageFilter !== "all" ? eq(materials.language, languageFilter) : undefined,
     materialIds && materialIds.length > 0
       ? inArray(materialChunks.materialId, materialIds)
       : undefined,
