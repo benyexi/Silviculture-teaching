@@ -3,8 +3,9 @@
  * 由于 Forge API 不支持 Embedding 端点，本实现改用 MySQL 全文关键词检索。
  * 检索策略：
  *   1. 对问题进行分词（提取关键词）
- *   2. 使用 MySQL LIKE 多关键词匹配，计算命中分数
- *   3. 返回 Top-K 最相关的教材片段
+ *   2. 多策略检索：精确短语 + 关键词 OR 匹配
+ *   3. 使用 TF-IDF 启发式评分，长关键词权重更高
+ *   4. 返回 Top-K 最相关的教材片段
  * 对于 10 本教材（约 5000-10000 个 chunk），此方案完全满足性能需求。
  */
 import { getDb } from "./db";
@@ -23,12 +24,43 @@ export type SearchResult = {
   similarity: number;
 };
 
+// ─── 林业领域同义词扩展表 ───────────────────────────────────────────────────
+const SYNONYM_MAP: Record<string, string[]> = {
+  '造林密度': ['林分密度', '初植密度', '种植密度', '密度'],
+  '林分密度': ['造林密度', '初植密度', '种植密度', '密度'],
+  '造林': ['人工林', '植树', '营造林', '造林更新'],
+  '立地质量': ['立地条件', '立地指数', '地位指数', '立地'],
+  '树种选择': ['适地适树', '树种配置', '造林树种'],
+  '苗木质量': ['苗木规格', '苗木标准', '苗木等级'],
+  '抚育间伐': ['间伐', '疏伐', '抚育采伐', '透光伐'],
+  '森林更新': ['天然更新', '人工更新', '更新造林'],
+  '整地': ['土地整理', '造林整地', '整地方式'],
+  '施肥': ['林木施肥', '追肥', '基肥', '肥料'],
+};
+
+function expandWithSynonyms(keywords: string[]): string[] {
+  const expanded = new Set(keywords);
+  for (const kw of keywords) {
+    if (SYNONYM_MAP[kw]) {
+      SYNONYM_MAP[kw].forEach(syn => expanded.add(syn));
+    }
+    // 反向查找
+    for (const [key, syns] of Object.entries(SYNONYM_MAP)) {
+      if (syns.includes(kw)) {
+        expanded.add(key);
+        syns.forEach(s => expanded.add(s));
+      }
+    }
+  }
+  return Array.from(expanded);
+}
+
 // ─── 中文分词（基于 n-gram 提取关键词）───────────────────────
-function extractKeywords(text: string): string[] {
+export function extractKeywords(text: string): string[] {
   // 移除标点符号和常见问句词
   const cleaned = text
-    .replace(/[，。？！、；：“”‘’（）【】《》、？!?,;:"'()\[\]]/g, " ")
-    .replace(/什么是|如何|怎么|怎样|为什么|哪些|请问|介绍|说明|解释|试述|分析|比较|请说明|请介绍/g, " ")
+    .replace(/[，。？！、；：""''（）【】《》、？!?,;:"'()\[\]]/g, " ")
+    .replace(/什么是|如何|怎么|怎样|为什么|哪些|请问|介绍|说明|解释|试述|分析|比较|请说明|请介绍|阐述|论述/g, " ")
     .trim();
   
   const keywords: string[] = [];
@@ -81,16 +113,19 @@ function extractKeywords(text: string): string[] {
   return Array.from(new Set(keywords)).filter(k => !stopWords.has(k) && k.length >= 2);
 }
 
-// ─── 计算文本与关键词的匹配分数 ───────────────────────────────────────────────
-function scoreChunk(content: string, keywords: string[]): number {
+// ─── 计算文本与关键词的匹配分数（改进版 TF-IDF 启发式）──────────────────────
+function scoreChunk(content: string, keywords: string[], originalQuestion: string): number {
   if (keywords.length === 0) return 0;
   const lowerContent = content.toLowerCase();
   let score = 0;
   let matchedKeywords = 0;
   
+  // 提取原始问题中的核心词（长度>=3的词优先）
+  const coreKeywords = keywords.filter(k => k.length >= 3);
+  const shortKeywords = keywords.filter(k => k.length < 3);
+  
   for (const kw of keywords) {
     const lowerKw = kw.toLowerCase();
-    // 计算关键词出现次数
     let pos = 0;
     let count = 0;
     while ((pos = lowerContent.indexOf(lowerKw, pos)) !== -1) {
@@ -99,14 +134,32 @@ function scoreChunk(content: string, keywords: string[]): number {
     }
     if (count > 0) {
       matchedKeywords++;
-      // TF 分数：出现次数 / 内容长度，并乘以关键词长度权重（长词更重要）
-      score += (count / (content.length / 100)) * Math.log(kw.length + 1);
+      // 长关键词权重更高（指数级），短词权重较低
+      const lengthWeight = Math.pow(kw.length, 1.5);
+      // TF 分数：出现次数 / 内容长度
+      const tf = count / (content.length / 100);
+      score += tf * lengthWeight;
     }
   }
   
-  // 覆盖率加权：匹配到的关键词比例
-  const coverageBonus = matchedKeywords / keywords.length;
-  return score * (0.5 + 0.5 * coverageBonus);
+  // 核心关键词覆盖率加权
+  const coreCoverage = coreKeywords.length > 0
+    ? coreKeywords.filter(k => lowerContent.includes(k.toLowerCase())).length / coreKeywords.length
+    : 0;
+  
+  // 总覆盖率
+  const totalCoverage = matchedKeywords / keywords.length;
+  
+  // 如果原始问题中的关键词（4字以上）直接出现在内容中，大幅加分
+  const longPhrases = keywords.filter(k => k.length >= 4);
+  let phraseBonus = 0;
+  for (const phrase of longPhrases) {
+    if (lowerContent.includes(phrase.toLowerCase())) {
+      phraseBonus += phrase.length * 2;
+    }
+  }
+  
+  return (score * (0.4 + 0.6 * coreCoverage)) + phraseBonus;
 }
 
 // ─── 关键词检索 Top-K ─────────────────────────────────────────────────────────
@@ -118,18 +171,31 @@ export async function semanticSearch(
   const db = await getDb();
   if (!db) throw new Error("数据库不可用");
 
-  const keywords = extractKeywords(question);
-  if (keywords.length === 0) return [];
+  const rawKeywords = extractKeywords(question);
+  if (rawKeywords.length === 0) return [];
+  
+  // 同义词扩展：增加检索召回率
+  const keywords = expandWithSynonyms(rawKeywords);
 
   // 从数据库获取所有已发布教材的 chunks
-  // 为避免全表扫描，先用 LIKE 过滤出包含至少一个关键词的 chunks
-  const topKeywords = keywords.slice(0, 5); // 最多用5个关键词做 SQL 过滤
+  // 策略：使用所有关键词（包括长词和同义词）做 SQL 过滤，OR 条件
+  // 优先使用长关键词（更精确），最多使用 10 个
+  const sortedKeywords = [...keywords].sort((a, b) => b.length - a.length);
+  const sqlKeywords = sortedKeywords.slice(0, 10);
   
-  const likeConditions = topKeywords.map(kw => 
+  const likeConditions = sqlKeywords.map(kw => 
     like(materialChunks.content, `%${kw}%`)
   );
   
-  let query = db
+  const baseWhere = and(
+    eq(materials.status, 'published'),
+    materialIds && materialIds.length > 0
+      ? inArray(materialChunks.materialId, materialIds)
+      : undefined,
+    or(...likeConditions)
+  );
+
+  const candidates = await db
     .select({
       id: materialChunks.id,
       materialId: materialChunks.materialId,
@@ -140,25 +206,15 @@ export async function semanticSearch(
     })
     .from(materialChunks)
     .innerJoin(materials, eq(materialChunks.materialId, materials.id))
-    .where(
-      and(
-        eq(materials.status, 'published'),
-        materialIds && materialIds.length > 0
-          ? inArray(materialChunks.materialId, materialIds)
-          : undefined,
-        or(...likeConditions)
-      )
-    )
-    .limit(200); // 候选集最多200个，再在应用层精排
-
-  const candidates = await query;
+    .where(baseWhere)
+    .limit(300); // 候选集最多300个，再在应用层精排
   
   if (candidates.length === 0) return [];
 
   // 应用层精排：计算每个 chunk 的关键词匹配分数
   const scored = candidates.map(chunk => ({
     ...chunk,
-    score: scoreChunk(chunk.content, keywords),
+    score: scoreChunk(chunk.content, keywords, question),
   }));
 
   // 按分数降序排列，取 Top-K
@@ -184,7 +240,7 @@ export async function semanticSearch(
     pageStart: r.pageStart,
     pageEnd: r.pageEnd,
     content: r.content,
-    similarity: Math.min(r.score / 10, 1), // 归一化到 0-1
+    similarity: Math.min(r.score / 20, 1), // 归一化到 0-1
   }));
 }
 

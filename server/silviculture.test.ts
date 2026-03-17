@@ -119,12 +119,16 @@ vi.mock("./qaService", () => ({
   }),
 }));
 
-vi.mock("./vectorSearch", () => ({
-  semanticSearch: vi.fn().mockResolvedValue([]),
-  storeChunkVector: vi.fn().mockResolvedValue(undefined),
-  invalidateMaterialCache: vi.fn(),
-  forceRefreshCache: vi.fn().mockResolvedValue(undefined),
-}));
+vi.mock("./vectorSearch", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./vectorSearch")>();
+  return {
+    ...actual,
+    semanticSearch: vi.fn().mockResolvedValue([]),
+    storeChunkVector: vi.fn().mockResolvedValue(undefined),
+    invalidateMaterialCache: vi.fn(),
+    forceRefreshCache: vi.fn().mockResolvedValue(undefined),
+  };
+});
 
 vi.mock("./geoip", () => ({
   getGeoInfo: vi.fn().mockResolvedValue({
@@ -347,5 +351,46 @@ describe("stats", () => {
     const result = await caller.stats.recentQueries({ limit: 10 });
     expect(result).toBeInstanceOf(Array);
     expect(result[0].question).toBe("什么是立地质量？");
+  });
+});
+
+// ─── 关键词提取与同义词扩展测试 ───────────────────────────────────────────────
+import { extractKeywords } from "./vectorSearch";
+
+describe("extractKeywords", () => {
+  it("extracts meaningful keywords from a simple question", () => {
+    const kws = extractKeywords("造林密度如何确定？");
+    expect(kws).toContain("造林密度");
+    expect(kws).toContain("密度");
+    expect(kws).toContain("确定");
+    // Should NOT contain the question word itself as a single keyword
+    expect(kws).not.toContain("如何");
+  });
+
+  it("extracts keywords from a complex question", () => {
+    const kws = extractKeywords("什么是森林培育学？");
+    expect(kws).toContain("森林");
+    expect(kws).toContain("培育");
+    expect(kws.some(k => k.includes("森林培育"))).toBe(true);
+  });
+
+  it("handles questions about tree species selection", () => {
+    const kws = extractKeywords("树种选择的原则有哪些？");
+    expect(kws).toContain("树种");
+    expect(kws).toContain("选择");
+    expect(kws).toContain("原则");
+  });
+
+  it("removes stop words from extracted keywords", () => {
+    const kws = extractKeywords("什么是立地质量？");
+    expect(kws).not.toContain("什么");
+    expect(kws).not.toContain("是");
+    expect(kws).toContain("立地");
+    expect(kws).toContain("质量");
+  });
+
+  it("extracts English keywords", () => {
+    const kws = extractKeywords("什么是silviculture？");
+    expect(kws).toContain("silviculture");
   });
 });
