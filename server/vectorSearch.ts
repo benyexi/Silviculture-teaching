@@ -10,7 +10,7 @@
  */
 import { getDb } from "./db";
 import { materialChunks, materials } from "../drizzle/schema";
-import { eq, inArray, and, like, or, sql } from "drizzle-orm";
+import { eq, inArray, and, like, or } from "drizzle-orm";
 
 // ─── 检索结果类型 ─────────────────────────────────────────────────────────────
 export type SearchResult = {
@@ -36,6 +36,46 @@ const SYNONYM_MAP: Record<string, string[]> = {
   '森林更新': ['天然更新', '人工更新', '更新造林'],
   '整地': ['土地整理', '造林整地', '整地方式'],
   '施肥': ['林木施肥', '追肥', '基肥', '肥料'],
+
+  // 采伐与更新
+  '主伐': ['采伐', '皆伐', '择伐', '渐伐', '轮伐'],
+  '采伐': ['主伐', '皆伐', '择伐', '渐伐', '更新采伐'],
+  '天然更新': ['天然林更新', '自然更新', '萌芽更新', '根蘖更新'],
+  '人工更新': ['造林更新', '人工造林', '补植'],
+
+  // 林分结构
+  '郁闭度': ['林冠覆盖', '冠层郁闭', '林冠郁闭度'],
+  '树高': ['林木高度', '树木高度', '立木高度', '优势木高'],
+  '胸径': ['胸高直径', 'DBH', '直径', '林木直径'],
+  '蓄积量': ['林分蓄积', '木材蓄积', '立木蓄积'],
+
+  // 立地与土壤
+  '立地指数': ['地位指数', '立地质量指数', '立地等级'],
+  '土壤肥力': ['土壤养分', '土壤肥沃度', '土壤质量'],
+  '坡向': ['坡面方向', '阴坡', '阳坡', '半阴坡'],
+
+  // 苗木培育
+  '容器苗': ['营养袋苗', '穴盘苗', '容器育苗'],
+  '裸根苗': ['裸根育苗', '大田苗', '普通苗'],
+  '扦插': ['插条', '扦插繁殖', '营养繁殖'],
+
+  // 抚育管理
+  '透光伐': ['透光抚育', '幼林透光', '疏伐'],
+  '生长伐': ['生长抚育', '间伐', '疏伐'],
+  '卫生伐': ['卫生采伐', '清理采伐'],
+  '修枝': ['整枝', '剪枝', '林木修枝'],
+
+  // 混交林
+  '混交林': ['混交造林', '针阔混交', '乔灌混交'],
+  '纯林': ['单一树种林', '单树种造林'],
+
+  // 种子与繁殖
+  '种子园': ['母树林', '种子基地', '良种基地'],
+  '播种': ['直播造林', '播种造林', '撒播'],
+
+  // 保护与病虫害
+  '病虫害': ['森林病害', '森林虫害', '林木病虫', '病害防治'],
+  '防护林': ['防风林', '水土保持林', '水源涵养林'],
 };
 
 function expandWithSynonyms(keywords: string[]): string[] {
@@ -62,7 +102,7 @@ export function extractKeywords(text: string): string[] {
     .replace(/[，。？！、；：""''（）【】《》、？!?,;:"'()\[\]]/g, " ")
     .replace(/什么是|如何|怎么|怎样|为什么|哪些|请问|介绍|说明|解释|试述|分析|比较|请说明|请介绍|阐述|论述/g, " ")
     .trim();
-  
+
   const keywords: string[] = [];
   const stopWords = new Set([
     '的', '了', '在', '是', '我', '有', '和', '就', '不', '人', '都', '一',
@@ -71,14 +111,14 @@ export function extractKeywords(text: string): string[] {
     '需要', '能够', '进行', '实现', '就是', '也就', '不是', '就会',
     '主要', '基本', '一般', '通常', '具有', '包括', '属于'
   ]);
-  
+
   // 提取英文单词（3字母以上）
   const englishMatches = cleaned.match(/[a-zA-Z]{3,}/g) || [];
   keywords.push(...englishMatches.map(w => w.toLowerCase()));
-  
+
   // 提取中文：先按空格分割成词组，再提取 n-gram
   const segments = cleaned.split(/\s+/).filter(s => s.length > 0);
-  
+
   for (const seg of segments) {
     // 提取纯中文片段
     const chineseParts = seg.match(/[\u4e00-\u9fa5]+/g) || [];
@@ -109,21 +149,19 @@ export function extractKeywords(text: string): string[] {
       }
     }
   }
-  
+
   return Array.from(new Set(keywords)).filter(k => !stopWords.has(k) && k.length >= 2);
 }
 
 // ─── 计算文本与关键词的匹配分数（改进版 TF-IDF 启发式）──────────────────────
-function scoreChunk(content: string, keywords: string[], originalQuestion: string): number {
+function scoreChunk(content: string, keywords: string[], originalQuestion: string, chapter?: string): number {
   if (keywords.length === 0) return 0;
   const lowerContent = content.toLowerCase();
   let score = 0;
-  let matchedKeywords = 0;
-  
+
   // 提取原始问题中的核心词（长度>=3的词优先）
   const coreKeywords = keywords.filter(k => k.length >= 3);
-  const shortKeywords = keywords.filter(k => k.length < 3);
-  
+
   for (const kw of keywords) {
     const lowerKw = kw.toLowerCase();
     let pos = 0;
@@ -133,7 +171,6 @@ function scoreChunk(content: string, keywords: string[], originalQuestion: strin
       pos += lowerKw.length;
     }
     if (count > 0) {
-      matchedKeywords++;
       // 长关键词权重更高（指数级），短词权重较低
       const lengthWeight = Math.pow(kw.length, 1.5);
       // TF 分数：出现次数 / 内容长度
@@ -141,15 +178,12 @@ function scoreChunk(content: string, keywords: string[], originalQuestion: strin
       score += tf * lengthWeight;
     }
   }
-  
+
   // 核心关键词覆盖率加权
   const coreCoverage = coreKeywords.length > 0
     ? coreKeywords.filter(k => lowerContent.includes(k.toLowerCase())).length / coreKeywords.length
     : 0;
-  
-  // 总覆盖率
-  const totalCoverage = matchedKeywords / keywords.length;
-  
+
   // 如果原始问题中的关键词（4字以上）直接出现在内容中，大幅加分
   const longPhrases = keywords.filter(k => k.length >= 4);
   let phraseBonus = 0;
@@ -158,7 +192,16 @@ function scoreChunk(content: string, keywords: string[], originalQuestion: strin
       phraseBonus += phrase.length * 2;
     }
   }
-  
+
+  // 新增：章节标题匹配加分
+  if (chapter) {
+    for (const kw of keywords) {
+      if (chapter.includes(kw)) {
+        score += kw.length * 3;
+      }
+    }
+  }
+
   return (score * (0.4 + 0.6 * coreCoverage)) + phraseBonus;
 }
 
@@ -173,7 +216,7 @@ export async function semanticSearch(
 
   const rawKeywords = extractKeywords(question);
   if (rawKeywords.length === 0) return [];
-  
+
   // 同义词扩展：增加检索召回率
   const keywords = expandWithSynonyms(rawKeywords);
 
@@ -182,11 +225,11 @@ export async function semanticSearch(
   // 优先使用长关键词（更精确），最多使用 10 个
   const sortedKeywords = [...keywords].sort((a, b) => b.length - a.length);
   const sqlKeywords = sortedKeywords.slice(0, 10);
-  
-  const likeConditions = sqlKeywords.map(kw => 
+
+  const likeConditions = sqlKeywords.map(kw =>
     like(materialChunks.content, `%${kw}%`)
   );
-  
+
   const baseWhere = and(
     eq(materials.status, 'published'),
     materialIds && materialIds.length > 0
@@ -208,13 +251,13 @@ export async function semanticSearch(
     .innerJoin(materials, eq(materialChunks.materialId, materials.id))
     .where(baseWhere)
     .limit(300); // 候选集最多300个，再在应用层精排
-  
+
   if (candidates.length === 0) return [];
 
   // 应用层精排：计算每个 chunk 的关键词匹配分数
   const scored = candidates.map(chunk => ({
     ...chunk,
-    score: scoreChunk(chunk.content, keywords, question),
+    score: scoreChunk(chunk.content, keywords, question, chunk.chapter ?? undefined),
   }));
 
   // 按分数降序排列，取 Top-K

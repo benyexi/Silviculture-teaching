@@ -16,6 +16,9 @@ type TextChunk = {
   tokenCount: number;
 };
 
+const HEADING_PATTERN =
+  /^(第[一二三四五六七八九十百\d]+[章节]|[\d]+\.[\d]+[\s\S]{0,30}|[一二三四五六七八九十]+[、．])/;
+
 // ─── 主处理函数 ───────────────────────────────────────────────────────────────
 export async function processMaterial(
   materialId: number,
@@ -132,103 +135,81 @@ async function extractPdfText(
 // ─── 智能文本分块 ─────────────────────────────────────────────────────────────
 function splitIntoChunks(text: string, pageTexts: string[]): TextChunk[] {
   const chunks: TextChunk[] = [];
-  const MAX_CHUNK_SIZE = 800;  // 每块最大字符数
-  const MIN_CHUNK_SIZE = 100;  // 每块最小字符数
-  const OVERLAP = 100;         // 块间重叠字符数
+  const MAX_CHUNK_SIZE = 800;
+  const MIN_CHUNK_SIZE = 50;
 
-  // 章节检测正则（中文教材常见格式）
-  const chapterRegex = /^(第[一二三四五六七八九十百\d]+[章节篇][\s\S]{0,50}|[\d]+[\.、]\s*[\S]{2,30})/m;
+  const splitByHeading = (input: string, maxChunkSize = 800): string[] => {
+    const lines = input.split("\n");
+    const localChunks: string[] = [];
+    let currentChunk = "";
 
-  // 按页面处理，保留页码信息
+    for (const rawLine of lines) {
+      const line = rawLine.trim();
+      if (!line) continue;
+
+      const isHeading = HEADING_PATTERN.test(line);
+      if (isHeading && currentChunk.trim().length > 100) {
+        localChunks.push(currentChunk.trim());
+        currentChunk = `${line}\n`;
+      } else if (currentChunk.length + line.length > maxChunkSize) {
+        if (currentChunk.trim()) localChunks.push(currentChunk.trim());
+        currentChunk = `${line}\n`;
+      } else {
+        currentChunk += `${line}\n`;
+      }
+    }
+
+    if (currentChunk.trim()) localChunks.push(currentChunk.trim());
+
+    const merged: string[] = [];
+    for (const c of localChunks.filter((c) => c.length >= MIN_CHUNK_SIZE)) {
+      const last = merged[merged.length - 1];
+      if (last && last.length < 120 && last.length + c.length <= maxChunkSize) {
+        merged[merged.length - 1] = `${last}\n${c}`;
+      } else {
+        merged.push(c);
+      }
+    }
+    return merged;
+  };
+
   if (pageTexts.length > 0) {
     let currentChapter: string | null = null;
 
     for (let pageIdx = 0; pageIdx < pageTexts.length; pageIdx++) {
       const pageText = pageTexts[pageIdx].trim();
-      if (pageText.length < MIN_CHUNK_SIZE) continue;
+      if (!pageText) continue;
 
       const pageNum = pageIdx + 1;
+      const pageChunks = splitByHeading(pageText, MAX_CHUNK_SIZE);
 
-      // 检测章节标题
-      const chapterMatch = pageText.match(chapterRegex);
-      if (chapterMatch) {
-        currentChapter = chapterMatch[0].trim().substring(0, 100);
-      }
-
-      // 按段落分割页面文本
-      const paragraphs = pageText
-        .split(/\n{2,}|\r\n{2,}/)
-        .map((p) => p.trim())
-        .filter((p) => p.length >= MIN_CHUNK_SIZE);
-
-      if (paragraphs.length === 0) {
-        // 整页作为一个块
-        if (pageText.length <= MAX_CHUNK_SIZE) {
-          chunks.push({
-            content: pageText,
-            chapter: currentChapter,
-            pageStart: pageNum,
-            pageEnd: pageNum,
-            tokenCount: estimateTokens(pageText),
-          });
-        } else {
-          // 超长页面按固定大小分割
-          const subChunks = slidingWindowSplit(pageText, MAX_CHUNK_SIZE, OVERLAP);
-          subChunks.forEach((sc) => {
-            chunks.push({
-              content: sc,
-              chapter: currentChapter,
-              pageStart: pageNum,
-              pageEnd: pageNum,
-              tokenCount: estimateTokens(sc),
-            });
-          });
+      for (const piece of pageChunks) {
+        const firstLine = piece.split("\n")[0]?.trim() || "";
+        if (HEADING_PATTERN.test(firstLine)) {
+          currentChapter = firstLine.substring(0, 100);
         }
-        continue;
-      }
 
-      // 合并短段落，分割长段落
-      let buffer = "";
-      for (const para of paragraphs) {
-        if (buffer.length + para.length > MAX_CHUNK_SIZE) {
-          if (buffer.length >= MIN_CHUNK_SIZE) {
-            chunks.push({
-              content: buffer.trim(),
-              chapter: currentChapter,
-              pageStart: pageNum,
-              pageEnd: pageNum,
-              tokenCount: estimateTokens(buffer),
-            });
-          }
-          buffer = para.length > MAX_CHUNK_SIZE
-            ? para.substring(0, MAX_CHUNK_SIZE)
-            : para;
-        } else {
-          buffer = buffer ? `${buffer}\n${para}` : para;
-        }
-      }
-      if (buffer.trim().length >= MIN_CHUNK_SIZE) {
         chunks.push({
-          content: buffer.trim(),
+          content: piece,
           chapter: currentChapter,
           pageStart: pageNum,
           pageEnd: pageNum,
-          tokenCount: estimateTokens(buffer),
+          tokenCount: estimateTokens(piece),
         });
       }
     }
   } else {
-    // 无页面信息时，直接对全文分块
-    const subChunks = slidingWindowSplit(text, MAX_CHUNK_SIZE, OVERLAP);
-    subChunks.forEach((sc, idx) => {
+    const fullChunks = splitByHeading(text, MAX_CHUNK_SIZE);
+    for (const piece of fullChunks) {
+      const firstLine = piece.split("\n")[0]?.trim() || "";
       chunks.push({
-        content: sc,
-        chapter: null,
+        content: piece,
+        chapter: HEADING_PATTERN.test(firstLine) ? firstLine.substring(0, 100) : null,
         pageStart: null,
         pageEnd: null,
-        tokenCount: estimateTokens(sc),
+        tokenCount: estimateTokens(piece),
       });
-    });
+    }
   }
 
   return chunks.filter((c) => c.content.trim().length >= MIN_CHUNK_SIZE);
