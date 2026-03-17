@@ -1,5 +1,6 @@
 import {
   int,
+  tinyint,
   mysqlEnum,
   mysqlTable,
   text,
@@ -93,6 +94,7 @@ export type QuerySource = {
   pageStart: number | null;
   pageEnd: number | null;
   excerpt: string;
+  highlightedExcerpt?: string;
 };
 
 export type Query = typeof queries.$inferSelect;
@@ -163,3 +165,11 @@ export const uploadSessions = mysqlTable("upload_sessions", {
 export type S3Part = { partNumber: number; etag: string };
 export type UploadSession = typeof uploadSessions.$inferSelect;
 export type InsertUploadSession = typeof uploadSessions.$inferInsert;
+
+// ─── Query Feedback (答案反馈) ───────────────────────────────────────────────
+export const queryFeedback = mysqlTable("query_feedback", {
+  id: int("id").primaryKey().autoincrement(),
+  queryId: int("query_id").notNull(),
+  helpful: tinyint("helpful").notNull(), // 1=有帮助, 0=没帮助
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+});

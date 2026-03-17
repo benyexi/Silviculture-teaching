@@ -20,6 +20,8 @@ import {
   getTopQuestions,
   getMaterialUsageStats,
   getVisitorStats,
+  submitQueryFeedback,
+  getLowRatedQuestions,
   createUploadSession,
   getUploadSession,
   updateUploadSession,
@@ -68,6 +70,19 @@ export const appRouter = router({
           visitorLat: geo.lat || undefined,
           visitorLng: geo.lng || undefined,
         });
+      }),
+
+    submitFeedback: publicProcedure
+      .input(z.object({ queryId: z.number(), helpful: z.boolean() }))
+      .mutation(async ({ input }) => {
+        await submitQueryFeedback(input.queryId, input.helpful);
+        return { success: true };
+      }),
+
+    getLowRatedQuestions: protectedProcedure
+      .query(async ({ ctx }) => {
+        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        return await getLowRatedQuestions();
       }),
   }),
 

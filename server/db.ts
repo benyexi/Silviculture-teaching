@@ -9,6 +9,7 @@ import {
   llmConfigs,
   visitorStats,
   uploadSessions,
+  queryFeedback,
   type InsertMaterial,
   type InsertMaterialChunk,
   type InsertQuery,
@@ -165,6 +166,34 @@ export async function getQueryStats() {
     total: totalResult[0]?.count || 0,
     today: todayResult[0]?.count || 0,
   };
+}
+
+export async function submitQueryFeedback(queryId: number, helpful: boolean) {
+  const db = await getDb();
+  if (!db) throw new Error("数据库不可用");
+  await db.insert(queryFeedback).values({
+    queryId,
+    helpful: helpful ? 1 : 0,
+    createdAt: Date.now(),
+  });
+}
+
+export async function getLowRatedQuestions() {
+  const db = await getDb();
+  if (!db) return [];
+  const [rows] = await (db as any).$client.execute(`
+    SELECT q.id, q.question, q.answer, q.createdAt as created_at,
+           COUNT(f.id) as total_feedback,
+           SUM(CASE WHEN f.helpful = 0 THEN 1 ELSE 0 END) as unhelpful_count,
+           ROUND(SUM(CASE WHEN f.helpful = 0 THEN 1 ELSE 0 END) * 100.0 / COUNT(f.id), 1) as unhelpful_rate
+    FROM queries q
+    JOIN query_feedback f ON f.query_id = q.id
+    GROUP BY q.id
+    HAVING total_feedback >= 2 AND unhelpful_rate > 50
+    ORDER BY unhelpful_count DESC
+    LIMIT 20
+  `);
+  return rows as any[];
 }
 
 export async function getTopQuestions(limit = 10) {

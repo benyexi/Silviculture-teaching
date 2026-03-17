@@ -2,7 +2,7 @@
  * 问答生成服务（v2 — 集成 CODEX 改进）
  * 流程：问题向量化 → 语义检索 Top-5 → 构建结构化上下文 → LLM 生成 JSON 答案 → 解析引用 → 标注来源
  */
-import { semanticSearch, type SearchResult } from "./vectorSearch";
+import { semanticSearch, extractKeywords, type SearchResult } from "./vectorSearch";
 import { invokeLLMWithConfig } from "./llmDriver";
 import { createQuery, upsertVisitorStat } from "./db";
 import type { QuerySource } from "../drizzle/schema";
@@ -158,6 +158,7 @@ export async function generateAnswer(req: QARequest): Promise<QAResponse> {
   }
 
   const responseTimeMs = Date.now() - startTime;
+  const keywords = extractKeywords(req.question);
 
   // 6. 构建引用来源（包含教材名、章节、页码、原文摘录）
   const sources: QuerySource[] = usedSources.map((r) => ({
@@ -167,6 +168,7 @@ export async function generateAnswer(req: QARequest): Promise<QAResponse> {
     pageStart: r.pageStart,
     pageEnd: r.pageEnd,
     excerpt: r.content.substring(0, 200) + (r.content.length > 200 ? "..." : ""),
+    highlightedExcerpt: extractHighlightSentence(r.content, keywords),
   }));
 
   // 7. 记录查询到数据库
@@ -234,4 +236,21 @@ function isValidStructuredOutput(obj: unknown): obj is LLMStructuredOutput {
     Array.isArray(o.citation_indices) &&
     typeof o.confidence === "number"
   );
+}
+
+function extractHighlightSentence(content: string, keywords: string[]): string {
+  const sentences = content.split(/[。！？\n]/).filter((s) => s.trim().length > 10);
+  let best = sentences[0] || content.substring(0, 100);
+  let bestScore = 0;
+  for (const sentence of sentences) {
+    const score = keywords.reduce(
+      (acc, kw) => acc + (sentence.includes(kw) ? kw.length : 0),
+      0
+    );
+    if (score > bestScore) {
+      bestScore = score;
+      best = sentence;
+    }
+  }
+  return best.trim().substring(0, 150);
 }

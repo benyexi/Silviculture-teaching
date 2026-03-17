@@ -17,6 +17,7 @@ import { MessageSquare, Users, BookOpen, TrendingUp, MapPin } from "lucide-react
 
 export default function TeacherDashboard() {
   const { data, isLoading } = trpc.stats.overview.useQuery();
+  const { data: lowRatedQuestions } = trpc.qa.getLowRatedQuestions.useQuery();
 
   if (isLoading) {
     return (
@@ -118,6 +119,32 @@ export default function TeacherDashboard() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">待改进问题</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {(lowRatedQuestions || []).length === 0 ? (
+              <p className="text-muted-foreground text-sm text-center py-8">暂无待改进问题</p>
+            ) : (
+              <div className="space-y-3">
+                {(lowRatedQuestions || []).map((q: any) => (
+                  <div key={q.id} className="rounded-lg border border-border p-3">
+                    <p className="text-sm text-foreground line-clamp-2">{q.question}</p>
+                    <div className="mt-2 flex items-center gap-2">
+                      <Badge variant="outline" className="text-red-500 border-red-200">
+                        差评率 {q.unhelpful_rate}%
+                      </Badge>
+                      <Badge variant="secondary">差评 {q.unhelpful_count}</Badge>
+                      <Badge variant="secondary">反馈 {q.total_feedback}</Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* 热门问题 */}
         <Card>
           <CardHeader>

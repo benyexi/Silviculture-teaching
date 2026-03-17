@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,14 +17,19 @@ type AnswerResult = {
   modelUsed: string;
   responseTimeMs: number;
   queryId: number;
+  foundInMaterials: boolean;
 };
 
 export default function Home() {
   const { user } = useAuth();
   const [question, setQuestion] = useState("");
+  const [askedQuestion, setAskedQuestion] = useState("");
   const [result, setResult] = useState<AnswerResult | null>(null);
   const [showSources, setShowSources] = useState(true);
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
+  const [feedbackValue, setFeedbackValue] = useState<boolean | null>(null);
   const resultRef = useRef<HTMLDivElement>(null);
+  const submitFeedback = trpc.qa.submitFeedback.useMutation();
 
   const askMutation = trpc.qa.ask.useMutation({
     onSuccess: (data) => {
@@ -37,9 +42,22 @@ export default function Home() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!question.trim() || askMutation.isPending) return;
+    setAskedQuestion(question.trim());
     setResult(null);
     askMutation.mutate({ question: question.trim() });
   };
+
+  const handleFeedback = (helpful: boolean) => {
+    if (!result?.queryId || feedbackSubmitted) return;
+    submitFeedback.mutate({ queryId: result.queryId, helpful });
+    setFeedbackValue(helpful);
+    setFeedbackSubmitted(true);
+  };
+
+  useEffect(() => {
+    setFeedbackSubmitted(false);
+    setFeedbackValue(null);
+  }, [result?.queryId]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
@@ -212,6 +230,33 @@ export default function Home() {
                       <div className="prose prose-sm max-w-none text-foreground leading-relaxed">
                         <Streamdown>{result.answer}</Streamdown>
                       </div>
+
+                      {result && result.foundInMaterials && (
+                        <div className="mt-4 pt-3 border-t border-border flex items-center gap-3 flex-wrap">
+                          <span className="text-sm text-muted-foreground">这个答案对你有帮助吗？</span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleFeedback(true)}
+                            disabled={feedbackSubmitted}
+                            className={feedbackSubmitted && feedbackValue === true ? "border-green-500 text-green-600" : ""}
+                          >
+                            👍 有帮助
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleFeedback(false)}
+                            disabled={feedbackSubmitted}
+                            className={feedbackSubmitted && feedbackValue === false ? "border-red-400 text-red-500" : ""}
+                          >
+                            👎 没帮助
+                          </Button>
+                          {feedbackSubmitted && (
+                            <span className="text-sm text-muted-foreground">感谢反馈！</span>
+                          )}
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
 
@@ -236,7 +281,12 @@ export default function Home() {
                       {showSources && (
                         <CardContent className="pt-0 space-y-3">
                           {result.sources.map((source, idx) => (
-                            <SourceCard key={idx} source={source} index={idx + 1} />
+                            <SourceCard
+                              key={idx}
+                              source={source}
+                              index={idx + 1}
+                              keywords={extractHighlightKeywords(askedQuestion)}
+                            />
                           ))}
                         </CardContent>
                       )}
@@ -275,14 +325,25 @@ export default function Home() {
 }
 
 // ─── 引用来源卡片组件 ─────────────────────────────────────────────────────────
-function SourceCard({ source, index }: { source: QuerySource; index: number }) {
+function SourceCard({
+  source,
+  index,
+  keywords,
+}: {
+  source: QuerySource;
+  index: number;
+  keywords: string[];
+}) {
   const [expanded, setExpanded] = useState(false);
 
-  const locationParts = [
-    source.materialTitle,
-    source.chapter,
-    source.pageStart ? `第 ${source.pageStart}${source.pageEnd && source.pageEnd !== source.pageStart ? `–${source.pageEnd}` : ""} 页` : null,
-  ].filter(Boolean);
+  const pageLabel = source.pageStart
+    ? `第 ${source.pageStart}${source.pageEnd && source.pageEnd !== source.pageStart ? `–${source.pageEnd}` : ""} 页`
+    : null;
+  const chapterPath = source.chapter
+    ? pageLabel
+      ? `${source.chapter} > ${pageLabel}`
+      : source.chapter
+    : pageLabel || "未标注章节";
 
   return (
     <div className="border-l-4 border-primary/50 bg-primary/5 rounded-r-lg p-3">
@@ -293,15 +354,15 @@ function SourceCard({ source, index }: { source: QuerySource; index: number }) {
               {index}
             </span>
             <span className="text-xs text-muted-foreground truncate">
-              {locationParts.join(" · ")}
+              {source.materialTitle} · {chapterPath}
             </span>
           </div>
           <p className={`text-xs text-foreground/80 leading-relaxed ${!expanded ? "line-clamp-2" : ""}`}>
-            {source.excerpt}
+            {highlightKeywords(source.highlightedExcerpt || source.excerpt, keywords)}
           </p>
         </div>
       </div>
-      {source.excerpt && source.excerpt.length > 100 && (
+      {(source.highlightedExcerpt || source.excerpt) && (source.highlightedExcerpt || source.excerpt).length > 100 && (
         <button
           onClick={() => setExpanded(!expanded)}
           className="mt-1 text-xs text-primary hover:underline"
@@ -310,5 +371,35 @@ function SourceCard({ source, index }: { source: QuerySource; index: number }) {
         </button>
       )}
     </div>
+  );
+}
+
+function extractHighlightKeywords(text: string): string[] {
+  return Array.from(
+    new Set(
+      text
+        .split(/[，。！？；、,\s]+/)
+        .map((s) => s.trim())
+        .filter((s) => s.length >= 2)
+    )
+  );
+}
+
+function escapeRegExp(input: string): string {
+  return input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function highlightKeywords(text: string, keywords: string[]): React.ReactNode {
+  if (!keywords.length) return text;
+  const pattern = new RegExp(`(${keywords.map((k) => escapeRegExp(k)).join("|")})`, "g");
+  const parts = text.split(pattern);
+  return parts.map((part, i) =>
+    keywords.includes(part) ? (
+      <mark key={i} className="bg-yellow-200 text-yellow-900 rounded px-0.5">
+        {part}
+      </mark>
+    ) : (
+      part
+    )
   );
 }

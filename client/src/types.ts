@@ -7,6 +7,7 @@ export type QuerySource = {
   pageStart: number | null;
   pageEnd: number | null;
   excerpt: string;
+  highlightedExcerpt?: string;
 };
 
 export type MaterialStatus = "uploading" | "processing" | "published" | "error";
