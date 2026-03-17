@@ -72,11 +72,23 @@ export async function getUserByOpenId(openId: string) {
 }
 
 // ─── Materials ────────────────────────────────────────────────────────────────
+// Helper: Drizzle with mysql2 driver returns [ResultSetHeader, FieldPacket[]]
+// insertId lives on result[0].insertId
+function extractInsertId(result: unknown): number {
+  // Drizzle mysql2: result is [ResultSetHeader, ...] or ResultSetHeader directly
+  const header = Array.isArray(result) ? result[0] : result;
+  const id = (header as any)?.insertId;
+  if (id === undefined || id === null || isNaN(Number(id))) {
+    throw new Error(`[DB] insertId is invalid: ${JSON.stringify(id)}`);
+  }
+  return Number(id);
+}
+
 export async function createMaterial(data: InsertMaterial) {
   const db = await getDb();
   if (!db) throw new Error("数据库不可用");
   const result = await db.insert(materials).values(data);
-  return Number((result as any).insertId);
+  return extractInsertId(result);
 }
 
 export async function getMaterials() {
@@ -114,7 +126,7 @@ export async function insertMaterialChunk(data: InsertMaterialChunk): Promise<nu
   const db = await getDb();
   if (!db) throw new Error("数据库不可用");
   const result = await db.insert(materialChunks).values(data);
-  return Number((result as any).insertId);
+  return extractInsertId(result);
 }
 
 export async function getChunksByMaterialId(materialId: number) {
@@ -128,7 +140,7 @@ export async function createQuery(data: InsertQuery): Promise<number> {
   const db = await getDb();
   if (!db) throw new Error("数据库不可用");
   const result = await db.insert(queries).values(data);
-  return Number((result as any).insertId);
+  return extractInsertId(result);
 }
 
 export async function getRecentQueries(limit = 50) {
@@ -216,7 +228,7 @@ export async function createLlmConfig(data: InsertLlmConfig): Promise<number> {
   const db = await getDb();
   if (!db) throw new Error("数据库不可用");
   const result = await db.insert(llmConfigs).values(data);
-  return Number((result as any).insertId);
+  return extractInsertId(result);
 }
 
 export async function updateLlmConfig(id: number, data: Partial<InsertLlmConfig>) {

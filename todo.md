@@ -58,3 +58,6 @@
 - [ ] 向量检索精度调优（分块策略优化）
 - [ ] 答案生成 Prompt 调优（更严格的教材约束）
 - [ ] 阿里云服务器 Docker Compose 部署配置
+
+## Bug 修复
+- [x] 修复上传完成时 materialId = NaN 的错误（Drizzle mysql2 驱动 insertId 在 result[0] 中，已用 extractInsertId 助手函数修复）
