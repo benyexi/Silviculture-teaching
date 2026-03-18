@@ -290,26 +290,39 @@ export async function semanticSearch(
   const rawKeywords =
     questionLang === "en" ? extractKeywordsEn(question) : extractKeywords(question);
 
-  // 同义词扩展：增加检索召回率
-  const keywords = questionLang === "en" ? rawKeywords : expandWithSynonyms(rawKeywords);
-
   // 将原始问题的完整核心短语加入关键词（去掉问号等标点和常见提问词）
   const cleanedQ = question
     .replace(/[，。？！、；：""''（）【】《》？!?,;:"'()\[\]\s]+/g, "")
     .replace(/什么是|如何|怎么|怎样|为什么|哪些|请问|介绍|说明|解释|试述|分析|比较|请说明|请介绍|阐述|论述/g, "");
-  if (cleanedQ.length >= 2 && cleanedQ.length <= 10 && !keywords.includes(cleanedQ)) {
-    keywords.unshift(cleanedQ); // 放在最前面，最高优先级
+  if (cleanedQ.length >= 2 && cleanedQ.length <= 10 && !rawKeywords.includes(cleanedQ)) {
+    rawKeywords.unshift(cleanedQ);
   }
+
+  // 同义词扩展：仅用于评分/排序，不用于 SQL 检索
+  const scoringKeywords = questionLang === "en" ? rawKeywords : expandWithSynonyms(rawKeywords);
+
+  // SQL 检索使用原始关键词（广撒网），确保基础词不被挤掉
+  // 同时加入少量同义词中最重要的（长度>=4 的精确词）
+  const sqlKeywordsSet = new Set(rawKeywords);
+  // 从同义词中挑选 ≥4字的加入 SQL（作为额外召回）
+  for (const kw of scoringKeywords) {
+    if (kw.length >= 4 && sqlKeywordsSet.size < 15) {
+      sqlKeywordsSet.add(kw);
+    }
+  }
+  const sqlKeywords = Array.from(sqlKeywordsSet);
 
   // ─── 路径1：关键词检索 ─────────────────────────────────────────────────────
   let keywordCandidates: typeof vectorCandidates = [];
-  if (keywords.length > 0) {
-    const sortedKeywords = [...keywords].sort((a, b) => b.length - a.length);
-    const sqlKeywords = sortedKeywords.slice(0, 10);
-
+  if (sqlKeywords.length > 0) {
     const likeConditions = sqlKeywords.map(kw =>
       like(materialChunks.content, `%${kw}%`)
     );
+
+    // 也搜索章节标题
+    const chapterConditions = rawKeywords
+      .filter(kw => kw.length >= 2)
+      .map(kw => like(materialChunks.chapter, `%${kw}%`));
 
     const kwWhere = and(
       eq(materials.status, 'published'),
@@ -317,7 +330,7 @@ export async function semanticSearch(
       materialIds && materialIds.length > 0
         ? inArray(materialChunks.materialId, materialIds)
         : undefined,
-      or(...likeConditions)
+      or(...likeConditions, ...chapterConditions)
     );
 
     keywordCandidates = await db
@@ -395,7 +408,7 @@ export async function semanticSearch(
 
   // 关键词评分
   for (const chunk of keywordCandidates) {
-    const kwScore = scoreChunk(chunk.content, keywords, question, chunk.chapter ?? undefined);
+    const kwScore = scoreChunk(chunk.content, scoringKeywords, question, chunk.chapter ?? undefined);
     scoreMap.set(chunk.id, {
       id: chunk.id,
       materialId: chunk.materialId,
