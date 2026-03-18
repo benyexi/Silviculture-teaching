@@ -31,7 +31,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { Plus, Trash2, CheckCircle, Settings, Zap, Loader2, Pencil } from "lucide-react";
+import { Plus, Trash2, CheckCircle, Settings, Zap, Loader2, Pencil, Wifi } from "lucide-react";
 import { LLM_PROVIDER_LABELS, LLM_PROVIDER_DEFAULT_MODELS, type LlmProvider } from "@/types";
 
 const PROVIDERS: LlmProvider[] = ["openai", "deepseek", "qwen", "ollama", "custom"];
@@ -43,6 +43,7 @@ export default function TeacherLlmConfig() {
   const [editConfig, setEditConfig] = useState<{
     id: number;
     name: string;
+    provider: string;
     modelName: string;
     apiBaseUrl?: string | null;
     temperature?: number | null;
@@ -177,6 +178,7 @@ export default function TeacherLlmConfig() {
                       onClick={() => setEditConfig({
                         id: config.id,
                         name: config.name,
+                        provider: config.provider,
                         modelName: config.modelName,
                         apiBaseUrl: config.apiBaseUrl,
                         temperature: config.temperature,
@@ -249,6 +251,7 @@ function EditConfigForm({
   config: {
     id: number;
     name: string;
+    provider: string;
     modelName: string;
     apiBaseUrl?: string | null;
     temperature?: number | null;
@@ -346,14 +349,65 @@ function EditConfigForm({
         </div>
       </div>
 
-      <Button onClick={handleSubmit} disabled={updateMutation.isPending} className="w-full">
-        {updateMutation.isPending ? (
-          <><Loader2 className="h-4 w-4 mr-2 animate-spin" />保存中...</>
-        ) : (
-          "保存修改"
-        )}
-      </Button>
+      <div className="flex gap-2">
+        <TestConnectionButton provider={config.provider} modelName={modelName} apiKey={apiKey} apiBaseUrl={apiBaseUrl} />
+        <Button onClick={handleSubmit} disabled={updateMutation.isPending} className="flex-1">
+          {updateMutation.isPending ? (
+            <><Loader2 className="h-4 w-4 mr-2 animate-spin" />保存中...</>
+          ) : (
+            "保存修改"
+          )}
+        </Button>
+      </div>
     </div>
+  );
+}
+
+// ─── 测试连接按钮 ─────────────────────────────────────────────────────────────
+function TestConnectionButton({
+  provider,
+  modelName,
+  apiKey,
+  apiBaseUrl,
+}: {
+  provider: string;
+  modelName: string;
+  apiKey: string;
+  apiBaseUrl: string;
+}) {
+  const testMutation = trpc.llmConfig.testConnection.useMutation({
+    onSuccess: (result) => {
+      if (result.success) {
+        toast.success(result.message);
+      } else {
+        toast.error(result.message, { duration: 8000 });
+      }
+    },
+    onError: (e) => toast.error(`测试失败: ${e.message}`),
+  });
+
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      onClick={() => {
+        if (!modelName) { toast.error("请先填写模型名称"); return; }
+        testMutation.mutate({
+          provider,
+          modelName,
+          apiKey: apiKey || undefined,
+          apiBaseUrl: apiBaseUrl || undefined,
+        });
+      }}
+      disabled={testMutation.isPending}
+    >
+      {testMutation.isPending ? (
+        <Loader2 className="h-4 w-4 animate-spin mr-1" />
+      ) : (
+        <Wifi className="h-4 w-4 mr-1" />
+      )}
+      测试连接
+    </Button>
   );
 }
 
@@ -551,17 +605,20 @@ function AddConfigForm({ onSuccess }: { onSuccess: () => void }) {
         </div>
       </div>
 
-      <Button
-        onClick={handleSubmit}
-        disabled={createMutation.isPending}
-        className="w-full"
-      >
-        {createMutation.isPending ? (
-          <><Loader2 className="h-4 w-4 mr-2 animate-spin" />添加中...</>
-        ) : (
-          "添加配置"
-        )}
-      </Button>
+      <div className="flex gap-2">
+        <TestConnectionButton provider={provider} modelName={modelName} apiKey={apiKey} apiBaseUrl={apiBaseUrl} />
+        <Button
+          onClick={handleSubmit}
+          disabled={createMutation.isPending}
+          className="flex-1"
+        >
+          {createMutation.isPending ? (
+            <><Loader2 className="h-4 w-4 mr-2 animate-spin" />添加中...</>
+          ) : (
+            "添加配置"
+          )}
+        </Button>
+      </div>
     </div>
   );
 }
