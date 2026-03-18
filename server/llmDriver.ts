@@ -25,6 +25,12 @@ export type EmbeddingResponse = {
   model: string;
 };
 
+export type LLMInvokeOptions = {
+  temperature?: number;
+  maxTokens?: number;
+  responseFormat?: "text" | "json_object";
+};
+
 // ─── 获取当前激活的 LLM 配置 ─────────────────────────────────────────────────
 export async function getActiveLlmConfig() {
   const db = await getDb();
@@ -69,7 +75,8 @@ function getProviderBaseUrl(provider: string, customUrl?: string | null): string
 // ─── 主推理接口 ───────────────────────────────────────────────────────────────
 export async function invokeLLMWithConfig(
   messages: LLMMessage[],
-  systemPrompt?: string
+  systemPrompt?: string,
+  options?: LLMInvokeOptions
 ): Promise<LLMResponse> {
   const config = await getActiveLlmConfig();
 
@@ -90,11 +97,17 @@ export async function invokeLLMWithConfig(
 
   const client = buildOpenAIClient(apiKey, baseURL);
 
+  const responseFormat =
+    options?.responseFormat === "json_object"
+      ? { type: "json_object" as const }
+      : undefined;
+
   const response = await client.chat.completions.create({
     model: config.modelName,
     messages: allMessages,
-    temperature: config.temperature ?? 0.1,
-    max_tokens: config.maxTokens ?? 4096,
+    temperature: options?.temperature ?? config.temperature ?? 0.1,
+    max_tokens: options?.maxTokens ?? config.maxTokens ?? 4096,
+    ...(responseFormat ? { response_format: responseFormat } : {}),
   });
 
   const content = response.choices[0]?.message?.content || "";
@@ -109,7 +122,8 @@ export async function invokeLLMWithConfig(
 // ─── 流式推理接口 ─────────────────────────────────────────────────────────────
 export async function invokeLLMStreamWithConfig(
   messages: LLMMessage[],
-  systemPrompt?: string
+  systemPrompt?: string,
+  options?: LLMInvokeOptions
 ): Promise<{ stream: AsyncIterable<string>; model: string }> {
   const config = await getActiveLlmConfig();
 
@@ -129,11 +143,17 @@ export async function invokeLLMStreamWithConfig(
   const apiKey = config.apiKey || "ollama";
   const client = buildOpenAIClient(apiKey, baseURL);
 
+  const responseFormat =
+    options?.responseFormat === "json_object"
+      ? { type: "json_object" as const }
+      : undefined;
+
   const response = await client.chat.completions.create({
     model: config.modelName,
     messages: allMessages,
-    temperature: config.temperature ?? 0.1,
-    max_tokens: config.maxTokens ?? 4096,
+    temperature: options?.temperature ?? config.temperature ?? 0.1,
+    max_tokens: options?.maxTokens ?? config.maxTokens ?? 4096,
+    ...(responseFormat ? { response_format: responseFormat } : {}),
     stream: true,
   });
 

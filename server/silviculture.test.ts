@@ -145,6 +145,7 @@ vi.mock("./geoip", () => ({
 vi.mock("./storage", () => ({
   storagePut: vi.fn().mockResolvedValue({ key: "test-key", url: "https://example.com/test.pdf" }),
   storageGet: vi.fn().mockResolvedValue({ key: "test-key", url: "https://example.com/test.pdf" }),
+  storageExists: vi.fn().mockReturnValue(true),
 }));
 
 // ─── 测试辅助函数 ─────────────────────────────────────────────────────────────

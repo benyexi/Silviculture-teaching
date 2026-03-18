@@ -1,12 +1,12 @@
 /**
  * 教材检索服务
- * 由于 Forge API 不支持 Embedding 端点，本实现改用 MySQL 全文关键词检索。
+ * 采用纯关键词检索，不依赖 Embedding API。
  * 检索策略：
- *   1. 对问题进行分词（提取关键词）
- *   2. 多策略检索：精确短语 + 关键词 OR 匹配
- *   3. 使用 TF-IDF 启发式评分，长关键词权重更高
- *   4. 返回 Top-K 最相关的教材片段
- * 对于 10 本教材（约 5000-10000 个 chunk），此方案完全满足性能需求。
+ *   1. 对问题做领域词优先的关键词抽取
+ *   2. 多路召回：strict / phrase / broad
+ *   3. 基于 BM25-like + 覆盖率 + 章节/短语加权进行重排
+ *   4. 对 Top 结果做邻接块扩展，补足上下文
+ *   5. 最终做去重和多样性控制
  */
 import { getDb } from "./db";
 import { materialChunks, materials } from "../drizzle/schema";
@@ -16,6 +16,7 @@ import { detectLanguage } from "./languageDetect";
 // ─── 检索结果类型 ─────────────────────────────────────────────────────────────
 export type SearchResult = {
   chunkId: number;
+  chunkIndex: number;
   materialId: number;
   materialTitle: string;
   chapter: string | null;
@@ -24,6 +25,43 @@ export type SearchResult = {
   content: string;
   similarity: number;
 };
+
+type RouteName = "strict" | "phrase" | "broad";
+
+type CandidateRow = {
+  id: number;
+  materialId: number;
+  chunkIndex: number;
+  content: string;
+  chapter: string | null;
+  pageStart: number | null;
+  pageEnd: number | null;
+};
+
+type CandidateState = CandidateRow & {
+  routeHits: Record<RouteName, number>;
+  recallScore: number;
+  keywordScore: number;
+  adjacencyScore: number;
+  finalScore: number;
+};
+
+type SearchProfile = {
+  cleanedQuestion: string;
+  intentTerms: string[];
+  exactPhrases: string[];
+  coreTerms: string[];
+  broadTerms: string[];
+  scoringTerms: string[];
+};
+
+type TermStats = {
+  docCount: number;
+  avgLength: number;
+  df: Map<string, number>;
+};
+
+type DbConnection = NonNullable<Awaited<ReturnType<typeof getDb>>>;
 
 // ─── 林业领域同义词扩展表 ───────────────────────────────────────────────────
 // 用于评分阶段（不用于SQL检索），帮助识别相关但措辞不同的chunk
@@ -98,9 +136,8 @@ const SYNONYM_MAP: Record<string, string[]> = {
 
   // ── 水分管理 ──
   '灌溉': ['灌水', '浇水', '合理灌溉', '灌溉方法', '水分管理', '灌溉技术'],
-  '灌溉方法': ['灌溉方式', '灌溉技术', '滴灌', '喷灌', '漫灌', '渗灌', '沟灌', '畦灌'],
-  '合理灌溉': ['灌溉', '灌水', '浇水', '水分管理', '灌溉制度', '灌溉原则',
-    '灌溉时间', '灌水量', '灌溉位置', '灌溉方式', '四合理'],
+  '灌溉方法': ['灌溉方式', '灌溉技术', '滴灌', '喷灌', '漫灌'],
+  '合理灌溉': ['灌溉', '灌水', '浇水', '水分管理', '灌溉制度', '灌溉原则'],
   '排水': ['排涝', '排水沟', '排水系统', '排水方法'],
 
   // ── 土壤管理 ──
@@ -137,93 +174,330 @@ const SYNONYM_MAP: Record<string, string[]> = {
   '株行距': ['种植间距', '行距', '株距', '种植点配置'],
 };
 
-function expandWithSynonyms(keywords: string[]): string[] {
-  const expanded = new Set(keywords);
-  for (const kw of keywords) {
-    if (SYNONYM_MAP[kw]) {
-      SYNONYM_MAP[kw].forEach(syn => expanded.add(syn));
-    }
-    // 反向查找
-    for (const [key, syns] of Object.entries(SYNONYM_MAP)) {
-      if (syns.includes(kw)) {
-        expanded.add(key);
-        syns.forEach(s => expanded.add(s));
-      }
-    }
-  }
-  return Array.from(expanded);
+const QUESTION_INTENT_WORDS = [
+  "定义",
+  "含义",
+  "概念",
+  "是指",
+  "分类",
+  "类型",
+  "方法",
+  "步骤",
+  "原则",
+  "条件",
+  "特点",
+  "区别",
+  "比较",
+  "作用",
+  "意义",
+  "程序",
+  "过程",
+  "措施",
+  "要求",
+];
+
+const QUESTION_STOP_WORDS = new Set([
+  "的",
+  "了",
+  "在",
+  "是",
+  "我",
+  "有",
+  "和",
+  "就",
+  "不",
+  "人",
+  "都",
+  "一",
+  "上面",
+  "下面",
+  "什么",
+  "如何",
+  "怎么",
+  "怎样",
+  "为什么",
+  "哪些",
+  "这个",
+  "那个",
+  "这些",
+  "那些",
+  "这样",
+  "那样",
+  "可以",
+  "应该",
+  "需要",
+  "能够",
+  "进行",
+  "实现",
+  "就是",
+  "也就",
+  "不是",
+  "就会",
+  "主要",
+  "基本",
+  "一般",
+  "通常",
+  "具有",
+  "包括",
+  "属于",
+  "请问",
+  "介绍",
+  "说明",
+  "解释",
+  "试述",
+  "分析",
+  "比较",
+  "请说明",
+  "请介绍",
+  "阐述",
+  "论述",
+]);
+
+function normalizeForComparison(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[，。？！、；：""''（）【】《》、？!?,;:"'()\[\]\s]/g, "")
+    .replace(/[^\u4e00-\u9fa5a-z0-9]+/g, "");
 }
 
-// ─── 中文分词（基于 n-gram 提取关键词）───────────────────────
-export function extractKeywords(text: string): string[] {
-  // 移除标点符号和常见问句词
-  const cleaned = text
+function normalizeForLookup(text: string): string {
+  return text
+    .toLowerCase()
     .replace(/[，。？！、；：""''（）【】《》、？!?,;:"'()\[\]]/g, " ")
-    .replace(/什么是|如何|怎么|怎样|为什么|哪些|请问|介绍|说明|解释|试述|分析|比较|请说明|请介绍|阐述|论述/g, " ")
+    .replace(/\s+/g, " ")
     .trim();
+}
 
+function stripQuestionWords(text: string): string {
+  return text.replace(
+    /什么是|如何|怎么|怎样|为什么|哪些|请问|介绍|说明|解释|试述|分析|比较|请说明|请介绍|阐述|论述|有哪几种|有哪些|分别|简述/g,
+    " "
+  );
+}
+
+function countOccurrences(text: string, term: string): number {
+  if (!term) return 0;
+  let count = 0;
+  let pos = 0;
+  while ((pos = text.indexOf(term, pos)) !== -1) {
+    count++;
+    pos += term.length;
+  }
+  return count;
+}
+
+function termRelevanceScore(term: string): number {
+  const normalized = normalizeForComparison(term);
+  let score = Math.max(1, normalized.length);
+
+  if (DOMAIN_VOCAB_KEYS.has(normalized)) {
+    score += 8 + Math.min(6, normalized.length);
+  }
+
+  if (QUESTION_INTENT_KEYS.has(normalized)) {
+    score += 1.5;
+  }
+
+  if (normalized.length === 2 && QUESTION_STOP_WORDS.has(term)) {
+    score *= 0.45;
+  }
+
+  if (term.includes(" ")) {
+    score += 1.2;
+  }
+
+  if (/[a-z]/i.test(term)) {
+    score += 0.5;
+  }
+
+  return score;
+}
+
+function uniqueSortedTerms(terms: string[]): string[] {
+  const seen = new Set<string>();
+  const unique: string[] = [];
+
+  for (const term of terms) {
+    const cleaned = term.trim();
+    if (cleaned.length < 2) continue;
+    const key = normalizeForComparison(cleaned);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    unique.push(cleaned);
+  }
+
+  return unique.sort((a, b) => {
+    const diff = termRelevanceScore(b) - termRelevanceScore(a);
+    return diff !== 0 ? diff : b.length - a.length;
+  });
+}
+
+const DOMAIN_VOCAB = Array.from(
+  new Set(
+    Object.entries(SYNONYM_MAP).flatMap(([key, syns]) => [key, ...syns]).filter((term) => term.trim().length >= 2)
+  )
+).sort((a, b) => b.length - a.length);
+
+const DOMAIN_VOCAB_KEYS = new Set(DOMAIN_VOCAB.map((term) => normalizeForComparison(term)));
+const QUESTION_INTENT_KEYS = new Set(QUESTION_INTENT_WORDS.map((term) => normalizeForComparison(term)));
+
+const SYNONYM_REVERSE_MAP = new Map<string, string[]>();
+for (const [key, syns] of Object.entries(SYNONYM_MAP)) {
+  const keyNorm = normalizeForComparison(key);
+  if (!SYNONYM_REVERSE_MAP.has(keyNorm)) {
+    SYNONYM_REVERSE_MAP.set(keyNorm, []);
+  }
+  for (const syn of syns) {
+    const synNorm = normalizeForComparison(syn);
+    if (!SYNONYM_REVERSE_MAP.has(synNorm)) {
+      SYNONYM_REVERSE_MAP.set(synNorm, []);
+    }
+    SYNONYM_REVERSE_MAP.get(keyNorm)!.push(syn);
+    SYNONYM_REVERSE_MAP.get(synNorm)!.push(key);
+    for (const reverse of syns) {
+      if (reverse !== syn) SYNONYM_REVERSE_MAP.get(synNorm)!.push(reverse);
+    }
+  }
+}
+
+function extractDomainPhrases(text: string): string[] {
+  const normalized = normalizeForLookup(text);
+  const matches: string[] = [];
+
+  for (const term of DOMAIN_VOCAB) {
+    if (normalized.includes(term.toLowerCase())) {
+      matches.push(term);
+    }
+  }
+
+  return uniqueSortedTerms(matches);
+}
+
+function extractIntentTerms(text: string): string[] {
+  const normalized = normalizeForComparison(text);
+  return QUESTION_INTENT_WORDS.filter((term) => normalized.includes(normalizeForComparison(term)));
+}
+
+function buildSearchProfile(question: string, questionLang: "zh" | "en"): SearchProfile {
+  const normalizedQuestion = normalizeForLookup(question);
+  const strippedQuestion = stripQuestionWords(normalizedQuestion).trim();
+  const baseKeywords = questionLang === "en" ? extractKeywordsEn(question) : extractKeywords(question);
+  const exactPhrases = questionLang === "en" ? [] : extractDomainPhrases(strippedQuestion);
+  const derivedDefinitionTerms =
+    questionLang === "zh" && /(什么是|何谓|是指|定义|概念|含义)/.test(normalizedQuestion)
+      ? ["定义", "概念", "是指"]
+      : [];
+  const intentTerms = questionLang === "en"
+    ? []
+    : uniqueSortedTerms([...extractIntentTerms(normalizedQuestion), ...derivedDefinitionTerms]).slice(0, 8);
+
+  const candidateTerms = uniqueSortedTerms([
+    ...baseKeywords,
+    ...exactPhrases,
+    ...intentTerms,
+    ...(strippedQuestion.length >= 2 && strippedQuestion.length <= 12 ? [strippedQuestion] : []),
+  ]);
+
+  const coreTerms = candidateTerms.filter((term) => {
+    const normalized = normalizeForComparison(term);
+    return normalized.length >= 3 || DOMAIN_VOCAB_KEYS.has(normalized) || QUESTION_INTENT_KEYS.has(normalized);
+  }).slice(0, 8);
+
+  const broadTerms = uniqueSortedTerms([
+    ...candidateTerms,
+    ...expandWithSynonyms(candidateTerms).slice(0, 12),
+  ]).slice(0, 18);
+
+  const scoringTerms = uniqueSortedTerms([
+    ...coreTerms,
+    ...exactPhrases,
+    ...intentTerms,
+    ...broadTerms,
+  ]).slice(0, 16);
+
+  return {
+    cleanedQuestion: strippedQuestion,
+    intentTerms,
+    exactPhrases,
+    coreTerms,
+    broadTerms,
+    scoringTerms,
+  };
+}
+
+function expandWithSynonyms(keywords: string[]): string[] {
+  const expanded = new Set<string>();
+
+  for (const kw of keywords) {
+    const normalized = normalizeForComparison(kw);
+    if (!normalized) continue;
+    expanded.add(kw);
+
+    const direct = SYNONYM_MAP[kw] ?? SYNONYM_MAP[kw.toLowerCase()];
+    if (direct) {
+      direct.forEach((syn) => expanded.add(syn));
+    }
+
+    const reverse = SYNONYM_REVERSE_MAP.get(normalized);
+    if (reverse) {
+      reverse.forEach((term) => expanded.add(term));
+    }
+  }
+
+  return uniqueSortedTerms(Array.from(expanded));
+}
+
+// ─── 中文分词（基于领域词优先 + n-gram 提取关键词）────────────────────────────
+export function extractKeywords(text: string): string[] {
+  const cleaned = normalizeForLookup(text);
+  const stripped = stripQuestionWords(cleaned).trim();
   const keywords: string[] = [];
-  // 单字停用词：在 n-gram 提取前用于分割文本，避免"混交方法有"变成一个整体
-  const singleCharStops = new Set([
-    '的', '了', '在', '是', '我', '有', '和', '就', '不', '人', '都', '一',
-    '吗', '呢', '吧', '啊', '着', '过', '把', '被', '给', '让', '向', '从',
-    '到', '对', '与', '而', '也', '又', '才', '已', '还', '很', '更', '最',
-  ]);
-  const multiCharStops = new Set([
-    '上面', '下面', '什么', '如何', '怎么', '怎样', '为什么', '哪些',
-    '这个', '那个', '这些', '那些', '这样', '那样', '可以', '应该',
-    '需要', '能够', '进行', '实现', '就是', '也就', '不是', '就会',
-    '主要', '基本', '一般', '通常', '具有', '包括', '属于'
-  ]);
-  const allStops = new Set(Array.from(singleCharStops).concat(Array.from(multiCharStops)));
 
-  // 提取英文单词（3字母以上）
-  const englishMatches = cleaned.match(/[a-zA-Z]{3,}/g) || [];
-  keywords.push(...englishMatches.map(w => w.toLowerCase()));
+  const englishMatches = stripped.match(/[a-zA-Z]{3,}/g) || [];
+  keywords.push(...englishMatches.map((w) => w.toLowerCase()));
 
-  // 提取中文：先按空格分割成词组，再提取 n-gram
-  const segments = cleaned.split(/\s+/).filter(s => s.length > 0);
+  const domainTerms = extractDomainPhrases(stripped);
+  keywords.push(...domainTerms);
 
+  const intentTerms = extractIntentTerms(stripped);
+  keywords.push(...intentTerms);
+
+  if (stripped.length >= 2 && stripped.length <= 12) {
+    keywords.push(stripped);
+  }
+
+  const segments = stripped.split(/\s+/).filter((s) => s.length > 0);
   for (const seg of segments) {
-    // 提取纯中文片段
     const chineseParts = seg.match(/[\u4e00-\u9fa5]+/g) || [];
-    for (const rawPart of chineseParts) {
-      // 用单字停用词切割中文片段，避免"混交方法有"被当成一个整体
-      // "混交方法有" → ["混交方法"] （"有"是停用词，在此处切断）
-      const subParts = rawPart.split(new RegExp(`[${Array.from(singleCharStops).join('')}]`)).filter(s => s.length >= 2);
-      // 如果切割后没有结果，保留原文（可能没有停用词）
-      const parts = subParts.length > 0 ? subParts : (rawPart.length >= 2 ? [rawPart] : []);
+    for (const part of chineseParts) {
+      if (part.length >= 2 && part.length <= 10 && !QUESTION_STOP_WORDS.has(part)) {
+        keywords.push(part);
+      }
 
-      for (const part of parts) {
-        if (part.length >= 2 && part.length <= 8 && !allStops.has(part)) {
-          keywords.push(part);
+      if (part.length >= 4) {
+        for (let i = 0; i <= part.length - 2; i++) {
+          const bigram = part.slice(i, i + 2);
+          if (!QUESTION_STOP_WORDS.has(bigram)) keywords.push(bigram);
         }
-        // 提取 2-gram
-        if (part.length >= 4) {
-          for (let i = 0; i <= part.length - 2; i++) {
-            const bigram = part.slice(i, i + 2);
-            if (!allStops.has(bigram)) keywords.push(bigram);
-          }
+      }
+
+      if (part.length >= 5) {
+        for (let i = 0; i <= part.length - 3; i++) {
+          const trigram = part.slice(i, i + 3);
+          if (!QUESTION_STOP_WORDS.has(trigram)) keywords.push(trigram);
         }
-        // 提取 3-gram
-        if (part.length >= 5) {
-          for (let i = 0; i <= part.length - 3; i++) {
-            const trigram = part.slice(i, i + 3);
-            if (!allStops.has(trigram)) keywords.push(trigram);
-          }
-        }
-        // 提取 4-gram
-        if (part.length >= 6) {
-          for (let i = 0; i <= part.length - 4; i++) {
-            const fourgram = part.slice(i, i + 4);
-            if (!allStops.has(fourgram)) keywords.push(fourgram);
-          }
+      }
+
+      if (part.length >= 6) {
+        for (let i = 0; i <= part.length - 4; i++) {
+          const fourgram = part.slice(i, i + 4);
+          if (!QUESTION_STOP_WORDS.has(fourgram)) keywords.push(fourgram);
         }
       }
     }
   }
 
-  return Array.from(new Set(keywords)).filter(k => !allStops.has(k) && k.length >= 2);
+  return uniqueSortedTerms(keywords).slice(0, 24);
 }
 
 const EN_STOP_WORDS = new Set([
@@ -242,7 +516,7 @@ export function extractKeywordsEn(text: string): string[] {
     .split(/\s+/)
     .filter((w) => w.length >= 3 && !EN_STOP_WORDS.has(w));
 
-  const keywords = [...new Set(words)];
+  const keywords = Array.from(new Set(words));
 
   const wordArr = text
     .toLowerCase()
@@ -257,144 +531,339 @@ export function extractKeywordsEn(text: string): string[] {
     }
   }
 
-  return [...new Set(keywords)].slice(0, 15);
+  return uniqueSortedTerms(keywords).slice(0, 15);
 }
 
 // ─── 通用高频词（2字），在评分时适度降权 ─────────────────────────────────────
 // 注意：只放纯粹的修饰词/虚词，不放有领域含义的词（如"方法"、"类型"、"原则"）
 const GENERIC_2CHAR_WORDS = new Set([
-  '合理', '基本', '主要', '一般', '常见', '重要', '特殊', '正常',
-  '适当', '有效', '相关', '具体', '实际', '问题', '情况', '方面',
-  '数量', '关系', '过程', '阶段', '时期',
+  "合理", "基本", "主要", "一般", "常见", "重要", "特殊", "正常",
+  "适当", "有效", "相关", "具体", "实际", "问题", "情况", "方面",
+  "数量", "关系", "过程", "阶段", "时期",
 ]);
 
-// ─── 计算文本与关键词的匹配分数（改进版 TF-IDF 启发式）──────────────────────
-function scoreChunk(content: string, keywords: string[], originalQuestion: string, chapter?: string): number {
-  if (keywords.length === 0) return 0;
-  const lowerContent = content.toLowerCase();
-  let score = 0;
+function countTermStats(candidates: CandidateRow[], terms: string[]): TermStats {
+  const df = new Map<string, number>();
+  let totalLength = 0;
 
-  // 从原始问题中提取核心专业词（非通用词，长度>=2）
-  const coreKeywords = keywords.filter(k => k.length >= 3 || (k.length === 2 && !GENERIC_2CHAR_WORDS.has(k)));
+  for (const candidate of candidates) {
+    const normalized = normalizeForComparison(candidate.content);
+    totalLength += normalized.length;
 
-  for (const kw of keywords) {
-    const lowerKw = kw.toLowerCase();
-    let pos = 0;
-    let count = 0;
-    while ((pos = lowerContent.indexOf(lowerKw, pos)) !== -1) {
-      count++;
-      pos += lowerKw.length;
-    }
-    if (count > 0) {
-      // 通用2字词大幅降权
-      const isGeneric = kw.length === 2 && GENERIC_2CHAR_WORDS.has(kw);
-      const genericPenalty = isGeneric ? 0.1 : 1.0;
-
-      // 长关键词权重更高（指数级），短词权重较低
-      const lengthWeight = Math.pow(kw.length, 1.5);
-      // TF 分数：出现次数 / 内容长度
-      const tf = count / (content.length / 100);
-      score += tf * lengthWeight * genericPenalty;
-    }
-  }
-
-  // 核心关键词覆盖率加权（排除通用词后的覆盖率）
-  const coreCoverage = coreKeywords.length > 0
-    ? coreKeywords.filter(k => lowerContent.includes(k.toLowerCase())).length / coreKeywords.length
-    : 0;
-
-  // 原始问题完整短语匹配：最高优先级
-  // 如果原始问题的完整文本（去掉问号等标点）出现在 chunk 中，大幅加分
-  const cleanedQuestion = originalQuestion.replace(/[？?！!。，,、\s]+/g, '');
-  if (cleanedQuestion.length >= 3 && lowerContent.includes(cleanedQuestion.toLowerCase())) {
-    score += cleanedQuestion.length * 10;
-  }
-
-  // 如果原始问题中的关键词（3字以上）直接出现在内容中，大幅加分
-  const longPhrases = keywords.filter(k => k.length >= 3);
-  let phraseBonus = 0;
-  for (const phrase of longPhrases) {
-    if (lowerContent.includes(phrase.toLowerCase())) {
-      phraseBonus += phrase.length * 3;
-    }
-  }
-
-  // 章节标题匹配加分
-  if (chapter) {
-    for (const kw of coreKeywords) {
-      if (chapter.includes(kw)) {
-        score += kw.length * 5;
+    for (const term of terms) {
+      const key = normalizeForComparison(term);
+      if (!key) continue;
+      if (normalized.includes(key)) {
+        df.set(key, (df.get(key) || 0) + 1);
       }
     }
   }
 
-  return (score * (0.3 + 0.7 * coreCoverage)) + phraseBonus;
+  return {
+    docCount: candidates.length,
+    avgLength: candidates.length > 0 ? totalLength / candidates.length : 1,
+    df,
+  };
 }
 
-// ─── 关键词检索 Top-K ─────────────────────────────────────────────────────────
-// 回退到纯关键词检索：稳定可靠，不依赖 Embedding API
-export async function semanticSearch(
-  question: string,
-  materialIds?: number[],
-  topK: number = 8,
-  languageFilter: "zh" | "en" | "all" = "all",
-  _useEmbedding: boolean = true  // 保留参数兼容性，但不再使用向量检索
-): Promise<SearchResult[]> {
-  const db = await getDb();
-  if (!db) throw new Error("数据库不可用");
+// ─── 计算文本与关键词的匹配分数（BM25-like + 覆盖率 + 结构加权）──────────────
+function scoreChunk(
+  content: string,
+  keywords: string[],
+  originalQuestion: string,
+  chapter?: string,
+  options?: {
+    stats?: TermStats;
+    intentTerms?: string[];
+  }
+): number {
+  if (keywords.length === 0) return 0;
 
-  const questionLang = detectLanguage(question);
-  const rawKeywords =
-    questionLang === "en" ? extractKeywordsEn(question) : extractKeywords(question);
-  if (rawKeywords.length === 0) return [];
+  const compactContent = normalizeForComparison(content);
+  const compactChapter = normalizeForComparison(chapter || "");
+  const cleanedQuestion = normalizeForComparison(stripQuestionWords(originalQuestion));
+  const stats = options?.stats;
+  const intentTerms = options?.intentTerms ?? [];
+  const coreKeywords = keywords.filter((kw) => {
+    const normalized = normalizeForComparison(kw);
+    return normalized.length >= 3 || DOMAIN_VOCAB_KEYS.has(normalized) || QUESTION_INTENT_KEYS.has(normalized);
+  });
 
-  // 将原始问题的完整核心短语加入关键词（去掉问号等标点和常见提问词）
-  const cleanedQ = question
-    .replace(/[，。？！、；：""''（）【】《》？!?,;:"'()\[\]\s]+/g, "")
-    .replace(/什么是|如何|怎么|怎样|为什么|哪些|请问|介绍|说明|解释|试述|分析|比较|请说明|请介绍|阐述|论述/g, "");
-  if (cleanedQ.length >= 2 && cleanedQ.length <= 10 && !rawKeywords.includes(cleanedQ)) {
-    rawKeywords.unshift(cleanedQ);
+  const avgLength = stats?.avgLength || Math.max(1, compactContent.length);
+  const docCount = stats?.docCount || 1;
+  const k1 = 1.3;
+  const b = 0.72;
+
+  let bm25Score = 0;
+  let matchedCore = 0;
+  let maxTf = 0;
+
+  for (const keyword of keywords) {
+    const termKey = normalizeForComparison(keyword);
+    if (!termKey) continue;
+
+    const tf = countOccurrences(compactContent, termKey);
+    if (tf <= 0) continue;
+
+    if (coreKeywords.some((kw) => normalizeForComparison(kw) === termKey)) {
+      matchedCore++;
+    }
+    maxTf = Math.max(maxTf, tf);
+
+    const df = stats?.df.get(termKey) || 1;
+    const idf = Math.log(1 + (docCount - df + 0.5) / (df + 0.5));
+    const lenNorm = Math.max(1, compactContent.length) / Math.max(1, avgLength);
+    const tfNorm = (tf * (k1 + 1)) / (tf + k1 * (1 - b + b * lenNorm));
+    const lengthWeight = 1 + Math.min(0.8, termKey.length / 10);
+    const domainBoost = DOMAIN_VOCAB_KEYS.has(termKey) ? 1.2 : 1;
+    const intentBoost = QUESTION_INTENT_KEYS.has(termKey) ? 0.82 : 1;
+    const genericPenalty = termKey.length === 2 && QUESTION_STOP_WORDS.has(keyword) ? 0.55 : 1;
+
+    bm25Score += idf * tfNorm * lengthWeight * domainBoost * intentBoost * genericPenalty;
   }
 
-  // 同义词扩展：仅用于评分/排序，不用于 SQL 检索
-  const scoringKeywords = questionLang === "en" ? rawKeywords : expandWithSynonyms(rawKeywords);
+  const coverage = coreKeywords.length > 0 ? matchedCore / coreKeywords.length : 0;
 
-  // SQL 检索使用原始关键词（精准召回），确保基础词不被同义词挤掉
-  // 同时加入少量同义词中最重要的（长度>=4 的精确词）
-  const sqlKeywordsSet = new Set(rawKeywords);
-  for (const kw of scoringKeywords) {
-    if (kw.length >= 4 && sqlKeywordsSet.size < 15) {
-      sqlKeywordsSet.add(kw);
+  let phraseBonus = 0;
+  if (cleanedQuestion.length >= 3 && compactContent.includes(cleanedQuestion)) {
+    phraseBonus += cleanedQuestion.length * 0.9;
+  }
+
+  for (const phrase of coreKeywords) {
+    const phraseKey = normalizeForComparison(phrase);
+    if (phraseKey.length >= 3 && compactContent.includes(phraseKey)) {
+      phraseBonus += Math.min(8, phraseKey.length * 0.55);
     }
   }
-  const sqlKeywords = Array.from(sqlKeywordsSet);
 
-  console.log(`[Search] question="${question}", rawKeywords=[${rawKeywords.join(', ')}]`);
-  console.log(`[Search] sqlKeywords=[${sqlKeywords.join(', ')}]`);
-  console.log(`[Search] scoringKeywords=[${scoringKeywords.slice(0, 20).join(', ')}]`);
+  let chapterBonus = 0;
+  if (compactChapter.length > 0) {
+    for (const keyword of coreKeywords) {
+      const termKey = normalizeForComparison(keyword);
+      if (termKey.length >= 2 && compactChapter.includes(termKey)) {
+        chapterBonus += Math.min(6, termKey.length * 0.65);
+      }
+    }
 
-  const likeConditions = sqlKeywords.map(kw =>
-    like(materialChunks.content, `%${kw}%`)
-  );
+    for (const intent of intentTerms) {
+      const intentKey = normalizeForComparison(intent);
+      if (intentKey && compactChapter.includes(intentKey)) {
+        chapterBonus += 1.4;
+      }
+    }
+  }
 
-  // 也搜索章节标题（仅用 ≥4 字的关键词，避免"方法"等短词匹配无关章节）
-  const chapterConditions = rawKeywords
-    .filter(kw => kw.length >= 4)
-    .map(kw => like(materialChunks.chapter, `%${kw}%`));
+  let structureBonus = 0;
+  if (containsEnumerationMarkers(content) && intentTerms.some((term) => QUESTION_INTENT_KEYS.has(normalizeForComparison(term)))) {
+    structureBonus += 2.2;
+  }
 
-  const baseWhere = and(
-    eq(materials.status, 'published'),
+  const repetitionPenalty = computeRepetitionPenalty(content);
+  const tfPenalty = maxTf > 5 ? Math.max(0.82, 1 - (maxTf - 5) * 0.03) : 1;
+  const baseScore = bm25Score * (0.6 + 0.4 * coverage);
+
+  return (baseScore + phraseBonus + chapterBonus + structureBonus) * repetitionPenalty * tfPenalty;
+}
+
+function computeRepetitionPenalty(content: string): number {
+  const sentences = content
+    .split(/[。！？\n]/)
+    .map((sentence) => sentence.trim())
+    .filter((sentence) => sentence.length >= 10);
+
+  if (sentences.length < 3) return 1;
+
+  const freq = new Map<string, number>();
+  for (const sentence of sentences) {
+    const key = normalizeForComparison(sentence).slice(0, 80);
+    if (!key) continue;
+    freq.set(key, (freq.get(key) || 0) + 1);
+  }
+
+  let repeated = 0;
+  freq.forEach((count) => {
+    if (count > 1) repeated += count - 1;
+  });
+
+  const rate = repeated / Math.max(1, sentences.length);
+  return 1 - Math.min(0.18, rate * 0.35);
+}
+
+function containsEnumerationMarkers(content: string): boolean {
+  return /(?:^|\n)\s*(?:[一二三四五六七八九十]+[、．.）)]|\d+[\.、）)]|\([一二三四五六七八九十]+\))/m.test(content);
+}
+
+function buildBaseFilters(
+  materialIds?: number[],
+  languageFilter: "zh" | "en" | "all" = "all"
+) {
+  return [
+    eq(materials.status, "published"),
     languageFilter !== "all" ? eq(materials.language, languageFilter) : undefined,
-    materialIds && materialIds.length > 0
-      ? inArray(materialChunks.materialId, materialIds)
-      : undefined,
-    or(...likeConditions, ...chapterConditions)
-  );
+    materialIds && materialIds.length > 0 ? inArray(materialChunks.materialId, materialIds) : undefined,
+  ].filter((condition): condition is NonNullable<typeof condition> => Boolean(condition));
+}
 
-  const candidates = await db
+function buildTermCondition(term: string) {
+  const escaped = term.replace(/[\\%_]/g, "\\$&");
+  return or(
+    like(materialChunks.content, `%${escaped}%`),
+    like(materialChunks.chapter, `%${escaped}%`)
+  );
+}
+
+function mergeCandidate(
+  map: Map<number, CandidateState>,
+  row: CandidateRow
+): CandidateState {
+  const existing = map.get(row.id);
+  if (existing) return existing;
+
+  const state: CandidateState = {
+    ...row,
+    routeHits: { strict: 0, phrase: 0, broad: 0 },
+    recallScore: 0,
+    keywordScore: 0,
+    adjacencyScore: 0,
+    finalScore: 0,
+  };
+  map.set(row.id, state);
+  return state;
+}
+
+function isNearDuplicate(a: CandidateState, b: CandidateState): boolean {
+  if (a.id === b.id) return true;
+  if (a.materialId === b.materialId && a.chunkIndex === b.chunkIndex) return true;
+
+  const textA = normalizeForComparison(a.content).slice(0, 240);
+  const textB = normalizeForComparison(b.content).slice(0, 240);
+  if (!textA || !textB) return false;
+  if (textA === textB) return true;
+
+  const shorter = textA.length <= textB.length ? textA : textB;
+  const longer = shorter === textA ? textB : textA;
+  if (shorter.length >= 50 && longer.includes(shorter)) return true;
+
+  const windowSize = Math.max(6, Math.min(12, Math.floor(Math.min(textA.length, textB.length) / 14)));
+  const stride = Math.max(1, Math.floor(windowSize / 2));
+
+  const makeShingles = (text: string) => {
+    const set = new Set<string>();
+    for (let i = 0; i + windowSize <= text.length; i += stride) {
+      set.add(text.slice(i, i + windowSize));
+    }
+    return set;
+  };
+
+  const shinglesA = makeShingles(textA);
+  const shinglesB = makeShingles(textB);
+  if (shinglesA.size === 0 || shinglesB.size === 0) return false;
+
+  let intersection = 0;
+  shinglesA.forEach((shingle) => {
+    if (shinglesB.has(shingle)) intersection++;
+  });
+
+  const union = shinglesA.size + shinglesB.size - intersection;
+  const jaccard = union > 0 ? intersection / union : 0;
+  return jaccard >= 0.55;
+}
+
+function applyDiversitySelection(candidates: CandidateState[], topK: number): CandidateState[] {
+  const selected: CandidateState[] = [];
+  const selectedIds = new Set<number>();
+  const deferred: CandidateState[] = [];
+  const materialCounts = new Map<number, number>();
+  const chapterCounts = new Map<string, number>();
+
+  for (const candidate of candidates) {
+    const chapterKey = candidate.chapter ? normalizeForComparison(candidate.chapter) : "";
+    const materialCount = materialCounts.get(candidate.materialId) || 0;
+    const chapterCount = chapterKey ? chapterCounts.get(chapterKey) || 0 : 0;
+
+    let duplicatePenalty = 0;
+    for (const picked of selected) {
+      if (candidate.materialId === picked.materialId && Math.abs(candidate.chunkIndex - picked.chunkIndex) <= 1) {
+        duplicatePenalty = Math.max(duplicatePenalty, 0.4);
+        continue;
+      }
+      if (isNearDuplicate(candidate, picked)) {
+        duplicatePenalty = Math.max(duplicatePenalty, 0.65);
+      }
+    }
+
+    const diversityPenalty = Math.min(0.5, materialCount * 0.1 + chapterCount * 0.05 + duplicatePenalty);
+    const adjustedScore = candidate.finalScore * (1 - diversityPenalty);
+    if (adjustedScore <= 0) continue;
+    if (duplicatePenalty >= 0.65) {
+      deferred.push({
+        ...candidate,
+        finalScore: adjustedScore * 0.9,
+      });
+      continue;
+    }
+
+    selected.push({
+      ...candidate,
+      finalScore: adjustedScore,
+    });
+    selectedIds.add(candidate.id);
+
+    materialCounts.set(candidate.materialId, materialCount + 1);
+    if (chapterKey) {
+      chapterCounts.set(chapterKey, chapterCount + 1);
+    }
+
+    if (selected.length >= topK) break;
+  }
+
+  if (selected.length < topK) {
+    const fillPool = [...deferred, ...candidates];
+    for (const candidate of fillPool) {
+      if (selectedIds.has(candidate.id)) continue;
+
+      const nearAdjacent = selected.some(
+        (picked) => picked.materialId === candidate.materialId && Math.abs(candidate.chunkIndex - picked.chunkIndex) <= 1
+      );
+      const nearDuplicate = selected.some((picked) => isNearDuplicate(candidate, picked));
+      const fillPenalty = nearDuplicate ? 0.26 : nearAdjacent ? 0.16 : 0.08;
+      const adjustedScore = candidate.finalScore * (1 - fillPenalty);
+      if (adjustedScore <= 0) continue;
+
+      selected.push({
+        ...candidate,
+        finalScore: adjustedScore,
+      });
+      selectedIds.add(candidate.id);
+
+      if (selected.length >= topK) break;
+    }
+  }
+
+  return selected;
+}
+
+async function fetchRouteCandidates(
+  db: DbConnection,
+  route: RouteName,
+  terms: string[],
+  materialIds: number[] | undefined,
+  languageFilter: "zh" | "en" | "all",
+  limit: number
+): Promise<CandidateRow[]> {
+  if (terms.length === 0) return [];
+
+  const baseFilters = buildBaseFilters(materialIds, languageFilter);
+  const termConditions = terms.map((term) => buildTermCondition(term));
+  const matchClause = route === "strict"
+    ? and(...termConditions)
+    : or(...termConditions);
+
+  const rows = await db
     .select({
       id: materialChunks.id,
       materialId: materialChunks.materialId,
+      chunkIndex: materialChunks.chunkIndex,
       content: materialChunks.content,
       chapter: materialChunks.chapter,
       pageStart: materialChunks.pageStart,
@@ -402,57 +871,216 @@ export async function semanticSearch(
     })
     .from(materialChunks)
     .innerJoin(materials, eq(materialChunks.materialId, materials.id))
-    .where(baseWhere)
-    .limit(300);
+    .where(and(...baseFilters, matchClause))
+    .limit(limit);
 
-  console.log(`[Search] candidates=${candidates.length}`);
-
-  if (candidates.length === 0) return [];
-
-  // 应用层精排：用同义词扩展后的关键词评分（比 SQL 更精细的排序）
-  const scored = candidates.map(chunk => ({
-    ...chunk,
-    score: scoreChunk(chunk.content, scoringKeywords, question, chunk.chapter ?? undefined),
+  return rows.map((row) => ({
+    id: row.id,
+    materialId: row.materialId,
+    chunkIndex: row.chunkIndex,
+    content: row.content,
+    chapter: row.chapter,
+    pageStart: row.pageStart,
+    pageEnd: row.pageEnd,
   }));
+}
 
-  // 按分数降序排列
-  scored.sort((a, b) => b.score - a.score);
+async function fetchNeighborCandidates(
+  db: DbConnection,
+  seeds: CandidateState[],
+  materialIds: number[] | undefined,
+  languageFilter: "zh" | "en" | "all"
+): Promise<CandidateRow[]> {
+  if (seeds.length === 0) return [];
 
-  // 章节多样性选择：避免同一章节/来源的 chunk 独占 Top-K
-  // 每个章节最多选 maxPerChapter 个 chunk，剩余名额给其他章节
-  const maxPerChapter = Math.max(3, Math.ceil(topK * 0.4)); // 至少3个，最多占 topK 的 40%
-  const chapterCounts = new Map<string, number>();
-  const topResults: typeof scored = [];
-  const overflow: typeof scored = []; // 被多样性限制跳过的 chunk
-
-  for (const r of scored) {
-    if (r.score <= 0) break;
-    const chapterKey = `${r.materialId}:${r.chapter ?? ''}`;
-    const cnt = chapterCounts.get(chapterKey) ?? 0;
-    if (cnt < maxPerChapter) {
-      topResults.push(r);
-      chapterCounts.set(chapterKey, cnt + 1);
-      if (topResults.length >= topK) break;
-    } else {
-      overflow.push(r);
+  const needed = new Map<number, Set<number>>();
+  for (const seed of seeds) {
+    if (!needed.has(seed.materialId)) {
+      needed.set(seed.materialId, new Set());
     }
-  }
-  // 如果多样性选择后不够 topK，从 overflow 中补充
-  if (topResults.length < topK) {
-    for (const r of overflow) {
-      topResults.push(r);
-      if (topResults.length >= topK) break;
-    }
+    const indices = needed.get(seed.materialId)!;
+    indices.add(seed.chunkIndex - 1);
+    indices.add(seed.chunkIndex + 1);
   }
 
-  for (const r of topResults.slice(0, 5)) {
-    console.log(`[Search]   #${r.id} score=${r.score.toFixed(1)} ch="${r.chapter?.substring(0, 20) ?? '-'}" "${r.content.substring(0, 60)}..."`);
+  const rows: CandidateRow[] = [];
+  for (const [materialId, indices] of Array.from(needed.entries())) {
+    const filtered: number[] = [];
+    indices.forEach((index) => {
+      if (index >= 0) filtered.push(index);
+    });
+    if (filtered.length === 0) continue;
+
+    const baseFilters = buildBaseFilters(materialIds, languageFilter);
+    const neighborRows = await db
+      .select({
+        id: materialChunks.id,
+        materialId: materialChunks.materialId,
+        chunkIndex: materialChunks.chunkIndex,
+        content: materialChunks.content,
+        chapter: materialChunks.chapter,
+        pageStart: materialChunks.pageStart,
+        pageEnd: materialChunks.pageEnd,
+      })
+      .from(materialChunks)
+      .innerJoin(materials, eq(materialChunks.materialId, materials.id))
+      .where(and(...baseFilters, eq(materialChunks.materialId, materialId), inArray(materialChunks.chunkIndex, filtered)))
+      .limit(filtered.length + 2);
+
+    rows.push(
+      ...neighborRows.map((row) => ({
+        id: row.id,
+        materialId: row.materialId,
+        chunkIndex: row.chunkIndex,
+        content: row.content,
+        chapter: row.chapter,
+        pageStart: row.pageStart,
+        pageEnd: row.pageEnd,
+      }))
+    );
   }
+
+  return rows;
+}
+
+// ─── 混合检索 Top-K（纯关键词多路召回）──────────────────────────────────────
+export async function semanticSearch(
+  question: string,
+  materialIds?: number[],
+  topK: number = 8,
+  languageFilter: "zh" | "en" | "all" = "all",
+  useEmbedding: boolean = true
+): Promise<SearchResult[]> {
+  const db = await getDb();
+  if (!db) throw new Error("数据库不可用");
+
+  const questionLang = detectLanguage(question);
+  const profile = buildSearchProfile(question, questionLang);
+  const strictTerms = uniqueSortedTerms(profile.coreTerms.slice(0, 5));
+  const phraseTerms = uniqueSortedTerms([...profile.exactPhrases, ...profile.intentTerms]).slice(0, 8);
+  const broadTerms = profile.broadTerms.slice(0, 18);
+  const routePlan: Array<{
+    route: RouteName;
+    terms: string[];
+    limit: number;
+    weight: number;
+  }> = [
+    {
+      route: "strict",
+      terms: strictTerms.length > 0 ? strictTerms : phraseTerms.slice(0, 3),
+      limit: 120,
+      weight: 6.2,
+    },
+    {
+      route: "phrase",
+      terms: phraseTerms.length > 0 ? phraseTerms : broadTerms.slice(0, 6),
+      limit: 180,
+      weight: 3.6,
+    },
+    {
+      route: "broad",
+      terms: broadTerms,
+      limit: 300,
+      weight: 1.6,
+    },
+  ];
+
+  // 当前版本不依赖 embedding，useEmbedding 参数仅保留兼容性。
+  void useEmbedding;
+
+  const candidateMap = new Map<number, CandidateState>();
+
+  for (const route of routePlan) {
+    if (route.terms.length === 0) continue;
+
+    const routeRows = await fetchRouteCandidates(
+      db,
+      route.route,
+      route.terms,
+      materialIds,
+      languageFilter,
+      route.limit
+    );
+
+    const rankedRows = routeRows
+      .map((row) => ({
+        row,
+        score: scoreChunk(row.content, route.terms, question, row.chapter ?? undefined, {
+          intentTerms: profile.intentTerms,
+        }),
+      }))
+      .filter((item) => item.score > 0)
+      .sort((a, b) => b.score - a.score);
+
+    rankedRows.forEach((item, index) => {
+      const candidate = mergeCandidate(candidateMap, item.row);
+      candidate.routeHits[route.route] += 1;
+      candidate.recallScore += route.weight / (index + 1.5);
+    });
+  }
+
+  if (candidateMap.size === 0) return [];
+
+  let candidates = Array.from(candidateMap.values());
+  let stats = countTermStats(candidates, profile.scoringTerms);
+
+  for (const candidate of candidates) {
+    candidate.keywordScore = scoreChunk(candidate.content, profile.scoringTerms, question, candidate.chapter ?? undefined, {
+      stats,
+      intentTerms: profile.intentTerms,
+    });
+  }
+
+  for (const candidate of candidates) {
+    candidate.finalScore = candidate.keywordScore + candidate.recallScore;
+  }
+
+  candidates.sort((a, b) => b.finalScore - a.finalScore);
+
+  const seedCount = Math.min(candidates.length, Math.max(6, Math.ceil(topK * 0.7)));
+  const seedCandidates = candidates.slice(0, seedCount);
+  const neighborRows = await fetchNeighborCandidates(db, seedCandidates, materialIds, languageFilter);
+
+  for (const row of neighborRows) {
+    const candidate = mergeCandidate(candidateMap, row);
+    let adjacencyBoost = candidate.adjacencyScore;
+
+    for (const seed of seedCandidates) {
+      if (seed.materialId === row.materialId && Math.abs(seed.chunkIndex - row.chunkIndex) === 1) {
+        adjacencyBoost = Math.max(adjacencyBoost, seed.finalScore * 0.78);
+      }
+    }
+
+    candidate.adjacencyScore = Math.max(candidate.adjacencyScore, adjacencyBoost);
+  }
+
+  candidates = Array.from(candidateMap.values());
+  stats = countTermStats(candidates, profile.scoringTerms);
+
+  for (const candidate of candidates) {
+    candidate.keywordScore = scoreChunk(candidate.content, profile.scoringTerms, question, candidate.chapter ?? undefined, {
+      stats,
+      intentTerms: profile.intentTerms,
+    });
+  }
+
+  const maxKeyword = Math.max(...candidates.map((entry) => entry.keywordScore), 1);
+  const maxRecall = Math.max(...candidates.map((entry) => entry.recallScore), 1);
+  const maxAdjacency = Math.max(...candidates.map((entry) => entry.adjacencyScore), 1);
+
+  for (const candidate of candidates) {
+    const normKeyword = candidate.keywordScore / maxKeyword;
+    const normRecall = candidate.recallScore / maxRecall;
+    const normAdjacency = candidate.adjacencyScore / maxAdjacency;
+    candidate.finalScore = normKeyword * 0.58 + normRecall * 0.27 + normAdjacency * 0.15;
+  }
+
+  candidates.sort((a, b) => b.finalScore - a.finalScore);
+  const topResults = applyDiversitySelection(candidates, topK).filter((candidate) => candidate.finalScore > 0);
 
   if (topResults.length === 0) return [];
 
-  // 获取教材标题
-  const matIds = Array.from(new Set(topResults.map(c => c.materialId)));
+  const matIds = Array.from(new Set(topResults.map((c) => c.materialId)));
   const matDetails = await db
     .select({ id: materials.id, title: materials.title })
     .from(materials)
@@ -462,13 +1090,14 @@ export async function semanticSearch(
 
   return topResults.map(r => ({
     chunkId: r.id,
+    chunkIndex: r.chunkIndex,
     materialId: r.materialId,
     materialTitle: matMap.get(r.materialId) || "未知教材",
     chapter: r.chapter,
     pageStart: r.pageStart,
     pageEnd: r.pageEnd,
     content: r.content,
-    similarity: Math.min(r.score / 20, 1), // 归一化到 0-1
+    similarity: r.finalScore,
   }));
 }
 
