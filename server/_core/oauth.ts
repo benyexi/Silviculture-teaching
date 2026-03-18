@@ -46,14 +46,19 @@ export function registerOAuthRoutes(app: Express) {
     try {
       const openId = `local_${username}`;
 
-      await db.upsertUser({
-        openId,
-        name: username,
-        email: null,
-        loginMethod: "local",
-        role: "admin",
-        lastSignedIn: new Date(),
-      });
+      // Database upsert is best-effort — don't block login if DB fails
+      try {
+        await db.upsertUser({
+          openId,
+          name: username,
+          email: null,
+          loginMethod: "local",
+          role: "admin",
+          lastSignedIn: new Date(),
+        });
+      } catch (dbError) {
+        console.error("[Auth] DB upsert failed (non-fatal):", dbError);
+      }
 
       const sessionToken = await sdk.createSessionToken(openId, {
         name: username,
@@ -61,12 +66,13 @@ export function registerOAuthRoutes(app: Express) {
       });
 
       const cookieOptions = getSessionCookieOptions(req);
+      console.log("[Auth] Setting cookie with options:", cookieOptions);
       res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
 
       res.json({ success: true, user: { name: username, role: "admin" } });
     } catch (error) {
       console.error("[Auth] Login failed", error);
-      res.status(500).json({ error: "登录失败" });
+      res.status(500).json({ error: "登录失败: " + String(error) });
     }
   });
 
