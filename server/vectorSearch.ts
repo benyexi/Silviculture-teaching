@@ -175,6 +175,10 @@ const SYNONYM_MAP: Record<string, string[]> = {
 };
 
 const QUESTION_INTENT_WORDS = [
+  "定义",
+  "含义",
+  "概念",
+  "是指",
   "分类",
   "类型",
   "方法",
@@ -379,7 +383,13 @@ function buildSearchProfile(question: string, questionLang: "zh" | "en"): Search
   const strippedQuestion = stripQuestionWords(normalizedQuestion).trim();
   const baseKeywords = questionLang === "en" ? extractKeywordsEn(question) : extractKeywords(question);
   const exactPhrases = questionLang === "en" ? [] : extractDomainPhrases(strippedQuestion);
-  const intentTerms = questionLang === "en" ? [] : extractIntentTerms(strippedQuestion);
+  const derivedDefinitionTerms =
+    questionLang === "zh" && /(什么是|何谓|是指|定义|概念|含义)/.test(normalizedQuestion)
+      ? ["定义", "概念", "是指"]
+      : [];
+  const intentTerms = questionLang === "en"
+    ? []
+    : uniqueSortedTerms([...extractIntentTerms(normalizedQuestion), ...derivedDefinitionTerms]).slice(0, 8);
 
   const candidateTerms = uniqueSortedTerms([
     ...baseKeywords,
