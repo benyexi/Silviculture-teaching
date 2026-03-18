@@ -56,7 +56,19 @@ export default function TeacherMaterials() {
     onError: (e) => toast.error(`重新处理失败: ${e.message}`),
   });
   const reprocessAllMutation = trpc.materials.reprocessAll.useMutation({
-    onSuccess: (data) => { utils.materials.list.invalidate(); toast.success(`已开始重新处理 ${data.started} 本教材`); },
+    onSuccess: (data) => {
+      utils.materials.list.invalidate();
+      if (data.started > 0) {
+        toast.success(`已开始重新处理 ${data.started}/${data.total} 本教材`);
+      }
+      if (data.failures && data.failures.length > 0) {
+        const details = data.failures.map((f: { title: string; reason: string }) => `「${f.title}」: ${f.reason}`).join("\n");
+        toast.error(`${data.failures.length} 本教材处理失败:\n${details}`, { duration: 8000 });
+      }
+      if (data.started === 0 && (!data.failures || data.failures.length === 0)) {
+        toast("没有找到需要重新处理的教材");
+      }
+    },
     onError: (e) => toast.error(`批量处理失败: ${e.message}`),
   });
 
