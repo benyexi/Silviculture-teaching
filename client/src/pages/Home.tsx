@@ -68,7 +68,8 @@ export default function Home() {
     }
   };
 
-  const FOREST_BG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401618844/UwcsU6Nu9y4z2Keggtu7BV/forest-bg_f271853a.jpg";
+  // Forest background — place forest-bg.jpg in client/public/ or use a remote URL
+  const FOREST_BG = "https://images.unsplash.com/photo-1448375240586-882707db888b?w=1920&q=80";
 
   return (
     <div className="min-h-screen flex flex-col bg-[oklch(0.96_0.01_145)]">

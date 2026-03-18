@@ -36,8 +36,13 @@ async function startServer() {
   app.get("/healthz", (_req, res) => {
     res.status(200).json({ status: "ok" });
   });
-  // OAuth callback under /api/oauth/callback
+  // Auth routes (local login)
   registerOAuthRoutes(app);
+
+  // Serve uploaded files
+  const uploadDir = process.env.UPLOAD_DIR || "./uploads";
+  app.use("/uploads", express.static(uploadDir));
+
   // tRPC API
   app.use(
     "/api/trpc",

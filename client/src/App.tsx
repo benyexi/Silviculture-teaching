@@ -5,6 +5,7 @@ import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
+import Login from "./pages/Login";
 import TeacherLayout from "./pages/teacher/TeacherLayout";
 import TeacherDashboard from "./pages/teacher/TeacherDashboard";
 import TeacherMaterials from "./pages/teacher/TeacherMaterials";
@@ -16,6 +17,7 @@ function Router() {
     <Switch>
       {/* 学生端（公开） */}
       <Route path="/" component={Home} />
+      <Route path="/login" component={Login} />
 
       {/* 教师端（需要 admin 角色） */}
       <Route path="/teacher">

@@ -73,9 +73,10 @@ export async function invokeLLMWithConfig(
 ): Promise<LLMResponse> {
   const config = await getActiveLlmConfig();
 
-  // 如果没有自定义配置，使用内置 Forge API
   if (!config) {
-    return invokeBuiltinLLM(messages, systemPrompt);
+    throw new Error(
+      "未配置 LLM 模型。请在教师端「模型配置」页面添加并激活一个 LLM 配置（支持 OpenAI / DeepSeek / 通义千问 / Ollama）。"
+    );
   }
 
   const allMessages: LLMMessage[] = [];
@@ -105,28 +106,6 @@ export async function invokeLLMWithConfig(
   };
 }
 
-// ─── 内置 Forge API 回退 ──────────────────────────────────────────────────────
-async function invokeBuiltinLLM(
-  messages: LLMMessage[],
-  systemPrompt?: string
-): Promise<LLMResponse> {
-  const { invokeLLM } = await import("./_core/llm");
-
-  const allMessages: Array<{ role: string; content: string }> = [];
-  if (systemPrompt) {
-    allMessages.push({ role: "system", content: systemPrompt });
-  }
-  allMessages.push(...messages);
-
-  const response = await invokeLLM({ messages: allMessages as Array<{ role: "system" | "user" | "assistant"; content: string }> });
-  const rawContent = response.choices[0]?.message?.content;
-  const content = typeof rawContent === "string" ? rawContent : "";
-  return {
-    content,
-    model: "built-in",
-  };
-}
-
 // ─── Embedding 接口 ───────────────────────────────────────────────────────────
 export async function getEmbedding(text: string): Promise<number[]> {
   const config = await getActiveLlmConfig();
@@ -143,37 +122,9 @@ export async function getEmbedding(text: string): Promise<number[]> {
     return response.data[0].embedding;
   }
 
-  // 回退：使用内置 Forge API 的 Embedding
-  return invokeBuiltinEmbedding(text);
-}
-
-async function invokeBuiltinEmbedding(text: string): Promise<number[]> {
-  const apiUrl = process.env.BUILT_IN_FORGE_API_URL;
-  const apiKey = process.env.BUILT_IN_FORGE_API_KEY;
-
-  if (!apiUrl || !apiKey) {
-    throw new Error("内置 Forge API 未配置，请在教师端配置 LLM 模型");
-  }
-
-  const embeddingUrl = `${apiUrl.replace(/\/$/, '')}/v1/embeddings`;
-  const response = await fetch(embeddingUrl, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: "text-embedding-3-small",
-      input: text,
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Embedding API 请求失败: ${response.statusText}`);
-  }
-
-  const data = await response.json() as any;
-  return data.data[0].embedding as number[];
+  throw new Error(
+    "未配置 Embedding 模型。请在教师端「模型配置」页面配置 Embedding 模型和 API Key。"
+  );
 }
 
 // ─── 余弦相似度计算 ───────────────────────────────────────────────────────────
