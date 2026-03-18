@@ -197,7 +197,8 @@ export const appRouter = router({
         const fs = await import("node:fs");
         const path = await import("node:path");
 
-        const uploadDir = process.env.UPLOAD_DIR || "./uploads";
+        const { ENV } = await import("./_core/env");
+        const uploadDir = ENV.uploadDir;
         const fileKey = `materials/${nanoid()}-${session.filename}`;
         const destPath = path.join(uploadDir, fileKey);
         const destDir = path.dirname(destPath);

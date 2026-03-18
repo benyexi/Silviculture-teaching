@@ -7,5 +7,6 @@ export const ENV = {
   adminUsername: process.env.ADMIN_USERNAME ?? "admin",
   adminPassword: process.env.ADMIN_PASSWORD ?? "",
   // Upload directory for local file storage
-  uploadDir: process.env.UPLOAD_DIR ?? "./uploads",
+  // In production (Railway), always use /data/uploads where the volume is mounted
+  uploadDir: process.env.NODE_ENV === "production" ? "/data/uploads" : (process.env.UPLOAD_DIR ?? "./uploads"),
 };
