@@ -202,7 +202,12 @@ export const appRouter = router({
 
         // 存储完整文件
         const fileKey = `materials/${nanoid()}-${session.filename}`;
-        const { url: fileUrl } = await put(fileKey, fullBuffer, "application/pdf");
+        const ext = session.filename.toLowerCase().split(".").pop();
+        const contentType =
+          ext === "docx" || ext === "doc"
+            ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            : "application/pdf";
+        const { url: fileUrl } = await put(fileKey, fullBuffer, contentType);
 
         // 创建教材记录
         const materialId = await createMaterial({
@@ -225,8 +230,8 @@ export const appRouter = router({
           materialId,
         });
 
-        // 异步处理 PDF（不阻塞响应）
-        processMaterial(materialId, fullBuffer).catch((err) => {
+        // 异步处理文档（不阻塞响应）
+        processMaterial(materialId, fullBuffer, session.filename).catch((err) => {
           console.error(`[Router] 教材 ${materialId} 处理失败:`, err);
         });
 

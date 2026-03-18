@@ -1,12 +1,13 @@
 /**
- * PDF 处理管道
- * 上传 PDF → 提取文本 → 智能分块（按章节/段落）→ 向量化 → 存储
+ * 文档处理管道
+ * 上传 PDF/Word → 提取文本 → 智能分块（按章节/段落）→ 向量化 → 存储
  */
 import { getDb } from "./db";
 import { materials, materialChunks } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
 import { storeChunkVector } from "./vectorSearch";
 import { detectDocumentLanguage } from "./languageDetect";
+import mammoth from "mammoth";
 
 // ─── 文本块类型 ───────────────────────────────────────────────────────────────
 type TextChunk = {
@@ -20,13 +21,22 @@ type TextChunk = {
 const HEADING_PATTERN =
   /^(第[一二三四五六七八九十百\d]+[章节]|[\d]+\.[\d]+[\s\S]{0,30}|[一二三四五六七八九十]+[、．])/;
 
+// ─── 支持的文件类型 ──────────────────────────────────────────────────────────
+function getFileType(filename: string): "pdf" | "docx" {
+  const ext = filename.toLowerCase().split(".").pop();
+  if (ext === "docx" || ext === "doc") return "docx";
+  return "pdf";
+}
+
 // ─── 主处理函数 ───────────────────────────────────────────────────────────────
 export async function processMaterial(
   materialId: number,
-  pdfBuffer: Buffer
+  fileBuffer: Buffer,
+  filename: string = "document.pdf"
 ): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("数据库不可用");
+  const fileType = getFileType(filename);
 
   try {
     // 更新状态为处理中
@@ -35,16 +45,19 @@ export async function processMaterial(
       .set({ status: "processing" })
       .where(eq(materials.id, materialId));
 
-    // 1. 提取 PDF 文本
-    console.log(`[PDF] 开始提取教材 ${materialId} 的文本...`);
-    const { text, pageTexts } = await extractPdfText(pdfBuffer);
+    // 1. 提取文档文本
+    console.log(`[Doc] 开始提取教材 ${materialId} 的文本 (${fileType})...`);
+    const { text, pageTexts } =
+      fileType === "docx"
+        ? await extractDocxText(fileBuffer)
+        : await extractPdfText(fileBuffer);
     const detectedLanguage = detectDocumentLanguage(text);
-    console.log(`[PDF] 检测到教材语言: ${detectedLanguage}`);
+    console.log(`[Doc] 检测到教材语言: ${detectedLanguage}`);
 
     // 2. 智能分块
-    console.log(`[PDF] 开始分块，总文本长度: ${text.length} 字符`);
+    console.log(`[Doc] 开始分块，总文本长度: ${text.length} 字符`);
     const chunks = splitIntoChunks(text, pageTexts);
-    console.log(`[PDF] 分块完成，共 ${chunks.length} 个块`);
+    console.log(`[Doc] 分块完成，共 ${chunks.length} 个块`);
 
     // 3. 存储文本块到数据库
     const insertedChunks: number[] = [];
@@ -63,7 +76,7 @@ export async function processMaterial(
     }
 
     // 4. 全文检索模式：标记所有 chunks 为已处理（无需向量化）
-    console.log(`[PDF] 全文检索模式，标记 ${insertedChunks.length} 个块为已处理...`);
+    console.log(`[Doc] 全文检索模式，标记 ${insertedChunks.length} 个块为已处理...`);
     const BATCH_SIZE = 50;
     for (let i = 0; i < insertedChunks.length; i += BATCH_SIZE) {
       const batchIds = insertedChunks.slice(i, i + BATCH_SIZE);
@@ -72,7 +85,7 @@ export async function processMaterial(
           try {
             await storeChunkVector(chunkId, []); // fulltext 模式，vector 为空数组
           } catch (err) {
-            console.error(`[PDF] 标记块 ${chunkId} 失败:`, err);
+            console.error(`[Doc] 标记块 ${chunkId} 失败:`, err);
           }
         })
       );
@@ -84,9 +97,9 @@ export async function processMaterial(
       .set({ status: "published", totalChunks: chunks.length, language: detectedLanguage })
       .where(eq(materials.id, materialId));
 
-    console.log(`[PDF] 教材 ${materialId} 处理完成！`);
+    console.log(`[Doc] 教材 ${materialId} 处理完成！`);
   } catch (error) {
-    console.error(`[PDF] 教材 ${materialId} 处理失败:`, error);
+    console.error(`[Doc] 教材 ${materialId} 处理失败:`, error);
     await db
       .update(materials)
       .set({
@@ -133,6 +146,43 @@ async function extractPdfText(
   }
 
   return { text: data.text || pageTexts.join("\n"), pageTexts };
+}
+
+// ─── Word (.docx) 文本提取 ──────────────────────────────────────────────────
+async function extractDocxText(
+  docxBuffer: Buffer
+): Promise<{ text: string; pageTexts: string[] }> {
+  const result = await mammoth.extractRawText({ buffer: docxBuffer });
+  const text = result.value;
+
+  // Word 文件没有物理页面概念，按章节标题或段落分组模拟 "页面"
+  // 这样 splitIntoChunks 仍能正常工作
+  const lines = text.split("\n");
+  const sections: string[] = [];
+  let currentSection = "";
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    // 遇到章节标题时，开始新的 section
+    if (HEADING_PATTERN.test(trimmed) && currentSection.trim().length > 100) {
+      sections.push(currentSection.trim());
+      currentSection = trimmed + "\n";
+    } else {
+      currentSection += trimmed + "\n";
+    }
+  }
+  if (currentSection.trim()) {
+    sections.push(currentSection.trim());
+  }
+
+  // 如果没有检测到章节划分，将整个文本作为一个 section
+  if (sections.length === 0 && text.trim()) {
+    sections.push(text.trim());
+  }
+
+  return { text, pageTexts: sections };
 }
 
 // ─── 智能文本分块 ─────────────────────────────────────────────────────────────
