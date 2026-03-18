@@ -190,26 +190,34 @@ export const appRouter = router({
         const session = await getUploadSession(input.sessionId);
         if (!session) throw new TRPCError({ code: "NOT_FOUND" });
 
-        // 合并所有分块（从本地存储读取并拼接）
-        const { storagePut: put, storageReadBuffer } = await import("./storage");
-        const chunks: Buffer[] = [];
+        // 合并所有分块：流式写入目标文件，避免全部加载到内存
+        const { storageGet: _get, storageReadBuffer } = await import("./storage");
+        const fs = await import("node:fs");
+        const path = await import("node:path");
 
+        const uploadDir = process.env.UPLOAD_DIR || "./uploads";
+        const fileKey = `materials/${nanoid()}-${session.filename}`;
+        const destPath = path.join(uploadDir, fileKey);
+        const destDir = path.dirname(destPath);
+        if (!fs.existsSync(destDir)) fs.mkdirSync(destDir, { recursive: true });
+
+        // 流式合并：逐块追加写入，peak 内存只有一个 chunk 大小
+        let totalSize = 0;
+        const writeStream = fs.createWriteStream(destPath);
         for (let i = 0; i < session.totalChunks; i++) {
           const chunkKey = `uploads/chunks/${input.sessionId}/${i}`;
           const buf = await storageReadBuffer(chunkKey);
-          chunks.push(buf);
+          totalSize += buf.length;
+          await new Promise<void>((resolve, reject) => {
+            writeStream.write(buf, (err) => err ? reject(err) : resolve());
+          });
         }
+        await new Promise<void>((resolve, reject) => {
+          writeStream.end((err: Error | null) => err ? reject(err) : resolve());
+        });
 
-        const fullBuffer = Buffer.concat(chunks);
-
-        // 存储完整文件
-        const fileKey = `materials/${nanoid()}-${session.filename}`;
+        const fileUrl = `/uploads/${fileKey}`;
         const ext = session.filename.toLowerCase().split(".").pop();
-        const contentType =
-          ext === "docx" || ext === "doc"
-            ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            : "application/pdf";
-        const { url: fileUrl } = await put(fileKey, fullBuffer, contentType);
 
         // 创建教材记录
         const materialId = await createMaterial({
@@ -221,7 +229,7 @@ export const appRouter = router({
           language: input.language ?? "zh",
           fileKey,
           fileUrl,
-          fileSizeBytes: fullBuffer.length,
+          fileSizeBytes: totalSize,
           status: "processing",
           uploadedBy: ctx.user.id,
         });
@@ -232,12 +240,17 @@ export const appRouter = router({
           materialId,
         });
 
-        // 异步处理文档（不阻塞响应）
+        // 异步处理文档（读取完整文件用于解析）
+        const fullBuffer = fs.readFileSync(destPath);
         processMaterial(materialId, fullBuffer, session.filename)
-          .then(() => clearAnswerCache()) // 教材更新后清空答案缓存
+          .then(() => clearAnswerCache())
           .catch((err) => {
             console.error(`[Router] 教材 ${materialId} 处理失败:`, err);
           });
+
+        // 清理临时分块文件
+        const chunkDir = path.join(uploadDir, "uploads", "chunks", input.sessionId);
+        fs.rm(chunkDir, { recursive: true, force: true }, () => {});
 
         return { materialId, status: "processing" };
       }),
