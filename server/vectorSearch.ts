@@ -162,13 +162,19 @@ export function extractKeywords(text: string): string[] {
     .trim();
 
   const keywords: string[] = [];
-  const stopWords = new Set([
+  // 单字停用词：在 n-gram 提取前用于分割文本，避免"混交方法有"变成一个整体
+  const singleCharStops = new Set([
     '的', '了', '在', '是', '我', '有', '和', '就', '不', '人', '都', '一',
+    '吗', '呢', '吧', '啊', '着', '过', '把', '被', '给', '让', '向', '从',
+    '到', '对', '与', '而', '也', '又', '才', '已', '还', '很', '更', '最',
+  ]);
+  const multiCharStops = new Set([
     '上面', '下面', '什么', '如何', '怎么', '怎样', '为什么', '哪些',
     '这个', '那个', '这些', '那些', '这样', '那样', '可以', '应该',
     '需要', '能够', '进行', '实现', '就是', '也就', '不是', '就会',
     '主要', '基本', '一般', '通常', '具有', '包括', '属于'
   ]);
+  const allStops = new Set(Array.from(singleCharStops).concat(Array.from(multiCharStops)));
 
   // 提取英文单词（3字母以上）
   const englishMatches = cleaned.match(/[a-zA-Z]{3,}/g) || [];
@@ -180,35 +186,43 @@ export function extractKeywords(text: string): string[] {
   for (const seg of segments) {
     // 提取纯中文片段
     const chineseParts = seg.match(/[\u4e00-\u9fa5]+/g) || [];
-    for (const part of chineseParts) {
-      if (part.length >= 2 && part.length <= 8 && !stopWords.has(part)) {
-        keywords.push(part);
-      }
-      // 提取 2-gram
-      if (part.length >= 4) {
-        for (let i = 0; i <= part.length - 2; i++) {
-          const bigram = part.slice(i, i + 2);
-          if (!stopWords.has(bigram)) keywords.push(bigram);
+    for (const rawPart of chineseParts) {
+      // 用单字停用词切割中文片段，避免"混交方法有"被当成一个整体
+      // "混交方法有" → ["混交方法"] （"有"是停用词，在此处切断）
+      const subParts = rawPart.split(new RegExp(`[${Array.from(singleCharStops).join('')}]`)).filter(s => s.length >= 2);
+      // 如果切割后没有结果，保留原文（可能没有停用词）
+      const parts = subParts.length > 0 ? subParts : (rawPart.length >= 2 ? [rawPart] : []);
+
+      for (const part of parts) {
+        if (part.length >= 2 && part.length <= 8 && !allStops.has(part)) {
+          keywords.push(part);
         }
-      }
-      // 提取 3-gram
-      if (part.length >= 5) {
-        for (let i = 0; i <= part.length - 3; i++) {
-          const trigram = part.slice(i, i + 3);
-          if (!stopWords.has(trigram)) keywords.push(trigram);
+        // 提取 2-gram
+        if (part.length >= 4) {
+          for (let i = 0; i <= part.length - 2; i++) {
+            const bigram = part.slice(i, i + 2);
+            if (!allStops.has(bigram)) keywords.push(bigram);
+          }
         }
-      }
-      // 提取 4-gram
-      if (part.length >= 6) {
-        for (let i = 0; i <= part.length - 4; i++) {
-          const fourgram = part.slice(i, i + 4);
-          if (!stopWords.has(fourgram)) keywords.push(fourgram);
+        // 提取 3-gram
+        if (part.length >= 5) {
+          for (let i = 0; i <= part.length - 3; i++) {
+            const trigram = part.slice(i, i + 3);
+            if (!allStops.has(trigram)) keywords.push(trigram);
+          }
+        }
+        // 提取 4-gram
+        if (part.length >= 6) {
+          for (let i = 0; i <= part.length - 4; i++) {
+            const fourgram = part.slice(i, i + 4);
+            if (!allStops.has(fourgram)) keywords.push(fourgram);
+          }
         }
       }
     }
   }
 
-  return Array.from(new Set(keywords)).filter(k => !stopWords.has(k) && k.length >= 2);
+  return Array.from(new Set(keywords)).filter(k => !allStops.has(k) && k.length >= 2);
 }
 
 const EN_STOP_WORDS = new Set([
@@ -331,10 +345,11 @@ export async function semanticSearch(
   const rawKeywords =
     questionLang === "en" ? extractKeywordsEn(question) : extractKeywords(question);
 
-  // 将原始问题的完整核心短语加入关键词（去掉问号等标点和常见提问词）
+  // 将原始问题的完整核心短语加入关键词（去掉标点、提问词和停用词）
   const cleanedQ = question
     .replace(/[，。？！、；：""''（）【】《》？!?,;:"'()\[\]\s]+/g, "")
-    .replace(/什么是|如何|怎么|怎样|为什么|哪些|请问|介绍|说明|解释|试述|分析|比较|请说明|请介绍|阐述|论述/g, "");
+    .replace(/什么是|如何|怎么|怎样|为什么|哪些|请问|介绍|说明|解释|试述|分析|比较|请说明|请介绍|阐述|论述/g, "")
+    .replace(/[的了在是我有和就不人都一吗呢吧啊着过]/g, ""); // 去掉所有单字停用词
   if (cleanedQ.length >= 2 && cleanedQ.length <= 10 && !rawKeywords.includes(cleanedQ)) {
     rawKeywords.unshift(cleanedQ);
   }
@@ -352,6 +367,10 @@ export async function semanticSearch(
     }
   }
   const sqlKeywords = Array.from(sqlKeywordsSet);
+
+  console.log(`[Search] question="${question}", rawKeywords=[${rawKeywords.join(', ')}]`);
+  console.log(`[Search] scoringKeywords=[${scoringKeywords.slice(0, 20).join(', ')}]`);
+  console.log(`[Search] sqlKeywords=[${sqlKeywords.join(', ')}]`);
 
   // ─── 路径1：关键词检索 ─────────────────────────────────────────────────────
   let keywordCandidates: typeof vectorCandidates = [];
@@ -512,6 +531,11 @@ export async function semanticSearch(
   // 排序取 Top-K
   entries.sort((a, b) => b.finalScore - a.finalScore);
   const topResults = entries.slice(0, topK).filter(r => r.finalScore > 0);
+
+  console.log(`[Search] keywordCandidates=${keywordCandidates.length}, vectorCandidates=${vectorCandidates.length}, merged=${scoreMap.size}, topResults=${topResults.length}`);
+  for (const r of topResults.slice(0, 5)) {
+    console.log(`[Search]   #${r.id} score=${r.finalScore.toFixed(3)} kw=${r.keywordScore.toFixed(1)} vec=${r.vectorScore.toFixed(3)} "${r.content.substring(0, 60)}..."`);
+  }
 
   if (topResults.length === 0) return [];
 
