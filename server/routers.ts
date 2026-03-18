@@ -188,21 +188,19 @@ export const appRouter = router({
         const session = await getUploadSession(input.sessionId);
         if (!session) throw new TRPCError({ code: "NOT_FOUND" });
 
-        // 合并所有分块（从 S3 读取并拼接）
-        const { storagePut: put, storageGet } = await import("./storage");
+        // 合并所有分块（从本地存储读取并拼接）
+        const { storagePut: put, storageReadBuffer } = await import("./storage");
         const chunks: Buffer[] = [];
 
         for (let i = 0; i < session.totalChunks; i++) {
           const chunkKey = `uploads/chunks/${input.sessionId}/${i}`;
-          const { url } = await storageGet(chunkKey);
-          const resp = await fetch(url);
-          const buf = Buffer.from(await resp.arrayBuffer());
+          const buf = await storageReadBuffer(chunkKey);
           chunks.push(buf);
         }
 
         const fullBuffer = Buffer.concat(chunks);
 
-        // 上传完整文件到 S3
+        // 存储完整文件
         const fileKey = `materials/${nanoid()}-${session.filename}`;
         const { url: fileUrl } = await put(fileKey, fullBuffer, "application/pdf");
 

@@ -28,21 +28,16 @@ services:
       NODE_ENV: production
       PORT: 3000
       DATABASE_URL: mysql://${MYSQL_USER:-silviculture}:${MYSQL_PASSWORD:-silviculture_password}@db:3306/silviculture
-      # Manus OAuth（必填）
-      VITE_APP_ID: ${VITE_APP_ID:-}
       JWT_SECRET: ${JWT_SECRET:-please_change_me}
-      OAUTH_SERVER_URL: ${OAUTH_SERVER_URL:-}
-      VITE_OAUTH_PORTAL_URL: ${VITE_OAUTH_PORTAL_URL:-}
-      # 项目所有者信息
-      OWNER_OPEN_ID: ${OWNER_OPEN_ID:-}
-      OWNER_NAME: ${OWNER_NAME:-}
-      # Manus Forge API（LLM / 存储 / 通知）
-      BUILT_IN_FORGE_API_URL: ${BUILT_IN_FORGE_API_URL:-}
-      BUILT_IN_FORGE_API_KEY: ${BUILT_IN_FORGE_API_KEY:-}
-      VITE_FRONTEND_FORGE_API_URL: ${VITE_FRONTEND_FORGE_API_URL:-}
-      VITE_FRONTEND_FORGE_API_KEY: ${VITE_FRONTEND_FORGE_API_KEY:-}
-      # 前端应用信息
+      # 管理员登录凭据
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?请设置管理员密码 ADMIN_PASSWORD}
+      # 文件上传目录（容器内路径，挂载为 volume）
+      UPLOAD_DIR: /app/uploads
+      # 前端显示标题
       VITE_APP_TITLE: ${VITE_APP_TITLE:-森林培育学知识问答系统}
+    volumes:
+      - pdf_uploads:/app/uploads
     ports:
       - "3000:3000"
     healthcheck:
@@ -54,3 +49,4 @@ services:
 
 volumes:
   mysql_data:
+  pdf_uploads:

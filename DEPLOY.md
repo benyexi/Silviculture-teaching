@@ -1,10 +1,15 @@
-# Docker Compose 阿里云部署指南
+# 阿里云 Docker Compose 部署指南
 
 ## 1. 服务器准备
 
-- 系统建议：Ubuntu 22.04+
-- 安装 Docker 与 Docker Compose（`apt install docker.io docker-compose-plugin -y`）
-- 放通端口：`22`、`80`、`443`、`3000`（若走 Nginx，外部可只开放 `80/443`）
+- 系统建议：Ubuntu 22.04+ 或 CentOS 8+
+- 安装 Docker 与 Docker Compose：
+  ```bash
+  # Ubuntu
+  apt update && apt install docker.io docker-compose-plugin -y
+  systemctl enable docker && systemctl start docker
+  ```
+- 安全组放通端口：`22`、`80`、`443`、`3000`
 
 ## 2. 拉取代码
 
@@ -15,43 +20,27 @@ cd Silviculture-teaching
 
 ## 3. 配置环境变量
 
-在项目根目录创建 `.env` 文件：
-
-```env
-# ── MySQL 账户 ──────────────────────────────────────────────
-MYSQL_ROOT_PASSWORD=replace_with_strong_root_password
-MYSQL_USER=silviculture
-MYSQL_PASSWORD=replace_with_strong_password
-
-# ── 应用数据库连接（使用 Docker 内部网络主机名 db）──────────
-DATABASE_URL=mysql://silviculture:replace_with_strong_password@db:3306/silviculture
-
-# ── Manus OAuth（必填，从 Manus 平台获取）──────────────────
-VITE_APP_ID=
-JWT_SECRET=replace_with_strong_random_secret
-OAUTH_SERVER_URL=https://api.manus.im
-VITE_OAUTH_PORTAL_URL=https://manus.im
-
-# ── 项目所有者信息（从 Manus 平台获取）─────────────────────
-OWNER_OPEN_ID=
-OWNER_NAME=
-
-# ── Manus Forge API（LLM / 存储 / 通知，从 Manus 平台获取）─
-BUILT_IN_FORGE_API_URL=
-BUILT_IN_FORGE_API_KEY=
-VITE_FRONTEND_FORGE_API_URL=
-VITE_FRONTEND_FORGE_API_KEY=
-
-# ── 前端应用信息（可选）────────────────────────────────────
-VITE_APP_TITLE=森林培育学知识问答系统
+```bash
+cp .env.example .env
 ```
 
-> **重要**：`DATABASE_URL` 必须使用 Docker 内部网络主机名 `db`，不能写 `localhost`。
+编辑 `.env` 文件，**必须修改以下项**：
+
+```env
+MYSQL_ROOT_PASSWORD=你的强密码
+MYSQL_PASSWORD=你的强密码
+DATABASE_URL=mysql://silviculture:你的强密码@db:3306/silviculture
+JWT_SECRET=至少32字符的随机字符串
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=你的管理员密码
+```
+
+> **重要**：`DATABASE_URL` 中的密码必须与 `MYSQL_PASSWORD` 一致，主机名必须是 `db`（Docker 内部网络）。
 
 ## 4. 首次启动
 
 ```bash
-# 构建镜像并启动所有服务（后台运行）
+# 构建镜像并启动所有服务
 docker compose up -d --build
 
 # 查看启动状态
@@ -67,31 +56,43 @@ docker compose logs -f app
 docker compose exec app pnpm db:push
 ```
 
-如需手工检查数据库：
+## 6. 访问系统
 
-```bash
-docker compose exec db mysql -u$MYSQL_USER -p$MYSQL_PASSWORD silviculture
-```
+- **学生端**（无需登录）：`http://你的服务器IP:3000`
+- **教师端**：`http://你的服务器IP:3000/login`，用 ADMIN_USERNAME / ADMIN_PASSWORD 登录
 
-## 6. 一键更新部署
+## 7. 配置 LLM 模型（必须）
 
-后续更新代码后，执行：
+登录教师后台后，进入「模型配置」页面：
+1. 点击「添加配置」
+2. 选择 LLM 提供商（推荐 DeepSeek，国内访问快）
+3. 填写模型名称和 API Key
+4. 点击「激活」
+
+支持的提供商：
+- **DeepSeek**：`deepseek-chat`，Base URL 自动填充
+- **OpenAI**：`gpt-4o-mini` 等
+- **通义千问**：`qwen-plus` 等
+- **Ollama**：本地部署，无需 API Key
+
+## 8. 上传教材
+
+登录教师后台 → 教材管理 → 上传 PDF 教材
+
+## 9. 一键更新部署
 
 ```bash
 chmod +x deploy.sh
 ./deploy.sh
 ```
 
-脚本会自动执行：`git pull` → `docker compose down` → `docker compose up -d --build`。
-
-## 7. Nginx 反向代理（推荐）
+## 10. Nginx 反向代理（推荐）
 
 ```nginx
 server {
     listen 80;
     server_name your-domain.com;
 
-    # 大文件上传支持（教材 PDF 最大 200MB）
     client_max_body_size 200m;
 
     location / {
@@ -106,35 +107,20 @@ server {
 }
 ```
 
-建议后续使用 Certbot 配置 HTTPS：
+配置 HTTPS：
 
 ```bash
 apt install certbot python3-certbot-nginx -y
 certbot --nginx -d your-domain.com
 ```
 
-## 8. 健康检查端点
-
-应用提供 `/healthz` 端点，返回 `{"status":"ok"}`，可用于负载均衡器或监控系统。
-
-## 9. 常用运维命令
+## 11. 常用运维命令
 
 ```bash
-# 查看所有服务状态
-docker compose ps
-
-# 实时查看应用日志
-docker compose logs -f app
-
-# 重启应用（不重建镜像）
-docker compose restart app
-
-# 进入应用容器
-docker compose exec app sh
-
-# 停止所有服务
-docker compose down
-
-# 停止并删除数据卷（⚠️ 会清空数据库）
-docker compose down -v
+docker compose ps              # 查看服务状态
+docker compose logs -f app     # 实时查看应用日志
+docker compose restart app     # 重启应用
+docker compose exec app sh     # 进入应用容器
+docker compose down            # 停止所有服务
+docker compose down -v         # 停止并删除数据卷（⚠️ 会清空数据库和上传文件）
 ```
