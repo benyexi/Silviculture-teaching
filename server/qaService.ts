@@ -4,7 +4,7 @@ import {
   extractKeywordsEn,
   type SearchResult,
 } from "./vectorSearch";
-import { invokeLLMWithConfig } from "./llmDriver";
+import { invokeLLMWithConfig, getActiveLlmConfig } from "./llmDriver";
 import { createQuery, upsertVisitorStat } from "./db";
 import { detectLanguage } from "./languageDetect";
 import type { QuerySource } from "../drizzle/schema";
@@ -115,7 +115,9 @@ Rules:
 3. If not covered, set found_in_materials=false and state that the content is not covered.
 4. If multiple viewpoints exist, list all of them.
 5. Use **bold** (Markdown) to highlight key terms and definitions.
-6. Return JSON only:
+6. Do NOT include any citation markers or reference numbers in the answer text. Keep the answer clean.
+7. Put the excerpt numbers you referenced in the citation_indices array (e.g. [1, 3, 5]).
+8. Return pure JSON (no markdown code blocks):
 { "answer": "...", "found_in_materials": true/false, "confidence": 0-1, "citation_indices": [] }`;
   }
 
@@ -128,10 +130,10 @@ Rules:
 规则：
 - 只能基于提供的教材内容回答，不能使用教材以外的知识
 - 如果教材中没有相关内容，设 found_in_materials=false
-- 使用 citation_indices 标注来源片段编号
+- answer 中不要包含引用标记，在 citation_indices 数组中填写引用的片段编号
 - 使用 **加粗**（Markdown格式）标记关键术语和重要概念
 
-返回 JSON：{ "answer": "...", "found_in_materials": true/false, "confidence": 0-1, "citation_indices": [] }`;
+返回纯 JSON（不要 markdown 代码块）：{ "answer": "...", "found_in_materials": true/false, "confidence": 0-1, "citation_indices": [] }`;
   }
 
   const titleList = materialTitles.length
@@ -146,9 +148,10 @@ ${titleList}
 2. 综合整理教材片段中的信息，给出结构清晰、内容完整的回答。可以适当组织和概括内容，但核心信息必须来自教材。
 3. 若教材未涉及该内容，设 found_in_materials=false，明确说明"教材中未涉及此内容"。
 4. 如果教材中有多个观点或说法，应完整列出。
-5. 使用 **加粗** 标记关键术语和重要概念。
-6. 使用 citation_indices 标注引用来源。
-7. 返回 JSON：{ "answer": "...", "found_in_materials": true/false, "confidence": 0-1, "citation_indices": [] }`;
+5. 使用 **加粗**（Markdown格式）标记关键术语和重要概念。
+6. answer 字段中不要包含任何引用标记或编号，直接输出干净的回答文本。
+7. 在 citation_indices 数组中填写你引用了哪些片段的编号（如 [1, 3, 5]）。
+8. 返回纯 JSON（不要 markdown 代码块）：{ "answer": "...", "found_in_materials": true/false, "confidence": 0-1, "citation_indices": [] }`;
 }
 
 export function buildUserPrompt(
@@ -183,6 +186,10 @@ export async function generateAnswer(req: QARequest): Promise<QAResponse> {
   const startTime = Date.now();
   const questionLanguage = detectLanguage(req.question);
 
+  // 检查当前配置是否启用了 RAG 模式
+  const activeConfig = await getActiveLlmConfig();
+  const useRAG = activeConfig?.useRAG ?? false;
+
   let mainResult: CallLLMResult;
   let enAnswer: string | undefined;
   let enSources: QuerySource[] | undefined;
@@ -195,8 +202,11 @@ export async function generateAnswer(req: QARequest): Promise<QAResponse> {
     enAnswer = cached.enAnswer;
     enSources = cached.enSources;
     fromCache = true;
+  } else if (!useRAG) {
+    // 直接模式：不走 RAG，直接将问题发给 LLM
+    mainResult = await callLLMDirect(req.question, questionLanguage);
   } else {
-    // 缓存未命中，调用 LLM
+    // RAG 模式：检索教材片段后再问 LLM
     if (questionLanguage === "en") {
       const enResults = await semanticSearch(req.question, undefined, 8, "en");
       mainResult = await callLLM(req.question, enResults, "en", "en");
@@ -254,6 +264,35 @@ export async function generateAnswer(req: QARequest): Promise<QAResponse> {
   };
 }
 
+// ─── 直接模式：不走 RAG，直接问 LLM ─────────────────────────────────────────
+async function callLLMDirect(
+  question: string,
+  questionLang: "zh" | "en"
+): Promise<CallLLMResult> {
+  const systemPrompt =
+    questionLang === "en"
+      ? `You are a silviculture teaching assistant at Beijing Forestry University. Answer questions about silviculture thoroughly and accurately. Use **bold** for key terms. Structure your answer with clear headings and bullet points where appropriate.`
+      : `你是北京林业大学森林培育学科的专业教学助手。请详细、准确地回答学生关于森林培育学的问题。
+要求：
+1. 回答要结构清晰，使用标题和列表组织内容。
+2. 使用 **加粗** 标记关键术语和重要概念。
+3. 内容要全面、准确，适合大学本科教学水平。
+4. 直接输出回答内容（Markdown格式），不需要返回JSON。`;
+
+  const llmResponse = await invokeLLMWithConfig(
+    [{ role: "user", content: question }],
+    systemPrompt
+  );
+
+  return {
+    answer: llmResponse.content,
+    sources: [],
+    modelUsed: llmResponse.model,
+    foundInMaterials: true,
+    confidence: 0.8,
+  };
+}
+
 async function callLLM(
   question: string,
   searchResults: SearchResult[],
@@ -292,7 +331,7 @@ async function callLLM(
   let usedSources = searchResults;
 
   if (parsed) {
-    answer = parsed.answer;
+    answer = stripCitationMarkers(parsed.answer);
     foundInMaterials = parsed.found_in_materials;
     confidence = parsed.confidence;
 
@@ -329,6 +368,15 @@ async function callLLM(
     foundInMaterials,
     confidence,
   };
+}
+
+/** 清除 LLM 回答中残留的 citation 标记，如 [citation_indices: 3] 或 [citation_indices: 3, 6] */
+function stripCitationMarkers(text: string): string {
+  return text
+    .replace(/\[citation_indices?:\s*[\d,\s]+\]/gi, "")
+    .replace(/\[引用\d+\]/g, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
 }
 
 function parseLLMOutput(content: string): LLMStructuredOutput | null {

@@ -384,6 +384,7 @@ export const appRouter = router({
           embeddingModel: z.string().optional(),
           embeddingApiKey: z.string().optional(),
           embeddingBaseUrl: z.string().optional(),
+          useRAG: z.boolean().optional(),
         })
       )
       .mutation(async ({ input }) => {
@@ -413,6 +414,7 @@ export const appRouter = router({
           embeddingModel: z.string().optional(),
           embeddingApiKey: z.string().optional(),
           embeddingBaseUrl: z.string().optional(),
+          useRAG: z.boolean().optional(),
         })
       )
       .mutation(async ({ input }) => {

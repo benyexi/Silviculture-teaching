@@ -121,6 +121,7 @@ export const llmConfigs = mysqlTable("llm_configs", {
   embeddingModel: varchar("embeddingModel", { length: 128 }), // 用于向量化的模型
   embeddingApiKey: text("embeddingApiKey"),
   embeddingBaseUrl: text("embeddingBaseUrl"),
+  useRAG: boolean("useRAG").default(false).notNull(),         // 是否启用 RAG 检索增强模式
   isActive: boolean("isActive").default(false).notNull(),    // 当前激活的配置
   isDefault: boolean("isDefault").default(false).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
