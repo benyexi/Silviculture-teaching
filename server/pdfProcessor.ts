@@ -2,7 +2,7 @@
  * 文档处理管道
  * 上传 PDF/Word → 提取文本 → 智能分块（按章节/段落）→ 向量化 → 存储
  */
-import { getDb } from "./db";
+import { getDb, getActiveLlmConfig } from "./db";
 import { materials, materialChunks } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
 import { detectDocumentLanguage } from "./languageDetect";
@@ -63,23 +63,29 @@ export async function processMaterial(
     const chunks = splitIntoChunks(text, pageTexts);
     console.log(`[Doc] 分块完成，共 ${chunks.length} 个块`);
 
-    // 3. 存储文本块到数据库 + 生成 Embedding
-    console.log(`[Doc] 存储文本块并生成 Embedding...`);
-    let embeddingEnabled = true;
+    // 3. 存储文本块到数据库 + 按需生成 Embedding
+    const activeConfig = await getActiveLlmConfig();
+    const useRAG = activeConfig?.useRAG ?? false;
+
+    let embeddingEnabled = useRAG; // 只有开启语义检索模式才尝试生成 Embedding
     const BATCH_SIZE = 10;
 
-    // 先测试 Embedding 是否可用
-    try {
-      await getEmbedding("test");
-    } catch (err: any) {
-      embeddingEnabled = false;
-      const msg = err?.message || String(err);
-      if (msg.includes("401") || msg.includes("Authentication") || msg.includes("invalid")) {
-        console.warn(`[Doc] ⚠️ Embedding API Key 无效，降级为全文检索模式。请检查 API Key 配置。错误: ${msg}`);
-      } else if (msg.includes("未配置")) {
-        console.log(`[Doc] Embedding 未配置，仅使用全文检索模式`);
-      } else {
-        console.warn(`[Doc] Embedding 不可用（${msg}），降级为全文检索模式`);
+    if (!useRAG) {
+      console.log(`[Doc] 当前为关键词检索模式，跳过 Embedding 生成`);
+    } else {
+      // 先测试 Embedding 是否可用
+      try {
+        await getEmbedding("test");
+      } catch (err: any) {
+        embeddingEnabled = false;
+        const msg = err?.message || String(err);
+        if (msg.includes("401") || msg.includes("Authentication") || msg.includes("invalid")) {
+          console.warn(`[Doc] ⚠️ Embedding API Key 无效，降级为全文检索模式。请检查 API Key 配置。错误: ${msg}`);
+        } else if (msg.includes("未配置")) {
+          console.log(`[Doc] Embedding 未配置，仅使用全文检索模式`);
+        } else {
+          console.warn(`[Doc] Embedding 不可用（${msg}），降级为全文检索模式`);
+        }
       }
     }
 
