@@ -94,36 +94,249 @@ type CallLLMResult = {
   confidence: number;
 };
 
+type QuestionIntent = "definition" | "classification" | "method" | "comparison" | "other";
+
+type QuestionAnalysis = {
+  intent: QuestionIntent;
+  intents: QuestionIntent[];
+  expectsEnumeration: boolean;
+  expectsComparisonTable: boolean;
+  expectsFullCoverage: boolean;
+  keywords: string[];
+};
+
+type AnswerReview = {
+  complete: boolean;
+  issues: string[];
+  shouldRetry: boolean;
+  downgradeNote: string;
+};
+
+function detectQuestionIntent(question: string, questionLang: "zh" | "en"): QuestionAnalysis {
+  const q = question.toLowerCase();
+  const intents: QuestionIntent[] = [];
+
+  if (
+    questionLang === "zh"
+      ? /(比较|对比|区别|差异|异同|有何不同|怎么区分|区分)/.test(q)
+      : /(compare|difference|differences|compare and contrast|versus|vs\.?)/.test(q)
+  ) {
+    intents.push("comparison");
+  }
+
+  if (
+    questionLang === "zh"
+      ? /(分类|类型|种类|有哪些|包括哪些|几类|几种|分为|可分为|列出|罗列)/.test(q)
+      : /(types?|kinds?|categories?|classes?|which kinds|what types|list)/.test(q)
+  ) {
+    intents.push("classification");
+  }
+
+  if (
+    questionLang === "zh"
+      ? /(方法|方式|步骤|流程|程序|如何|怎么|怎样|实施|操作|处理|进行)/.test(q)
+      : /(methods?|ways?|steps?|process|procedure|how to|how do|how should)/.test(q)
+  ) {
+    intents.push("method");
+  }
+
+  if (
+    questionLang === "zh"
+      ? /(什么是|定义|含义|概念|解释|说明|何谓|是指|指的是)/.test(q)
+      : /(what is|define|definition|meaning|concept|explain)/.test(q)
+  ) {
+    intents.push("definition");
+  }
+
+  if (intents.length === 0) intents.push("other");
+
+  return {
+    intent: intents[0],
+    intents,
+    expectsEnumeration: intents.includes("classification") || intents.includes("method"),
+    expectsComparisonTable: intents.includes("comparison"),
+    expectsFullCoverage: intents.some((intent) => intent !== "definition" && intent !== "other"),
+    keywords: (questionLang === "en" ? extractKeywordsEn(question) : extractKeywords(question)).slice(0, 8),
+  };
+}
+
+function describeIntent(intent: QuestionIntent, lang: "zh" | "en"): string {
+  const zhMap: Record<QuestionIntent, string> = {
+    definition: "定义题",
+    classification: "分类题",
+    method: "方法/步骤题",
+    comparison: "比较题",
+    other: "一般问答",
+  };
+  const enMap: Record<QuestionIntent, string> = {
+    definition: "definition question",
+    classification: "classification question",
+    method: "method/step question",
+    comparison: "comparison question",
+    other: "general question",
+  };
+  return lang === "en" ? enMap[intent] : zhMap[intent];
+}
+
+function buildAnswerBlueprint(analysis: QuestionAnalysis, questionLang: "zh" | "en"): string {
+  if (questionLang === "en") {
+    switch (analysis.intent) {
+      case "classification":
+        return `1. Short overview\n2. Complete list of types/classes mentioned in the excerpts\n3. Item-by-item explanation\n4. Completeness note`;
+      case "method":
+        return `1. Short overview\n2. Complete list of methods/steps mentioned in the excerpts\n3. Details for each method/step\n4. Notes and constraints`;
+      case "comparison":
+        return `1. Objects being compared\n2. Side-by-side comparison table\n3. Key differences and conclusion`;
+      case "definition":
+        return `1. Direct definition\n2. Key features or boundaries\n3. Related explanation or application`;
+      default:
+        return `1. Short overview\n2. Structured explanation\n3. Completeness note if the excerpts are partial`;
+    }
+  }
+
+  switch (analysis.intent) {
+    case "classification":
+      return `1. 一句话概述\n2. 完整列出教材明确出现的类型/分类/条目\n3. 逐项说明每一项\n4. 说明是否存在教材未覆盖的部分`;
+    case "method":
+      return `1. 一句话概述\n2. 完整列出教材明确出现的方法/步骤\n3. 逐项说明每一项的条件、要点或作用\n4. 说明是否存在教材未覆盖的部分`;
+    case "comparison":
+      return `1. 说明比较对象\n2. 用对比表或分点对比列出差异\n3. 给出结论`;
+    case "definition":
+      return `1. 先给出定义或核心含义\n2. 补充关键特征、边界或作用\n3. 结合教材语境做简短解释`;
+    default:
+      return `1. 简要概述\n2. 结构化展开\n3. 说明教材是否仅覆盖部分内容`;
+  }
+}
+
+function buildFewShot(questionLang: "zh" | "en"): string {
+  if (questionLang === "en") {
+    return `Examples:
+Example 1 (classification):
+Q: What types are mentioned?
+A:
+## Overview
+The excerpts clearly mention several types.
+## Types
+1. Type A: ...
+2. Type B: ...
+3. Type C: ...
+## Completeness note
+Only the items explicitly mentioned in the excerpts are listed.
+
+Example 2 (method):
+Q: What methods or steps are described?
+A:
+## Overview
+The excerpts provide a complete list of the described methods/steps.
+## Methods / steps
+1. ...
+2. ...
+3. ...
+## Notes
+If the excerpts only cover part of the topic, say so explicitly.`;
+  }
+
+  return `示例1（分类题）：
+用户问题：某对象有哪些类型？
+回答：
+## 一、概述
+教材明确出现若干类型。
+## 二、类型清单
+1. 第一类：...
+2. 第二类：...
+3. 第三类：...
+## 三、完整性说明
+以上仅列出教材明确出现的项目，不额外补充。
+
+示例2（方法题）：
+用户问题：某操作有哪些方法或步骤？
+回答：
+## 一、概述
+教材给出了完整或部分的方法/步骤。
+## 二、方法/步骤清单
+1. ...
+2. ...
+3. ...
+## 三、注意事项
+如教材只覆盖部分内容，应明确说明。`;
+}
+
+function buildSystemHeader(
+  questionLang: "zh" | "en",
+  materialLang: "zh" | "en",
+  analysis: QuestionAnalysis
+): string {
+  if (questionLang === "en") {
+    const materialNote = materialLang === "en"
+      ? "The excerpts are in English; answer in English."
+      : "The excerpts may contain mixed-language content; answer in English.";
+
+    return `You are a silviculture teaching assistant at Beijing Forestry University.
+${materialNote}
+
+Answering protocol:
+1. First identify the intent: ${describeIntent(analysis.intent, "en")}.
+2. If the question is about classifications, methods, steps, or comparisons, enumerate all items explicitly mentioned in the excerpts.
+3. Do not stop at a summary sentence when the question asks for types, methods, steps, or differences.
+4. If the excerpts only cover part of the topic, say so plainly and do not invent missing items.
+5. Use Markdown only. Do not wrap the final answer in JSON or code fences.
+6. Do not include citation markers like [citation] or [引用1].`;
+  }
+
+  const materialNote =
+    materialLang === "en"
+      ? "教材片段为英文或英中混合，回答时可先保留关键英文术语，再用中文解释。"
+      : "教材片段为中文，优先使用教材原词。";
+
+  return `你是北京林业大学森林培育学科的专业教学助手，只能基于提供的教材片段回答。
+${materialNote}
+
+回答协议：
+1. 先识别问题意图：${describeIntent(analysis.intent, "zh")}。
+2. 如果问题是分类、方法、步骤或比较题，必须完整列出教材中明确出现的项目，不得只给总述。
+3. 分类题先给“总览 + 完整清单 + 逐项说明”；方法/步骤题先给“总览 + 完整清单 + 逐项说明”；比较题先给“对比表/分点对比 + 结论”。
+4. 如果教材只覆盖部分内容，要明确说明“教材只明确提到以下项目”，不要补外部知识。
+5. 回答前先在内部检查一次：是否覆盖所有相关片段、是否存在漏项、是否还带有教材外补充。检查不过就重写。
+6. 直接输出 Markdown，不要包裹在 JSON 或代码块中。
+7. 不要出现"[引用1]"、"[citation]"、"片段[1]"等引用标记。`;
+}
+
 export function buildSystemPrompt(
   materialTitles: string[],
   questionLang: "zh" | "en" = "zh",
-  materialLang: "zh" | "en" = "zh"
+  materialLang: "zh" | "en" = "zh",
+  analysis: QuestionAnalysis = detectQuestionIntent("", questionLang)
 ): string {
   if (questionLang === "en") {
     const titleList = materialTitles.length
       ? materialTitles.map((t) => `- ${t}`).join("\n")
       : "- (No textbook excerpts)";
 
-    return `You are a silviculture teaching assistant at Beijing Forestry University. Answer questions based ONLY on the provided textbook excerpts.
+    return `${buildSystemHeader(questionLang, materialLang, analysis)}
 
 Textbooks:
 ${titleList}
 
 Requirements:
-1. **Source**: Use only the provided excerpts. Do not add outside knowledge. If not covered, reply: "The provided textbook excerpts do not cover this topic."
-2. **Comprehensive**: Synthesize ALL provided excerpts thoroughly. Do not omit any relevant information. For classifications, methods, or steps mentioned in the textbooks, list every item with its specific details.
-3. **Well-structured**: Use multi-level headings (##, ###) and bullet points. Organize by: Definition → Classification/Types → Methods/Steps → Principles → Applications.
-4. **Highlight key terms**: Use **bold** for key terms, important concepts, and critical conclusions. Precisely cite data, formulas, and ratios from the textbook.
-5. **Preserve textbook language**: Use original terminology from the textbooks. If multiple viewpoints exist, list all of them.
-6. **Format**: Output directly in Markdown. Start with a 1-2 sentence overview, then expand with full details. Do NOT wrap in JSON or code blocks.
-7. **No citation markers**: Do NOT include "[引用1]", "[citation]", or any reference markers in your answer. Just state the content directly.`;
+1. Source only: use only the provided excerpts. Do not add outside knowledge. If not covered, reply with: "The provided textbook excerpts do not cover this topic."
+2. Completeness: synthesize ALL provided excerpts thoroughly. For classification/method/step/comparison questions, list every item that appears in the excerpts.
+3. Structure: follow this blueprint: ${buildAnswerBlueprint(analysis, questionLang)}.
+4. Key terms: use **bold** for key terms, important concepts, and critical conclusions. Precisely preserve numeric data, formulas, and ratios from the textbook.
+5. Textbook language: preserve original terminology. If multiple viewpoints exist, list them all.
+6. Format: output directly in Markdown. Start with a 1-2 sentence overview, then expand with full details.
+7. No citation markers: do not include "[引用1]", "[citation]", or any reference markers.
+
+${buildFewShot(questionLang)}`;
   }
 
   if (materialLang === "en") {
-    return `你是一位森林培育学助教。以下是英文教材的相关段落。
-请基于这些英文教材内容，用中文回答问题。回答时：
-1. 先给出英文教材的关键原文（1-2句）
+    return `${buildSystemHeader(questionLang, materialLang, analysis)}
+
+下面是英文教材相关段落，请基于这些英文教材内容，用中文回答问题。
+回答时：
+1. 先给出英文教材的关键原文或关键术语（1-2句）
 2. 再给出中文翻译和解释
+3. 若问题属于分类/方法/步骤/比较题，必须完整列出教材中明确出现的项目，不能只给概述
 
 规则：
 - 只能基于提供的教材内容回答，不能使用教材以外的知识
@@ -136,23 +349,28 @@ Requirements:
     ? materialTitles.map((t, i) => `  ${i + 1}. 《${t}》`).join("\n")
     : "  （暂无已发布教材）";
 
-  return `你是北京林业大学森林培育学科的专业教学助手，严格基于以下教材内容回答学生问题：
+  return `${buildSystemHeader(questionLang, materialLang, analysis)}
+
+严格基于以下教材内容回答学生问题：
 ${titleList}
 
 回答要求：
-1. **知识来源**：只能基于提供的教材片段回答，不得使用教材外知识。如果教材未涉及该内容，明确回复"教材中未涉及此内容"。
-2. **全面完整**：综合所有提供的教材片段信息，给出尽可能全面、详尽的回答。不要遗漏任何片段中的相关内容。对于教材中提到的分类、类型、方法、步骤等，要完整列出每一项，并对每项给出教材中的具体说明。
-3. **结构清晰**：使用多级标题组织内容（如"## 一、xxx"、"### （一）xxx"），善用列表和缩进体现层次关系。按照"定义与概述→分类/类型→具体方法/步骤→原则与注意事项→应用场景"等逻辑顺序组织。
-4. **突出重点**：使用 **加粗** 标记关键术语、重要概念和核心结论。对于教材中的数据、公式、比例等要精确引用。
-5. **保留教材表述**：尽量使用教材中的原始术语和表述，可以适当组织和概括，但核心信息必须来自教材。如果教材中有多个观点或说法，应完整列出。
-6. **格式规范**：直接输出 Markdown 格式，不要包裹在 JSON 或代码块中。开头先用1-2句话概括主题，再展开详细内容。
-7. **禁止引用标记**：回答中绝对不要出现"[引用1]"、"[引用2]"等引用编号标记，也不要出现"片段[引用N]"、"[citation]"等任何形式的引用标注。直接陈述内容即可。`;
+1. 知识来源：只能基于提供的教材片段回答，不得使用教材外知识。如果教材未涉及该内容，明确回复"教材中未涉及此内容"。
+2. 全面完整：综合所有提供的教材片段信息，给出尽可能全面、详尽的回答。对于分类、类型、方法、步骤、比较等题目，要完整列出每一项，并逐项说明。
+3. 结构清晰：按照"定义与概述→分类/类型→具体方法/步骤→原则与注意事项→应用场景"等逻辑顺序组织。${buildAnswerBlueprint(analysis, questionLang)}
+4. 突出重点：使用 **加粗** 标记关键术语、重要概念和核心结论。对于教材中的数据、公式、比例等要精确引用。
+5. 保留教材表述：尽量使用教材中的原始术语和表述，可以适当组织和概括，但核心信息必须来自教材。如果教材中有多个观点或说法，应完整列出。
+6. 格式规范：直接输出 Markdown 格式，不要包裹在 JSON 或代码块中。开头先用1-2句话概括主题，再展开详细内容。
+7. 禁止引用标记：回答中绝对不要出现"[引用1]"、"[引用2]"等引用编号标记，也不要出现"片段[引用N]"、"[citation]"等任何形式的引用标注。直接陈述内容即可。
+
+${buildFewShot(questionLang)}`;
 }
 
 export function buildUserPrompt(
   question: string,
   chunks: SearchResult[],
-  questionLang: "zh" | "en" = "zh"
+  questionLang: "zh" | "en" = "zh",
+  analysis: QuestionAnalysis = detectQuestionIntent(question, questionLang)
 ): string {
   const chunkTexts = chunks
     .map((r, idx) => {
@@ -171,15 +389,50 @@ export function buildUserPrompt(
     .join("\n\n---\n\n");
 
   if (questionLang === "en") {
-    return `Question:\n${question}\n\nTextbook excerpts (${chunks.length}):\n${chunkTexts}\n\nPlease answer based on the excerpts above.`;
+    return `Question intent: ${describeIntent(analysis.intent, "en")}
+
+Question:
+${question}
+
+Answer blueprint:
+${buildAnswerBlueprint(analysis, questionLang)}
+
+Completion constraints:
+- Use only the excerpts below.
+- If the question asks for types, methods, steps, or comparisons, list every item explicitly mentioned in the excerpts.
+- Do not stop at a summary sentence.
+- If the excerpts only cover part of the topic, say so clearly.
+
+Textbook excerpts (${chunks.length}):
+${chunkTexts}
+
+Please answer based on the excerpts above and keep the structure aligned with the blueprint.`;
   }
 
-  return `【学生问题】\n${question}\n\n【教材内容片段（共 ${chunks.length} 条）】\n${chunkTexts}\n\n请综合以上所有教材片段，给出全面、详尽、结构清晰的回答。不要遗漏任何片段中的相关信息。`;
+  return `【问题类型】${describeIntent(analysis.intent, "zh")}
+
+【学生问题】
+${question}
+
+【回答蓝图】
+${buildAnswerBlueprint(analysis, questionLang)}
+
+【完整性约束】
+- 只能使用下方教材片段。
+- 如果是分类/方法/步骤/比较题，必须把教材中明确出现的项目全部列出。
+- 不要只写概述，必须先总述再逐项展开。
+- 如果教材只覆盖部分内容，要明确说明“教材只明确提到以下项目”。
+
+【教材内容片段（共 ${chunks.length} 条）】
+${chunkTexts}
+
+请综合以上所有教材片段，给出全面、详尽、结构清晰的回答。不要遗漏任何片段中的相关信息。`;
 }
 
 export async function generateAnswer(req: QARequest): Promise<QAResponse> {
   const startTime = Date.now();
   const questionLanguage = detectLanguage(req.question);
+  const questionAnalysis = detectQuestionIntent(req.question, questionLanguage);
 
   // 检查当前配置是否启用了 RAG 模式
   const activeConfig = await getActiveLlmConfig();
@@ -201,17 +454,17 @@ export async function generateAnswer(req: QARequest): Promise<QAResponse> {
     // useRAG=true: 关键词+向量混合检索; useRAG=false: 仅关键词检索（两者都搜教材）
     if (questionLanguage === "en") {
       const enResults = await semanticSearch(req.question, undefined, 8, "en", useRAG);
-      mainResult = await callLLM(req.question, enResults, "en", "en");
+      mainResult = await callLLM(req.question, enResults, "en", "en", questionAnalysis);
     } else {
       const [zhResults, enResults] = await Promise.all([
         semanticSearch(req.question, undefined, 20, "zh", useRAG),
         semanticSearch(req.question, undefined, 5, "en", useRAG),
       ]);
 
-      mainResult = await callLLM(req.question, zhResults, "zh", "zh");
+      mainResult = await callLLM(req.question, zhResults, "zh", "zh", questionAnalysis);
 
       if (enResults.length > 0) {
-        const enResult = await callLLM(req.question, enResults, "zh", "en");
+        const enResult = await callLLM(req.question, enResults, "zh", "en", questionAnalysis);
         if (enResult.foundInMaterials) {
           enAnswer = enResult.answer;
           enSources = enResult.sources;
@@ -260,7 +513,8 @@ async function callLLM(
   question: string,
   searchResults: SearchResult[],
   questionLang: "zh" | "en",
-  materialLang: "zh" | "en"
+  materialLang: "zh" | "en",
+  analysis: QuestionAnalysis = detectQuestionIntent(question, questionLang)
 ): Promise<CallLLMResult> {
   if (searchResults.length === 0) {
     const answer =
@@ -278,13 +532,10 @@ async function callLLM(
   }
 
   const materialTitles = Array.from(new Set(searchResults.map((r) => r.materialTitle)));
-  const systemPrompt = buildSystemPrompt(materialTitles, questionLang, materialLang);
-  const userMessage = buildUserPrompt(question, searchResults, questionLang);
+  const systemPrompt = buildSystemPrompt(materialTitles, questionLang, materialLang, analysis);
+  const userMessage = buildUserPrompt(question, searchResults, questionLang, analysis);
 
-  const llmResponse = await invokeLLMWithConfig(
-    [{ role: "user", content: userMessage }],
-    systemPrompt
-  );
+  const llmResponse = await invokeLLMWithConfig([{ role: "user", content: userMessage }], systemPrompt);
 
   let answer = stripCitationMarkers(llmResponse.content);
 
@@ -292,6 +543,46 @@ async function callLLM(
   const parsed = parseLLMOutput(llmResponse.content);
   if (parsed) {
     answer = stripCitationMarkers(parsed.answer);
+  }
+
+  const localReview = assessAnswerLocally(answer, searchResults, analysis, questionLang);
+  let review = localReview;
+
+  if (!localReview.complete) {
+    try {
+      const reviewResponse = await invokeLLMWithConfig(
+        [{ role: "user", content: buildAnswerReviewPrompt(question, answer, searchResults, questionLang, analysis) }],
+        questionLang === "en"
+          ? "You are a strict answer reviewer. Return JSON only."
+          : "你是严格的答案审校器，只返回 JSON。", 
+        { responseFormat: "json_object", temperature: 0 }
+      );
+
+      const parsedReview = parseAnswerReview(reviewResponse.content);
+      if (parsedReview) {
+        review = parsedReview;
+      }
+    } catch {
+      // JSON 审校失败时回退到本地规则
+    }
+  }
+
+  if (review.shouldRetry) {
+    try {
+      const revisionResponse = await invokeLLMWithConfig(
+        [{ role: "user", content: buildRevisionPrompt(question, answer, searchResults, questionLang, analysis, review.issues) }],
+        buildSystemPrompt(materialTitles, questionLang, materialLang, analysis)
+      );
+      const revisionParsed = parseLLMOutput(revisionResponse.content);
+      answer = stripCitationMarkers(revisionParsed ? revisionParsed.answer : revisionResponse.content);
+    } catch {
+      // 重写失败时保留原答案
+    }
+  }
+
+  const finalReview = assessAnswerLocally(answer, searchResults, analysis, questionLang);
+  if (!finalReview.complete) {
+    answer = appendDegradationNote(answer, finalReview.downgradeNote);
   }
 
   // 判断是否在教材中找到了内容
@@ -310,12 +601,14 @@ async function callLLM(
     highlightedExcerpt: extractHighlightSentence(r.content, keywords),
   }));
 
+  const confidence = finalReview.complete ? 0.82 : review.shouldRetry ? 0.58 : 0.68;
+
   return {
     answer,
     sources,
     modelUsed: llmResponse.model,
     foundInMaterials,
-    confidence: foundInMaterials ? 0.8 : 0.1,
+    confidence: foundInMaterials ? confidence : 0.1,
   };
 }
 
@@ -386,6 +679,221 @@ function extractHighlightSentence(content: string, keywords: string[]): string {
   return best.trim().substring(0, 150);
 }
 
+function countStructuredItems(answer: string): number {
+  return answer
+    .split(/\n+/)
+    .filter((line) => /^\s*(\d+[.)、．]|[一二三四五六七八九十]+[、．.)]|[-*•])\s+/.test(line) || /^#{1,6}\s+/.test(line))
+    .length;
+}
+
+function assessAnswerLocally(
+  answer: string,
+  searchResults: SearchResult[],
+  analysis: QuestionAnalysis,
+  questionLang: "zh" | "en"
+): AnswerReview {
+  const compactAnswer = answer.replace(/\s+/g, "");
+  const itemCount = countStructuredItems(answer);
+  const hasNotFoundPhrase = /未涉及|没有相关|未找到|not cover|not found/i.test(answer);
+  const hasCoveragePhrase = /共\d+|共有\d+|明确提到|完整列出|逐项|包括|分为|可分为|types?|methods?|steps?/i.test(answer);
+  const hasCompareStructure = /\|.+\|/m.test(answer) || /对比|比较|difference|compare/i.test(answer);
+  const issues: string[] = [];
+
+  if (analysis.expectsFullCoverage && compactAnswer.length < 120) {
+    issues.push("回答过短，可能未覆盖完整要点");
+  }
+
+  if (analysis.intent === "definition" && !/(定义|含义|概念|是指|指的是|meaning|definition|concept)/i.test(answer)) {
+    issues.push("定义题缺少明确的定义表达");
+  }
+
+  if (analysis.expectsEnumeration && itemCount < 2) {
+    issues.push("分类/方法题的结构化条目过少");
+  }
+
+  if (analysis.intent === "comparison" && !hasCompareStructure) {
+    issues.push("比较题缺少对比表或分点对比");
+  }
+
+  if (analysis.expectsFullCoverage && !hasCoveragePhrase) {
+    issues.push("缺少完整性提示或清单式表达");
+  }
+
+  if (searchResults.length > 0 && hasNotFoundPhrase && !/教材只明确提到|部分内容|partial/i.test(answer)) {
+    issues.push("存在召回片段，但回答仍表现为未涉及");
+  }
+
+  const complete = issues.length === 0;
+  const downgradeNote =
+    questionLang === "en"
+      ? "The excerpts only cover part of the topic, so this answer summarizes the explicitly mentioned items only."
+      : "教材片段只覆盖了该问题的部分要点，以下仅整理已明确出现的内容。";
+
+  return {
+    complete,
+    issues,
+    shouldRetry: !complete && searchResults.length > 0,
+    downgradeNote,
+  };
+}
+
+function parseAnswerReview(content: string): AnswerReview | null {
+  try {
+    const parsed = JSON.parse(content.trim());
+    if (isValidAnswerReview(parsed)) return parsed;
+  } catch {
+    const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (jsonMatch) {
+      try {
+        const parsed = JSON.parse(jsonMatch[1].trim());
+        if (isValidAnswerReview(parsed)) return parsed;
+      } catch {
+        // noop
+      }
+    }
+  }
+  return null;
+}
+
+function isValidAnswerReview(obj: unknown): obj is AnswerReview {
+  if (typeof obj !== "object" || obj === null) return false;
+  const o = obj as Record<string, unknown>;
+  return (
+    typeof o.complete === "boolean" &&
+    Array.isArray(o.issues) &&
+    typeof o.shouldRetry === "boolean" &&
+    typeof o.downgradeNote === "string"
+  );
+}
+
+function buildAnswerReviewPrompt(
+  question: string,
+  answer: string,
+  searchResults: SearchResult[],
+  questionLang: "zh" | "en",
+  analysis: QuestionAnalysis
+): string {
+  const sourceTexts = searchResults
+    .map((r, idx) => {
+      const location = [
+        `《${r.materialTitle}》`,
+        r.chapter ? r.chapter : null,
+        r.pageStart ? `第${r.pageStart}页${r.pageEnd && r.pageEnd !== r.pageStart ? `~${r.pageEnd}页` : ""}` : null,
+      ]
+        .filter(Boolean)
+        .join(" · ");
+
+      return `【片段${idx + 1}】${location}\n${r.content.substring(0, 260)}`;
+    })
+    .join("\n\n---\n\n");
+
+  if (questionLang === "en") {
+    return `You are reviewing an answer for completeness.
+Question intent: ${describeIntent(analysis.intent, "en")}
+Question: ${question}
+
+Answer:
+${answer}
+
+Textbook excerpts:
+${sourceTexts}
+
+Return JSON with:
+{"complete": boolean, "issues": string[], "shouldRetry": boolean, "downgradeNote": string}
+
+Rules:
+- complete=true only when the answer fully covers the items explicitly present in the excerpts.
+- shouldRetry=true when the answer is too short, misses list items, or collapses a list question into a summary.
+- downgradeNote should explain the limitation in one sentence.`;
+  }
+
+  return `你是答案审校器，只判断当前答案是否完整，不要改写答案。
+问题意图：${describeIntent(analysis.intent, "zh")}
+学生问题：${question}
+
+当前答案：
+${answer}
+
+教材片段：
+${sourceTexts}
+
+请只返回 JSON，格式如下：
+{"complete": true/false, "issues": ["问题1", "问题2"], "shouldRetry": true/false, "downgradeNote": "一句话说明"}
+
+规则：
+- complete=true 仅当答案完整覆盖了教材片段中明确出现的项目。
+- 如果答案把分类/方法/步骤题写成了概述，shouldRetry 要设为 true。
+- downgradeNote 用一句话说明教材片段覆盖范围有限时应如何表述。`;
+}
+
+function buildRevisionPrompt(
+  question: string,
+  answer: string,
+  searchResults: SearchResult[],
+  questionLang: "zh" | "en",
+  analysis: QuestionAnalysis,
+  issues: string[]
+): string {
+  const sourceTexts = searchResults
+    .map((r, idx) => {
+      const location = [
+        `《${r.materialTitle}》`,
+        r.chapter ? r.chapter : null,
+        r.pageStart ? `第${r.pageStart}页${r.pageEnd && r.pageEnd !== r.pageStart ? `~${r.pageEnd}页` : ""}` : null,
+      ]
+        .filter(Boolean)
+        .join(" · ");
+
+      return `【片段${idx + 1}】${location}\n${r.content}`;
+    })
+    .join("\n\n---\n\n");
+
+  if (questionLang === "en") {
+    return `Rewrite the answer to be complete and strictly grounded in the excerpts.
+Question intent: ${describeIntent(analysis.intent, "en")}
+Question: ${question}
+
+Review issues:
+- ${issues.join("\n- ")}
+
+Previous answer:
+${answer}
+
+Textbook excerpts:
+${sourceTexts}
+
+Requirements:
+1. Keep the final answer in Markdown.
+2. Do not mention the review process.
+3. For classification/method/step/comparison questions, enumerate every item explicitly mentioned in the excerpts.
+4. If the excerpts only cover part of the topic, say so clearly.`;
+  }
+
+  return `请重写答案，补全遗漏项，并且只使用教材片段中明确出现的内容。
+问题意图：${describeIntent(analysis.intent, "zh")}
+学生问题：${question}
+
+审校发现的问题：
+- ${issues.join("\n- ")}
+
+原始答案：
+${answer}
+
+教材片段：
+${sourceTexts}
+
+要求：
+1. 最终答案必须是 Markdown。
+2. 不要提及审校过程。
+3. 如果是分类/方法/步骤/比较题，必须把教材中明确出现的项目全部列出。
+4. 如果教材只覆盖部分内容，明确说明限制。`;
+}
+
+function appendDegradationNote(answer: string, note: string): string {
+  if (answer.includes(note)) return answer;
+  return `${answer}\n\n> ${note}`;
+}
+
 // ─── 流式答案生成 ─────────────────────────────────────────────────────────────
 
 export type StreamMeta = {
@@ -413,6 +921,7 @@ export async function generateAnswerStream(
 ): Promise<void> {
   const startTime = Date.now();
   const questionLanguage = detectLanguage(req.question);
+  const questionAnalysis = detectQuestionIntent(req.question, questionLanguage);
   const activeConfig = await getActiveLlmConfig();
   const useRAG = activeConfig?.useRAG ?? false;
 
@@ -474,8 +983,8 @@ export async function generateAnswerStream(
     }
 
     const materialTitles = Array.from(new Set(searchResults.map((r) => r.materialTitle)));
-    const systemPrompt = buildSystemPrompt(materialTitles, questionLanguage, questionLanguage);
-    const userMessage = buildUserPrompt(req.question, searchResults, questionLanguage);
+    const systemPrompt = buildSystemPrompt(materialTitles, questionLanguage, questionLanguage, questionAnalysis);
+    const userMessage = buildUserPrompt(req.question, searchResults, questionLanguage, questionAnalysis);
     const keywords = questionLanguage === "en" ? extractKeywordsEn(req.question) : extractKeywords(req.question);
 
     const sources: QuerySource[] = searchResults.map((r) => ({
@@ -514,6 +1023,10 @@ export async function generateAnswerStream(
     // 判断是否找到内容
     const notFoundPhrases = ["未涉及", "not cover", "没有相关", "未找到", "not found"];
     const foundInMaterials = !notFoundPhrases.some((p) => fullAnswer.toLowerCase().includes(p));
+    const finalReview = assessAnswerLocally(fullAnswer, searchResults, questionAnalysis, questionLanguage);
+    if (!finalReview.complete) {
+      fullAnswer = appendDegradationNote(fullAnswer, finalReview.downgradeNote);
+    }
 
     const responseTimeMs = Date.now() - startTime;
 
@@ -535,7 +1048,13 @@ export async function generateAnswerStream(
     // 缓存
     if (foundInMaterials) {
       setCachedAnswer(req.question, {
-        mainResult: { answer: fullAnswer, sources, modelUsed: model, foundInMaterials, confidence: 0.8 },
+        mainResult: {
+          answer: fullAnswer,
+          sources,
+          modelUsed: model,
+          foundInMaterials,
+          confidence: foundInMaterials ? (finalReview.complete ? 0.82 : 0.68) : 0.1,
+        },
         questionLanguage,
       });
     }
