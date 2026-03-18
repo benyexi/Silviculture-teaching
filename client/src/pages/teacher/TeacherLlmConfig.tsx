@@ -50,6 +50,7 @@ export default function TeacherLlmConfig() {
     maxTokens?: number | null;
     embeddingModel?: string | null;
     embeddingBaseUrl?: string | null;
+    useRAG?: boolean;
   } | null>(null);
 
   const setActiveMutation = trpc.llmConfig.setActive.useMutation({
@@ -145,6 +146,9 @@ export default function TeacherLlmConfig() {
                           当前使用
                         </Badge>
                       )}
+                      <Badge variant="outline" className={`text-xs ${config.useRAG ? "border-amber-500 text-amber-600" : "border-blue-500 text-blue-600"}`}>
+                        {config.useRAG ? "语义检索（Embedding）" : "关键词检索"}
+                      </Badge>
                     </div>
                     <div className="flex items-center gap-3 mt-1 flex-wrap">
                       <Badge variant="secondary" className="text-xs">
@@ -185,6 +189,7 @@ export default function TeacherLlmConfig() {
                         maxTokens: config.maxTokens,
                         embeddingModel: config.embeddingModel,
                         embeddingBaseUrl: config.embeddingBaseUrl,
+                        useRAG: config.useRAG,
                       })}
                     >
                       <Pencil className="h-4 w-4" />
@@ -258,6 +263,7 @@ function EditConfigForm({
     maxTokens?: number | null;
     embeddingModel?: string | null;
     embeddingBaseUrl?: string | null;
+    useRAG?: boolean;
   };
   onSuccess: () => void;
 }) {
@@ -270,6 +276,7 @@ function EditConfigForm({
   const [embeddingModel, setEmbeddingModel] = useState(config.embeddingModel || "");
   const [embeddingApiKey, setEmbeddingApiKey] = useState("");
   const [embeddingBaseUrl, setEmbeddingBaseUrl] = useState(config.embeddingBaseUrl || "");
+  const [useRAG, setUseRAG] = useState(config.useRAG ?? false);
 
   const updateMutation = trpc.llmConfig.update.useMutation({
     onSuccess: () => { toast.success("配置已更新"); onSuccess(); },
@@ -287,6 +294,7 @@ function EditConfigForm({
     if (embeddingModel !== (config.embeddingModel || "")) data.embeddingModel = embeddingModel || undefined;
     if (embeddingApiKey) data.embeddingApiKey = embeddingApiKey;
     if (embeddingBaseUrl !== (config.embeddingBaseUrl || "")) data.embeddingBaseUrl = embeddingBaseUrl || undefined;
+    if (useRAG !== (config.useRAG ?? false)) data.useRAG = useRAG;
 
     if (Object.keys(data).length <= 1) {
       toast.info("没有需要更新的内容");
@@ -331,8 +339,36 @@ function EditConfigForm({
         </div>
       </div>
 
+      {/* 检索模式 */}
       <div className="border-t border-border pt-4">
-        <p className="text-sm font-medium text-foreground mb-3">Embedding 配置</p>
+        <p className="text-sm font-medium text-foreground mb-2">检索模式</p>
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant={!useRAG ? "default" : "outline"}
+            size="sm"
+            onClick={() => setUseRAG(false)}
+          >
+            关键词检索
+          </Button>
+          <Button
+            type="button"
+            variant={useRAG ? "default" : "outline"}
+            size="sm"
+            onClick={() => setUseRAG(true)}
+          >
+            语义检索（Embedding）
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground mt-2">
+          {useRAG
+            ? "关键词 + Embedding 向量混合检索教材（需配置 Embedding 模型），召回更全面但需调优"
+            : "仅用关键词匹配检索教材片段，与之前的行为一致，效果稳定"}
+        </p>
+      </div>
+
+      <div className="border-t border-border pt-4">
+        <p className="text-sm font-medium text-foreground mb-3">Embedding 配置（语义检索模式需要）</p>
         <div className="grid grid-cols-2 gap-3">
           <div>
             <Label>Embedding 模型</Label>
@@ -419,6 +455,7 @@ function AddConfigForm({ onSuccess }: { onSuccess: () => void }) {
   const [name, setName] = useState("");
   const [provider, setProvider] = useState<LlmProvider>("openai");
   const [modelName, setModelName] = useState("");
+  const [customModel, setCustomModel] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [apiBaseUrl, setApiBaseUrl] = useState("");
   const [temperature, setTemperature] = useState("0.1");
@@ -426,6 +463,7 @@ function AddConfigForm({ onSuccess }: { onSuccess: () => void }) {
   const [embeddingModel, setEmbeddingModel] = useState("");
   const [embeddingApiKey, setEmbeddingApiKey] = useState("");
   const [embeddingBaseUrl, setEmbeddingBaseUrl] = useState("");
+  const [useRAG, setUseRAG] = useState(false);
 
   const createMutation = trpc.llmConfig.create.useMutation({
     onSuccess: () => { toast.success("模型配置已添加"); onSuccess(); },
@@ -447,14 +485,15 @@ function AddConfigForm({ onSuccess }: { onSuccess: () => void }) {
   };
 
   const handleSubmit = () => {
-    if (!name.trim() || !modelName.trim()) {
+    const finalModel = modelName === "__custom__" ? customModel : modelName;
+    if (!name.trim() || !finalModel.trim()) {
       toast.error("请填写配置名称和模型名称");
       return;
     }
     createMutation.mutate({
       name,
       provider,
-      modelName,
+      modelName: finalModel,
       apiKey: apiKey || undefined,
       apiBaseUrl: apiBaseUrl || undefined,
       temperature: parseFloat(temperature) || 0.1,
@@ -462,6 +501,7 @@ function AddConfigForm({ onSuccess }: { onSuccess: () => void }) {
       embeddingModel: embeddingModel || undefined,
       embeddingApiKey: embeddingApiKey || undefined,
       embeddingBaseUrl: embeddingBaseUrl || undefined,
+      useRAG,
     });
   };
 
@@ -518,8 +558,8 @@ function AddConfigForm({ onSuccess }: { onSuccess: () => void }) {
           )}
           {modelName === "__custom__" && (
             <Input
-              value=""
-              onChange={(e) => setModelName(e.target.value)}
+              autoFocus
+              onChange={(e) => setCustomModel(e.target.value)}
               placeholder="输入自定义模型名称"
               className="mt-1"
             />
@@ -573,9 +613,37 @@ function AddConfigForm({ onSuccess }: { onSuccess: () => void }) {
         </div>
       </div>
 
+      {/* 检索模式 */}
+      <div className="border-t border-border pt-4">
+        <p className="text-sm font-medium text-foreground mb-2">检索模式</p>
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant={!useRAG ? "default" : "outline"}
+            size="sm"
+            onClick={() => setUseRAG(false)}
+          >
+            关键词检索
+          </Button>
+          <Button
+            type="button"
+            variant={useRAG ? "default" : "outline"}
+            size="sm"
+            onClick={() => setUseRAG(true)}
+          >
+            语义检索（Embedding）
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground mt-2">
+          {useRAG
+            ? "关键词 + Embedding 向量混合检索教材（需配置 Embedding 模型），召回更全面但需调优"
+            : "仅用关键词匹配检索教材片段，与之前的行为一致，效果稳定"}
+        </p>
+      </div>
+
       {/* Embedding 配置（可选） */}
       <div className="border-t border-border pt-4">
-        <p className="text-sm font-medium text-foreground mb-3">Embedding 配置（可选，用于向量化）</p>
+        <p className="text-sm font-medium text-foreground mb-3">Embedding 配置（语义检索模式需要）</p>
         <div className="grid grid-cols-2 gap-3">
           <div>
             <Label>Embedding 模型</Label>
@@ -609,7 +677,7 @@ function AddConfigForm({ onSuccess }: { onSuccess: () => void }) {
       </div>
 
       <div className="flex gap-2">
-        <TestConnectionButton provider={provider} modelName={modelName} apiKey={apiKey} apiBaseUrl={apiBaseUrl} />
+        <TestConnectionButton provider={provider} modelName={modelName === "__custom__" ? customModel : modelName} apiKey={apiKey} apiBaseUrl={apiBaseUrl} />
         <Button
           onClick={handleSubmit}
           disabled={createMutation.isPending}

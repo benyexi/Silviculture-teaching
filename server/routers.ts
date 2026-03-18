@@ -258,7 +258,9 @@ export const appRouter = router({
 
         // 清理临时分块文件
         const chunkDir = path.join(uploadDir, "uploads", "chunks", input.sessionId);
-        fs.rm(chunkDir, { recursive: true, force: true }, () => {});
+        fs.rm(chunkDir, { recursive: true, force: true }, (err) => {
+          if (err) console.warn(`[Router] 清理临时文件失败:`, err);
+        });
 
         return { materialId, status: "processing" };
       }),
@@ -382,6 +384,7 @@ export const appRouter = router({
           embeddingModel: z.string().optional(),
           embeddingApiKey: z.string().optional(),
           embeddingBaseUrl: z.string().optional(),
+          useRAG: z.boolean().optional(),
         })
       )
       .mutation(async ({ input }) => {
@@ -411,6 +414,7 @@ export const appRouter = router({
           embeddingModel: z.string().optional(),
           embeddingApiKey: z.string().optional(),
           embeddingBaseUrl: z.string().optional(),
+          useRAG: z.boolean().optional(),
         })
       )
       .mutation(async ({ input }) => {

@@ -5,7 +5,7 @@ import {
   type SearchResult,
 } from "./vectorSearch";
 import { invokeLLMWithConfig } from "./llmDriver";
-import { createQuery, upsertVisitorStat } from "./db";
+import { createQuery, upsertVisitorStat, getActiveLlmConfig } from "./db";
 import { detectLanguage } from "./languageDetect";
 import type { QuerySource } from "../drizzle/schema";
 
@@ -115,7 +115,9 @@ Rules:
 3. If not covered, set found_in_materials=false and state that the content is not covered.
 4. If multiple viewpoints exist, list all of them.
 5. Use **bold** (Markdown) to highlight key terms and definitions.
-6. Return JSON only:
+6. Do NOT include any citation markers or reference numbers in the answer text. Keep the answer clean.
+7. Put the excerpt numbers you referenced in the citation_indices array (e.g. [1, 3, 5]).
+8. Return pure JSON (no markdown code blocks):
 { "answer": "...", "found_in_materials": true/false, "confidence": 0-1, "citation_indices": [] }`;
   }
 
@@ -128,10 +130,10 @@ Rules:
 规则：
 - 只能基于提供的教材内容回答，不能使用教材以外的知识
 - 如果教材中没有相关内容，设 found_in_materials=false
-- 使用 citation_indices 标注来源片段编号
+- answer 中不要包含引用标记，在 citation_indices 数组中填写引用的片段编号
 - 使用 **加粗**（Markdown格式）标记关键术语和重要概念
 
-返回 JSON：{ "answer": "...", "found_in_materials": true/false, "confidence": 0-1, "citation_indices": [] }`;
+返回纯 JSON（不要 markdown 代码块）：{ "answer": "...", "found_in_materials": true/false, "confidence": 0-1, "citation_indices": [] }`;
   }
 
   const titleList = materialTitles.length
@@ -146,9 +148,10 @@ ${titleList}
 2. 综合整理教材片段中的信息，给出结构清晰、内容完整的回答。可以适当组织和概括内容，但核心信息必须来自教材。
 3. 若教材未涉及该内容，设 found_in_materials=false，明确说明"教材中未涉及此内容"。
 4. 如果教材中有多个观点或说法，应完整列出。
-5. 使用 **加粗** 标记关键术语和重要概念。
-6. 使用 citation_indices 标注引用来源。
-7. 返回 JSON：{ "answer": "...", "found_in_materials": true/false, "confidence": 0-1, "citation_indices": [] }`;
+5. 使用 **加粗**（Markdown格式）标记关键术语和重要概念。
+6. answer 字段中不要包含任何引用标记或编号，直接输出干净的回答文本。
+7. 在 citation_indices 数组中填写你引用了哪些片段的编号（如 [1, 3, 5]）。
+8. 返回纯 JSON（不要 markdown 代码块）：{ "answer": "...", "found_in_materials": true/false, "confidence": 0-1, "citation_indices": [] }`;
 }
 
 export function buildUserPrompt(
@@ -183,6 +186,10 @@ export async function generateAnswer(req: QARequest): Promise<QAResponse> {
   const startTime = Date.now();
   const questionLanguage = detectLanguage(req.question);
 
+  // 检查当前配置是否启用了 RAG 模式
+  const activeConfig = await getActiveLlmConfig();
+  const useRAG = activeConfig?.useRAG ?? false;
+
   let mainResult: CallLLMResult;
   let enAnswer: string | undefined;
   let enSources: QuerySource[] | undefined;
@@ -196,14 +203,14 @@ export async function generateAnswer(req: QARequest): Promise<QAResponse> {
     enSources = cached.enSources;
     fromCache = true;
   } else {
-    // 缓存未命中，调用 LLM
+    // useRAG=true: 关键词+向量混合检索; useRAG=false: 仅关键词检索（两者都搜教材）
     if (questionLanguage === "en") {
-      const enResults = await semanticSearch(req.question, undefined, 8, "en");
+      const enResults = await semanticSearch(req.question, undefined, 8, "en", useRAG);
       mainResult = await callLLM(req.question, enResults, "en", "en");
     } else {
       const [zhResults, enResults] = await Promise.all([
-        semanticSearch(req.question, undefined, 8, "zh"),
-        semanticSearch(req.question, undefined, 5, "en"),
+        semanticSearch(req.question, undefined, 8, "zh", useRAG),
+        semanticSearch(req.question, undefined, 5, "en", useRAG),
       ]);
 
       mainResult = await callLLM(req.question, zhResults, "zh", "zh");
@@ -292,7 +299,7 @@ async function callLLM(
   let usedSources = searchResults;
 
   if (parsed) {
-    answer = parsed.answer;
+    answer = stripCitationMarkers(parsed.answer);
     foundInMaterials = parsed.found_in_materials;
     confidence = parsed.confidence;
 
@@ -329,6 +336,15 @@ async function callLLM(
     foundInMaterials,
     confidence,
   };
+}
+
+/** 清除 LLM 回答中残留的 citation 标记，如 [citation_indices: 3] 或 [citation_indices: 3, 6] */
+function stripCitationMarkers(text: string): string {
+  return text
+    .replace(/\[citation_indices?:\s*[\d,\s]+\]/gi, "")
+    .replace(/\[引用\d+\]/g, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
 }
 
 function parseLLMOutput(content: string): LLMStructuredOutput | null {

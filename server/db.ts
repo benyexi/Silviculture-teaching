@@ -1,4 +1,4 @@
-import { eq, desc, sql, and, gte, lte, like, count } from "drizzle-orm";
+import { eq, ne, desc, sql, and, gte, lte, like, count } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { migrate } from "drizzle-orm/mysql2/migrator";
 import path from "path";
@@ -292,8 +292,8 @@ export async function updateLlmConfig(id: number, data: Partial<InsertLlmConfig>
 export async function setActiveLlmConfig(id: number) {
   const db = await getDb();
   if (!db) return;
-  // 先取消所有激活状态
-  await db.update(llmConfigs).set({ isActive: false });
+  // 单条 SQL：取消非目标配置的激活状态
+  await db.update(llmConfigs).set({ isActive: false }).where(ne(llmConfigs.id, id));
   // 激活指定配置
   await db.update(llmConfigs).set({ isActive: true }).where(eq(llmConfigs.id, id));
 }
