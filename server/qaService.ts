@@ -102,6 +102,8 @@ type QuestionAnalysis = {
   expectsEnumeration: boolean;
   expectsComparisonTable: boolean;
   expectsFullCoverage: boolean;
+  requestDetail: boolean;
+  conciseDefinition: boolean;
   keywords: string[];
 };
 
@@ -150,12 +152,21 @@ function detectQuestionIntent(question: string, questionLang: "zh" | "en"): Ques
 
   if (intents.length === 0) intents.push("other");
 
+  const requestDetail =
+    questionLang === "zh"
+      ? /(详细|具体|全面|系统|深入|展开|分别说明|分别阐述|论述|阐述|比较|对比分析)/.test(q)
+      : /(detailed|detail|comprehensive|in depth|elaborate|analyze|analysis|compare)/.test(q);
+
+  const intent = intents[0];
+
   return {
-    intent: intents[0],
+    intent,
     intents,
     expectsEnumeration: intents.includes("classification") || intents.includes("method"),
     expectsComparisonTable: intents.includes("comparison"),
     expectsFullCoverage: intents.some((intent) => intent !== "definition" && intent !== "other"),
+    requestDetail,
+    conciseDefinition: intent === "definition" && !requestDetail,
     keywords: (questionLang === "en" ? extractKeywordsEn(question) : extractKeywords(question)).slice(0, 8),
   };
 }
@@ -188,7 +199,9 @@ function buildAnswerBlueprint(analysis: QuestionAnalysis, questionLang: "zh" | "
       case "comparison":
         return `1. Objects being compared\n2. Side-by-side comparison table\n3. Key differences and conclusion`;
       case "definition":
-        return `1. Direct definition\n2. Key features or boundaries\n3. Related explanation or application`;
+        return analysis.conciseDefinition
+          ? `1. One direct definition sentence\n2. 1-2 supporting sentences from excerpts\n3. Stop; no background expansion`
+          : `1. Direct definition\n2. Key features or boundaries\n3. Related explanation or application`;
       default:
         return `1. Short overview\n2. Structured explanation\n3. Completeness note if the excerpts are partial`;
     }
@@ -202,13 +215,33 @@ function buildAnswerBlueprint(analysis: QuestionAnalysis, questionLang: "zh" | "
     case "comparison":
       return `1. 说明比较对象\n2. 用对比表或分点对比列出差异\n3. 给出结论`;
     case "definition":
-      return `1. 先给出定义或核心含义\n2. 补充关键特征、边界或作用\n3. 结合教材语境做简短解释`;
+      return analysis.conciseDefinition
+        ? `1. 先给出一句最直接定义\n2. 再补1-2句教材内关键说明\n3. 到此结束，不延伸历史、分类、目的等`
+        : `1. 先给出定义或核心含义\n2. 补充关键特征、边界或作用\n3. 结合教材语境做简短解释`;
     default:
       return `1. 简要概述\n2. 结构化展开\n3. 说明教材是否仅覆盖部分内容`;
   }
 }
 
-function buildFewShot(questionLang: "zh" | "en"): string {
+function buildFewShot(questionLang: "zh" | "en", analysis: QuestionAnalysis): string {
+  if (analysis.intent === "definition" && analysis.conciseDefinition) {
+    if (questionLang === "en") {
+      return `Example (concise definition):
+Q: What is silviculture?
+A:
+Silviculture is the discipline that studies forest cultivation theory and practice.
+It covers the cultivation process from seeds/seedlings to stand establishment and maturity.
+Only information explicitly stated in the excerpts is included.`;
+    }
+
+    return `示例（简洁定义题）：
+用户问题：什么是森林培育？
+回答：
+森林培育是按既定目标和自然规律开展的综合培育活动，涵盖从种子、苗木到成林成熟的全过程。
+森林培育学是研究上述培育活动理论与实践的学科。
+仅回答教材明确给出的定义，不扩展历史或延伸内容。`;
+  }
+
   if (questionLang === "en") {
     return `Examples:
 Example 1 (classification):
@@ -280,7 +313,8 @@ Answering protocol:
 3. Do not stop at a summary sentence when the question asks for types, methods, steps, or differences.
 4. If the excerpts only cover part of the topic, say so plainly and do not invent missing items.
 5. Use Markdown only. Do not wrap the final answer in JSON or code fences.
-6. Do not include citation markers like [citation] or [引用1].`;
+6. Do not include citation markers like [citation] or [引用1].
+7. Never add background history or external knowledge not supported by excerpts.`;
   }
 
   const materialNote =
@@ -298,7 +332,8 @@ ${materialNote}
 4. 如果教材只覆盖部分内容，要明确说明“教材只明确提到以下项目”，不要补外部知识。
 5. 回答前先在内部检查一次：是否覆盖所有相关片段、是否存在漏项、是否还带有教材外补充。检查不过就重写。
 6. 直接输出 Markdown，不要包裹在 JSON 或代码块中。
-7. 不要出现"[引用1]"、"[citation]"、"片段[1]"等引用标记。`;
+7. 不要出现"[引用1]"、"[citation]"、"片段[1]"等引用标记。
+8. 严禁扩展教材外知识，不要凭常识或通用知识补充。`;
 }
 
 export function buildSystemPrompt(
@@ -319,14 +354,16 @@ ${titleList}
 
 Requirements:
 1. Source only: use only the provided excerpts. Do not add outside knowledge. If not covered, reply with: "The provided textbook excerpts do not cover this topic."
-2. Completeness: synthesize ALL provided excerpts thoroughly. For classification/method/step/comparison questions, list every item that appears in the excerpts.
+2. ${analysis.conciseDefinition ? "Concise definition mode: answer only the core definition from excerpts in 2-4 sentences." : "Completeness: synthesize ALL provided excerpts thoroughly. For classification/method/step/comparison questions, list every item that appears in the excerpts."}
 3. Structure: follow this blueprint: ${buildAnswerBlueprint(analysis, questionLang)}.
 4. Key terms: use **bold** for key terms, important concepts, and critical conclusions. Precisely preserve numeric data, formulas, and ratios from the textbook.
 5. Textbook language: preserve original terminology. If multiple viewpoints exist, list them all.
-6. Format: output directly in Markdown. Start with a 1-2 sentence overview, then expand with full details.
+6. ${analysis.conciseDefinition ? "Format: output plain concise Markdown in 2-4 sentences; do not use long sectioned expansion." : "Format: output directly in Markdown. Start with a 1-2 sentence overview, then expand with full details."}
 7. No citation markers: do not include "[引用1]", "[citation]", or any reference markers.
 
-${buildFewShot(questionLang)}`;
+${analysis.conciseDefinition ? "8. This is a concise definition question. Answer in 2-4 sentences only; do not add history, classification, purpose, development, or other extensions." : ""}
+
+${buildFewShot(questionLang, analysis)}`;
   }
 
   if (materialLang === "en") {
@@ -356,14 +393,15 @@ ${titleList}
 
 回答要求：
 1. 知识来源：只能基于提供的教材片段回答，不得使用教材外知识。如果教材未涉及该内容，明确回复"教材中未涉及此内容"。
-2. 全面完整：综合所有提供的教材片段信息，给出尽可能全面、详尽的回答。对于分类、类型、方法、步骤、比较等题目，要完整列出每一项，并逐项说明。
-3. 结构清晰：按照"定义与概述→分类/类型→具体方法/步骤→原则与注意事项→应用场景"等逻辑顺序组织。${buildAnswerBlueprint(analysis, questionLang)}
+2. ${analysis.conciseDefinition ? "简洁定义模式：仅基于教材给出定义本身，控制在2-4句，不做延伸讲解。" : "全面完整：综合所有提供的教材片段信息，给出尽可能全面、详尽的回答。对于分类、类型、方法、步骤、比较等题目，要完整列出每一项，并逐项说明。"}
+3. 结构清晰：${analysis.conciseDefinition ? `直接按“定义句 + 1-2句补充说明”输出。` : `按照"定义与概述→分类/类型→具体方法/步骤→原则与注意事项→应用场景"等逻辑顺序组织。`} ${buildAnswerBlueprint(analysis, questionLang)}
 4. 突出重点：使用 **加粗** 标记关键术语、重要概念和核心结论。对于教材中的数据、公式、比例等要精确引用。
 5. 保留教材表述：尽量使用教材中的原始术语和表述，可以适当组织和概括，但核心信息必须来自教材。如果教材中有多个观点或说法，应完整列出。
-6. 格式规范：直接输出 Markdown 格式，不要包裹在 JSON 或代码块中。开头先用1-2句话概括主题，再展开详细内容。
+6. 格式规范：${analysis.conciseDefinition ? "直接输出 Markdown，2-4句即可，不要使用长篇多级标题。" : "直接输出 Markdown 格式，不要包裹在 JSON 或代码块中。开头先用1-2句话概括主题，再展开详细内容。"}
 7. 禁止引用标记：回答中绝对不要出现"[引用1]"、"[引用2]"等引用编号标记，也不要出现"片段[引用N]"、"[citation]"等任何形式的引用标注。直接陈述内容即可。
+${analysis.conciseDefinition ? "\n8. 当前是“简洁定义题”，仅回答定义本身（2-4句），不得扩展到历史、分类、目的、发展、问题等延伸内容。" : ""}
 
-${buildFewShot(questionLang)}`;
+${buildFewShot(questionLang, analysis)}`;
 }
 
 export function buildUserPrompt(
@@ -402,6 +440,7 @@ Completion constraints:
 - If the question asks for types, methods, steps, or comparisons, list every item explicitly mentioned in the excerpts.
 - Do not stop at a summary sentence.
 - If the excerpts only cover part of the topic, say so clearly.
+${analysis.conciseDefinition ? "- This is a concise definition question. Use 2-4 sentences only and stop after the core definition." : ""}
 
 Textbook excerpts (${chunks.length}):
 ${chunkTexts}
@@ -422,11 +461,23 @@ ${buildAnswerBlueprint(analysis, questionLang)}
 - 如果是分类/方法/步骤/比较题，必须把教材中明确出现的项目全部列出。
 - 不要只写概述，必须先总述再逐项展开。
 - 如果教材只覆盖部分内容，要明确说明“教材只明确提到以下项目”。
+${analysis.conciseDefinition ? "- 这是简洁定义题：只用2-4句话回答定义本身，禁止历史背景/分类/目的等延伸。" : ""}
 
 【教材内容片段（共 ${chunks.length} 条）】
 ${chunkTexts}
 
-请综合以上所有教材片段，给出全面、详尽、结构清晰的回答。不要遗漏任何片段中的相关信息。`;
+${analysis.conciseDefinition
+  ? "请仅基于以上片段给出2-4句定义性回答，不要展开历史、分类、目的或其他延伸。"
+  : "请综合以上所有教材片段，给出全面、详尽、结构清晰的回答。不要遗漏任何片段中的相关信息。"} `;
+}
+
+function pickTopK(questionLang: "zh" | "en", analysis: QuestionAnalysis, forAuxEnglish = false): number {
+  if (analysis.conciseDefinition) {
+    if (questionLang === "en") return forAuxEnglish ? 1 : 3;
+    return forAuxEnglish ? 2 : 4;
+  }
+  if (analysis.intent === "definition") return questionLang === "en" ? 6 : 10;
+  return questionLang === "en" ? 8 : 20;
 }
 
 export async function generateAnswer(req: QARequest): Promise<QAResponse> {
@@ -453,12 +504,12 @@ export async function generateAnswer(req: QARequest): Promise<QAResponse> {
   } else {
     // useRAG=true: 关键词+向量混合检索; useRAG=false: 仅关键词检索（两者都搜教材）
     if (questionLanguage === "en") {
-      const enResults = await semanticSearch(req.question, undefined, 8, "en", useRAG);
+      const enResults = await semanticSearch(req.question, undefined, pickTopK("en", questionAnalysis), "en", useRAG);
       mainResult = await callLLM(req.question, enResults, "en", "en", questionAnalysis);
     } else {
       const [zhResults, enResults] = await Promise.all([
-        semanticSearch(req.question, undefined, 20, "zh", useRAG),
-        semanticSearch(req.question, undefined, 5, "en", useRAG),
+        semanticSearch(req.question, undefined, pickTopK("zh", questionAnalysis), "zh", useRAG),
+        semanticSearch(req.question, undefined, pickTopK("en", questionAnalysis, true), "en", useRAG),
       ]);
 
       mainResult = await callLLM(req.question, zhResults, "zh", "zh", questionAnalysis);
@@ -535,7 +586,14 @@ async function callLLM(
   const systemPrompt = buildSystemPrompt(materialTitles, questionLang, materialLang, analysis);
   const userMessage = buildUserPrompt(question, searchResults, questionLang, analysis);
 
-  const llmResponse = await invokeLLMWithConfig([{ role: "user", content: userMessage }], systemPrompt);
+  const llmResponse = await invokeLLMWithConfig(
+    [{ role: "user", content: userMessage }],
+    systemPrompt,
+    {
+      temperature: analysis.conciseDefinition ? 0 : undefined,
+      maxTokens: analysis.conciseDefinition ? 420 : undefined,
+    }
+  );
 
   let answer = stripCitationMarkers(llmResponse.content);
 
@@ -545,10 +603,14 @@ async function callLLM(
     answer = stripCitationMarkers(parsed.answer);
   }
 
+  if (analysis.conciseDefinition) {
+    answer = enforceConciseDefinition(answer, questionLang);
+  }
+
   const localReview = assessAnswerLocally(answer, searchResults, analysis, questionLang);
   let review = localReview;
 
-  if (!localReview.complete) {
+  if (!analysis.conciseDefinition && !localReview.complete) {
     try {
       const reviewResponse = await invokeLLMWithConfig(
         [{ role: "user", content: buildAnswerReviewPrompt(question, answer, searchResults, questionLang, analysis) }],
@@ -567,7 +629,7 @@ async function callLLM(
     }
   }
 
-  if (review.shouldRetry) {
+  if (!analysis.conciseDefinition && review.shouldRetry) {
     try {
       const revisionResponse = await invokeLLMWithConfig(
         [{ role: "user", content: buildRevisionPrompt(question, answer, searchResults, questionLang, analysis, review.issues) }],
@@ -581,6 +643,24 @@ async function callLLM(
   }
 
   const finalReview = assessAnswerLocally(answer, searchResults, analysis, questionLang);
+  const grounding = assessGrounding(answer, searchResults, questionLang);
+  if (!grounding.grounded) {
+    try {
+      const groundedRewrite = await invokeLLMWithConfig(
+        [{ role: "user", content: buildGroundedRewritePrompt(question, searchResults, questionLang, analysis) }],
+        questionLang === "en"
+          ? "You are a strict extractive tutor. Use only the provided excerpts."
+          : "你是严格的教材抽取式助手，只能使用给定片段原意回答。",
+        { temperature: 0, maxTokens: analysis.conciseDefinition ? 320 : 1200 }
+      );
+      answer = stripCitationMarkers(groundedRewrite.content);
+      if (analysis.conciseDefinition) {
+        answer = enforceConciseDefinition(answer, questionLang);
+      }
+    } catch {
+      // fallback to existing answer
+    }
+  }
   if (!finalReview.complete) {
     answer = appendDegradationNote(answer, finalReview.downgradeNote);
   }
@@ -699,6 +779,10 @@ function assessAnswerLocally(
   const hasCompareStructure = /\|.+\|/m.test(answer) || /对比|比较|difference|compare/i.test(answer);
   const issues: string[] = [];
 
+  if (analysis.conciseDefinition && compactAnswer.length > 300) {
+    issues.push("定义题答案过长，出现不必要延伸");
+  }
+
   if (analysis.expectsFullCoverage && compactAnswer.length < 120) {
     issues.push("回答过短，可能未覆盖完整要点");
   }
@@ -732,7 +816,7 @@ function assessAnswerLocally(
   return {
     complete,
     issues,
-    shouldRetry: !complete && searchResults.length > 0,
+    shouldRetry: !analysis.conciseDefinition && !complete && searchResults.length > 0,
     downgradeNote,
   };
 }
@@ -894,6 +978,79 @@ function appendDegradationNote(answer: string, note: string): string {
   return `${answer}\n\n> ${note}`;
 }
 
+function enforceConciseDefinition(answer: string, questionLang: "zh" | "en"): string {
+  const plain = answer
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/^\s*[-*•]\s+/gm, "")
+    .replace(/^\s*\d+[.)、．]\s+/gm, "")
+    .replace(/\n{2,}/g, "\n")
+    .trim();
+  const sentences = questionLang === "en"
+    ? plain.split(/(?<=[.!?])\s+/).map((s) => s.trim()).filter(Boolean)
+    : plain.split(/(?<=[。！？])/).map((s) => s.trim()).filter(Boolean);
+  const kept = sentences.slice(0, 4);
+  let concise = kept.join(questionLang === "en" ? " " : "");
+  if (!concise) concise = plain.slice(0, 220);
+  const maxLen = questionLang === "en" ? 520 : 260;
+  if (concise.length > maxLen) {
+    concise = concise.slice(0, maxLen).trim();
+    if (questionLang === "zh" && !/[。！？]$/.test(concise)) concise += "。";
+    if (questionLang === "en" && !/[.!?]$/.test(concise)) concise += ".";
+  }
+  return concise;
+}
+
+function assessGrounding(
+  answer: string,
+  searchResults: SearchResult[],
+  questionLang: "zh" | "en"
+): { grounded: boolean; score: number } {
+  if (searchResults.length === 0) return { grounded: true, score: 1 };
+  const sourceText = searchResults.map((s) => s.content).join("\n").toLowerCase();
+  const keywords = (questionLang === "en" ? extractKeywordsEn(answer) : extractKeywords(answer))
+    .filter((k) => k.length >= 2)
+    .slice(0, 20);
+  if (keywords.length === 0) return { grounded: true, score: 1 };
+  let hit = 0;
+  for (const kw of keywords) {
+    if (sourceText.includes(kw.toLowerCase())) hit++;
+  }
+  const score = hit / keywords.length;
+  return { grounded: score >= 0.55, score };
+}
+
+function buildGroundedRewritePrompt(
+  question: string,
+  searchResults: SearchResult[],
+  questionLang: "zh" | "en",
+  analysis: QuestionAnalysis
+): string {
+  const sourceTexts = searchResults
+    .slice(0, analysis.conciseDefinition ? 4 : searchResults.length)
+    .map((r, idx) => `【片段${idx + 1}】${r.content}`)
+    .join("\n\n");
+  if (questionLang === "en") {
+    return `Rewrite the answer using only information that appears in the excerpts below.
+Question: ${question}
+Rules:
+1. No external knowledge.
+2. Paraphrase conservatively; do not add new facts.
+3. ${analysis.conciseDefinition ? "Answer in 2-4 sentences only." : "Keep a clear structure based on the question intent."}
+
+Excerpts:
+${sourceTexts}`;
+  }
+  return `请仅基于下方片段重写答案，不得加入片段以外事实。
+学生问题：${question}
+要求：
+1. 只能使用片段中出现的信息，不得发挥。
+2. 可适度改写表述，但不能新增事实。
+3. ${analysis.conciseDefinition ? "这是简洁定义题，仅用2-4句。禁止历史背景和延伸。" : "按问题类型组织结构，但不要超出片段。"}
+
+教材片段：
+${sourceTexts}`;
+}
+
 // ─── 流式答案生成 ─────────────────────────────────────────────────────────────
 
 export type StreamMeta = {
@@ -961,9 +1118,9 @@ export async function generateAnswerStream(
     // 检索教材
     let searchResults: SearchResult[];
     if (questionLanguage === "en") {
-      searchResults = await semanticSearch(req.question, undefined, 8, "en", useRAG);
+      searchResults = await semanticSearch(req.question, undefined, pickTopK("en", questionAnalysis), "en", useRAG);
     } else {
-      searchResults = await semanticSearch(req.question, undefined, 20, "zh", useRAG);
+      searchResults = await semanticSearch(req.question, undefined, pickTopK("zh", questionAnalysis), "zh", useRAG);
     }
 
     if (searchResults.length === 0) {
@@ -1019,6 +1176,9 @@ export async function generateAnswerStream(
     }
 
     fullAnswer = stripCitationMarkers(fullAnswer);
+    if (questionAnalysis.conciseDefinition) {
+      fullAnswer = enforceConciseDefinition(fullAnswer, questionLanguage);
+    }
 
     // 判断是否找到内容
     const notFoundPhrases = ["未涉及", "not cover", "没有相关", "未找到", "not found"];
