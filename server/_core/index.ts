@@ -38,6 +38,50 @@ async function startServer() {
   app.get("/healthz", (_req, res) => {
     res.status(200).json({ status: "ok" });
   });
+
+  // Debug endpoint — visit /api/debug/auth in browser after login to diagnose cookie issues
+  app.get("/api/debug/auth", async (req, res) => {
+    const { parse: parseCookie } = await import("cookie");
+    const { COOKIE_NAME } = await import("@shared/const");
+    const { sdk } = await import("./sdk");
+
+    const cookieHeader = req.headers.cookie;
+    const cookies = cookieHeader ? parseCookie(cookieHeader) : {};
+    const sessionCookie = cookies[COOKIE_NAME];
+    let sessionResult: unknown = null;
+    let dbUser: unknown = null;
+
+    if (sessionCookie) {
+      try {
+        sessionResult = await sdk.verifySession(sessionCookie);
+      } catch (e) {
+        sessionResult = { error: String(e) };
+      }
+
+      if (sessionResult && typeof sessionResult === "object" && "openId" in (sessionResult as any)) {
+        try {
+          const { getUserByOpenId } = await import("../db");
+          dbUser = await getUserByOpenId((sessionResult as any).openId);
+        } catch (e) {
+          dbUser = { error: String(e) };
+        }
+      }
+    }
+
+    res.json({
+      hasCookieHeader: !!cookieHeader,
+      cookieNames: Object.keys(cookies),
+      hasSessionCookie: !!sessionCookie,
+      sessionCookieLength: sessionCookie?.length ?? 0,
+      jwtVerifyResult: sessionResult,
+      dbUser: dbUser ? { id: (dbUser as any).id, openId: (dbUser as any).openId, role: (dbUser as any).role, name: (dbUser as any).name } : null,
+      protocol: req.protocol,
+      xForwardedProto: req.headers["x-forwarded-proto"],
+      jwtSecretSet: !!(process.env.JWT_SECRET),
+      jwtSecretLength: (process.env.JWT_SECRET ?? "").length,
+    });
+  });
+
   // Auth routes (local login)
   registerOAuthRoutes(app);
 
