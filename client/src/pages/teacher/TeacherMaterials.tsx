@@ -193,12 +193,13 @@ function UploadForm({ onSuccess }: { onSuccess: () => void }) {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
-    if (!f.name.toLowerCase().endsWith(".pdf")) {
-      toast.error("仅支持 PDF 格式");
+    const ext = f.name.toLowerCase().split(".").pop();
+    if (!["pdf", "doc", "docx"].includes(ext || "")) {
+      toast.error("仅支持 PDF 和 Word (.doc/.docx) 格式");
       return;
     }
     setFile(f);
-    if (!title) setTitle(f.name.replace(/\.pdf$/i, ""));
+    if (!title) setTitle(f.name.replace(/\.(pdf|docx?)$/i, ""));
   };
 
   const handleUpload = async () => {
@@ -286,7 +287,7 @@ function UploadForm({ onSuccess }: { onSuccess: () => void }) {
         <input
           ref={fileRef}
           type="file"
-          accept=".pdf"
+          accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
           className="hidden"
           onChange={handleFileChange}
           disabled={uploading}
@@ -302,7 +303,7 @@ function UploadForm({ onSuccess }: { onSuccess: () => void }) {
         ) : (
           <div className="space-y-2">
             <Upload className="h-8 w-8 text-muted-foreground/50 mx-auto" />
-            <p className="text-sm text-muted-foreground">点击选择 PDF 文件</p>
+            <p className="text-sm text-muted-foreground">点击选择 PDF 或 Word 文件</p>
             <p className="text-xs text-muted-foreground">支持 100MB+ 大文件</p>
           </div>
         )}

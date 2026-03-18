@@ -23,8 +23,10 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/drizzle ./drizzle
 COPY --from=build /app/package.json ./package.json
 
-# Create uploads directory
-RUN mkdir -p /app/uploads
+# Create uploads directory (Railway volume mounts at /data/uploads)
+RUN mkdir -p /data/uploads
+
+ENV UPLOAD_DIR=/data/uploads
 
 EXPOSE 3000
 
