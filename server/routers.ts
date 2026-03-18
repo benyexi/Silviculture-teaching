@@ -9,6 +9,8 @@ import {
   getMaterialById,
   createMaterial,
   deleteMaterial,
+  deleteChunksByMaterialId,
+  updateMaterialStatus,
   getLlmConfigs,
   getActiveLlmConfig,
   createLlmConfig,
@@ -249,6 +251,70 @@ export const appRouter = router({
         clearAnswerCache(); // 教材删除后清空答案缓存
         await deleteMaterial(input.id);
         return { success: true };
+      }),
+
+    // 重新处理教材（删除旧 chunks，重新分块+索引）
+    reprocess: adminProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        const mat = await getMaterialById(input.id);
+        if (!mat) throw new TRPCError({ code: "NOT_FOUND", message: "教材不存在" });
+        if (!mat.fileKey) throw new TRPCError({ code: "BAD_REQUEST", message: "教材文件不存在" });
+
+        // 读取原始文件
+        const { storageReadBuffer } = await import("./storage");
+        let fileBuffer: Buffer;
+        try {
+          fileBuffer = await storageReadBuffer(mat.fileKey);
+        } catch {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "教材原始文件已丢失，请重新上传" });
+        }
+
+        // 删除旧 chunks，更新状态为处理中
+        await deleteChunksByMaterialId(input.id);
+        await updateMaterialStatus(input.id, "processing");
+        invalidateMaterialCache(input.id);
+
+        // 提取文件名
+        const filename = mat.fileKey.split("/").pop() || "document.pdf";
+
+        // 异步重新处理
+        processMaterial(input.id, fileBuffer, filename)
+          .then(() => clearAnswerCache())
+          .catch((err) => {
+            console.error(`[Router] 教材 ${input.id} 重新处理失败:`, err);
+          });
+
+        return { status: "processing" };
+      }),
+
+    // 一键重新处理所有教材
+    reprocessAll: adminProcedure
+      .mutation(async () => {
+        const { storageReadBuffer } = await import("./storage");
+        const allMaterials = await getMaterials();
+        const published = allMaterials.filter(m => m.status === "published" || m.status === "error");
+
+        let started = 0;
+        for (const mat of published) {
+          if (!mat.fileKey) continue;
+          try {
+            const fileBuffer = await storageReadBuffer(mat.fileKey);
+            await deleteChunksByMaterialId(mat.id);
+            await updateMaterialStatus(mat.id, "processing");
+            invalidateMaterialCache(mat.id);
+            const filename = mat.fileKey.split("/").pop() || "document.pdf";
+            processMaterial(mat.id, fileBuffer, filename).catch((err) => {
+              console.error(`[Router] 教材 ${mat.id} 重新处理失败:`, err);
+            });
+            started++;
+          } catch (err) {
+            console.error(`[Router] 教材 ${mat.id} 文件读取失败:`, err);
+          }
+        }
+
+        clearAnswerCache();
+        return { started, total: published.length };
       }),
   }),
 

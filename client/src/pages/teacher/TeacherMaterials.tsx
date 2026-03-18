@@ -51,6 +51,14 @@ export default function TeacherMaterials() {
     onSuccess: () => { utils.materials.list.invalidate(); toast.success("教材已删除"); },
     onError: (e) => toast.error(`删除失败: ${e.message}`),
   });
+  const reprocessMutation = trpc.materials.reprocess.useMutation({
+    onSuccess: () => { utils.materials.list.invalidate(); toast.success("已开始重新处理，请稍候刷新查看状态"); },
+    onError: (e) => toast.error(`重新处理失败: ${e.message}`),
+  });
+  const reprocessAllMutation = trpc.materials.reprocessAll.useMutation({
+    onSuccess: (data) => { utils.materials.list.invalidate(); toast.success(`已开始重新处理 ${data.started} 本教材`); },
+    onError: (e) => toast.error(`批量处理失败: ${e.message}`),
+  });
 
   const [uploadOpen, setUploadOpen] = useState(false);
 
@@ -65,6 +73,15 @@ export default function TeacherMaterials() {
           <Button variant="outline" size="sm" onClick={() => refetch()}>
             <RefreshCw className="h-4 w-4 mr-1" />
             刷新
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => reprocessAllMutation.mutate()}
+            disabled={reprocessAllMutation.isPending}
+          >
+            {reprocessAllMutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-1" />}
+            全部重新处理
           </Button>
           <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
             <DialogTrigger asChild>
@@ -137,6 +154,16 @@ export default function TeacherMaterials() {
                         <p className="text-xs text-destructive mt-1">{mat.errorMessage}</p>
                       )}
                     </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-muted-foreground hover:text-primary shrink-0"
+                      title="重新处理"
+                      disabled={reprocessMutation.isPending || mat.status === "processing"}
+                      onClick={() => reprocessMutation.mutate({ id: mat.id })}
+                    >
+                      <RefreshCw className={`h-4 w-4 ${mat.status === "processing" ? "animate-spin" : ""}`} />
+                    </Button>
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive shrink-0">

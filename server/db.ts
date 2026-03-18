@@ -139,6 +139,12 @@ export async function deleteMaterial(id: number) {
   await db.delete(materials).where(eq(materials.id, id));
 }
 
+export async function deleteChunksByMaterialId(materialId: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(materialChunks).where(eq(materialChunks.materialId, materialId));
+}
+
 // ─── Material Chunks ──────────────────────────────────────────────────────────
 export async function insertMaterialChunk(data: InsertMaterialChunk): Promise<number> {
   const db = await getDb();
