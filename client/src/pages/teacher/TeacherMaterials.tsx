@@ -149,6 +149,9 @@ export default function TeacherMaterials() {
                           <span>{(mat.fileSizeBytes / 1024 / 1024).toFixed(1)} MB</span>
                         ) : null}
                         <span>{new Date(mat.createdAt).toLocaleDateString("zh-CN")}</span>
+                        {mat.hasFile === false && (
+                          <span className="text-amber-600">原始文件缺失</span>
+                        )}
                       </div>
                       {mat.status === "error" && mat.errorMessage && (
                         <p className="text-xs text-destructive mt-1">{mat.errorMessage}</p>
@@ -158,8 +161,8 @@ export default function TeacherMaterials() {
                       variant="ghost"
                       size="icon"
                       className="text-muted-foreground hover:text-primary shrink-0"
-                      title="重新处理"
-                      disabled={reprocessMutation.isPending || mat.status === "processing"}
+                      title={mat.hasFile === false ? "原始文件缺失，需重新上传后才能重新处理" : "重新处理"}
+                      disabled={reprocessMutation.isPending || mat.status === "processing" || mat.hasFile === false}
                       onClick={() => reprocessMutation.mutate({ id: mat.id })}
                     >
                       <RefreshCw className={`h-4 w-4 ${mat.status === "processing" ? "animate-spin" : ""}`} />

@@ -91,10 +91,12 @@ export const appRouter = router({
   // ─── 教材管理（教师端）──────────────────────────────────────────────────────
   materials: router({
     list: publicProcedure.query(async () => {
+      const { storageExists } = await import("./storage");
       const mats = await getMaterials();
       return mats.map((m) => ({
         ...m,
-        // 不暴露 fileKey 给前端
+        // 不暴露 fileKey 给前端，但告知文件是否存在
+        hasFile: m.fileKey ? storageExists(m.fileKey) : false,
         fileKey: undefined,
       }));
     }),

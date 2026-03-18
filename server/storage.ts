@@ -57,6 +57,12 @@ export async function storageGet(relKey: string): Promise<{ key: string; url: st
   return { key, url };
 }
 
+export function storageExists(relKey: string): boolean {
+  const key = normalizeKey(relKey);
+  const uploadDir = getUploadDir();
+  return fs.existsSync(path.join(uploadDir, key));
+}
+
 /**
  * Read file content directly from local storage.
  * Used during upload finalization to read chunk data.
