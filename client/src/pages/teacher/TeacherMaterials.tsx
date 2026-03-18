@@ -255,7 +255,7 @@ function UploadForm({ onSuccess }: { onSuccess: () => void }) {
         language,
       });
 
-      // 2. 分块上传
+      // 2. 分块上传（带重试机制）
       for (let i = 0; i < totalChunks; i++) {
         const start = i * CHUNK_SIZE;
         const end = Math.min(start + CHUNK_SIZE, file.size);
@@ -269,12 +269,28 @@ function UploadForm({ onSuccess }: { onSuccess: () => void }) {
           Array.from(new Uint8Array(arrayBuffer)).map((b) => String.fromCharCode(b)).join("")
         );
 
-        await uploadChunk.mutateAsync({
-          sessionId,
-          chunkIndex: i,
-          chunkData: base64,
-          isLastChunk: i === totalChunks - 1,
-        });
+        // 重试逻辑：最多重试 3 次，指数退避
+        let lastErr: Error | null = null;
+        for (let attempt = 0; attempt < 4; attempt++) {
+          try {
+            await uploadChunk.mutateAsync({
+              sessionId,
+              chunkIndex: i,
+              chunkData: base64,
+              isLastChunk: i === totalChunks - 1,
+            });
+            lastErr = null;
+            break;
+          } catch (err: any) {
+            lastErr = err;
+            if (attempt < 3) {
+              const delay = Math.pow(2, attempt) * 1000; // 1s, 2s, 4s
+              setStatusText(`分块 ${i + 1} 上传失败，${delay / 1000}秒后重试...`);
+              await new Promise(r => setTimeout(r, delay));
+            }
+          }
+        }
+        if (lastErr) throw lastErr;
 
         setProgress(Math.round(((i + 1) / totalChunks) * 80));
       }
