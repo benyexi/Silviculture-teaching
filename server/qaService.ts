@@ -9,6 +9,53 @@ import { createQuery, upsertVisitorStat } from "./db";
 import { detectLanguage } from "./languageDetect";
 import type { QuerySource } from "../drizzle/schema";
 
+// ─── 答案缓存 ─────────────────────────────────────────────────────────────────
+type CachedAnswer = {
+  mainResult: CallLLMResult;
+  enAnswer?: string;
+  enSources?: QuerySource[];
+  questionLanguage: "zh" | "en";
+  cachedAt: number;
+};
+
+const CACHE_TTL_MS = 30 * 60 * 1000; // 缓存 30 分钟
+const CACHE_MAX_SIZE = 500; // 最多缓存 500 条
+const answerCache = new Map<string, CachedAnswer>();
+
+function normalizeQuestion(q: string): string {
+  return q
+    .trim()
+    .toLowerCase()
+    .replace(/[，。？！、；：""''（）【】《》\s]+/g, "")
+    .replace(/[?,;:!"'()\[\]\s]+/g, "");
+}
+
+function getCachedAnswer(question: string): CachedAnswer | null {
+  const key = normalizeQuestion(question);
+  const cached = answerCache.get(key);
+  if (!cached) return null;
+  if (Date.now() - cached.cachedAt > CACHE_TTL_MS) {
+    answerCache.delete(key);
+    return null;
+  }
+  return cached;
+}
+
+function setCachedAnswer(question: string, data: Omit<CachedAnswer, "cachedAt">): void {
+  // 超出容量时清理最旧的条目
+  if (answerCache.size >= CACHE_MAX_SIZE) {
+    const firstKey = answerCache.keys().next().value;
+    if (firstKey !== undefined) answerCache.delete(firstKey);
+  }
+  answerCache.set(normalizeQuestion(question), { ...data, cachedAt: Date.now() });
+}
+
+/** 教材更新时清空缓存，保证答案基于最新教材 */
+export function clearAnswerCache(): void {
+  answerCache.clear();
+  console.log("[Cache] Answer cache cleared");
+}
+
 export type QARequest = {
   question: string;
   visitorIp?: string;
@@ -57,31 +104,35 @@ export function buildSystemPrompt(
       ? materialTitles.map((t) => `- ${t}`).join("\n")
       : "- (No textbook excerpts)";
 
-    return `You are a silviculture teaching assistant. Answer questions based ONLY on the provided textbook excerpts.
+    return `You are a silviculture teaching assistant. You may ONLY answer based on the provided textbook excerpts below. You are NOT allowed to use any knowledge outside these excerpts.
 
 Textbooks:
 ${titleList}
 
 Rules:
-1. Use only the provided excerpts. Do not add outside knowledge.
-2. If not covered, set found_in_materials=false and answer clearly that the content is not covered in the provided textbook.
-3. If multiple viewpoints exist, list all of them.
-4. Keep wording aligned with textbook terminology.
-5. Use **bold** (Markdown) to highlight key terms, definitions, and important concepts in your answer.
-6. Return JSON only:
+1. ONLY use information explicitly stated in the provided excerpts. Do NOT add, infer, or supplement with outside knowledge under any circumstances.
+2. Every claim in your answer MUST be directly traceable to a specific excerpt. Use citation_indices to indicate which excerpts support each part of your answer.
+3. If the excerpts do not contain sufficient information to answer the question, you MUST set found_in_materials=false and respond: "This topic is not covered in the provided textbook excerpts." Do NOT attempt a partial answer using your own knowledge.
+4. If multiple viewpoints exist in the excerpts, list all of them.
+5. Use the exact terminology from the textbook. Do not paraphrase into your own wording.
+6. Use **bold** (Markdown) to highlight key terms and definitions from the textbook.
+7. Return JSON only:
 { "answer": "...", "found_in_materials": true/false, "confidence": 0-1, "citation_indices": [] }`;
   }
 
   if (materialLang === "en") {
     return `你是一位森林培育学助教。以下是英文教材的相关段落。
-请基于这些英文教材内容，用中文回答问题。回答时：
+请严格基于这些英文教材内容，用中文回答问题。绝对禁止使用教材以外的任何知识。
+
+回答格式：
 1. 先给出英文教材的关键原文（1-2句）
 2. 再给出中文翻译和解释
 
-规则：
-- 只能基于提供的教材内容回答，不能使用教材以外的知识
-- 如果教材中没有相关内容，设 found_in_materials=false
-- confidence 表示答案与教材内容的匹配程度（0-1）
+严格规则：
+- 只能基于提供的教材片段回答，每句话都必须能在片段中找到原文依据
+- 禁止添加、推断、补充任何教材中没有明确写到的内容
+- 如果教材片段中没有相关内容，必须设 found_in_materials=false，回答"英文教材中未涉及此内容"
+- 使用 citation_indices 标注每个要点的来源片段编号
 - 使用 **加粗**（Markdown格式）标记关键术语和重要概念
 
 返回 JSON：{ "answer": "...", "found_in_materials": true/false, "confidence": 0-1, "citation_indices": [] }`;
@@ -91,16 +142,19 @@ Rules:
     ? materialTitles.map((t, i) => `  ${i + 1}. 《${t}》`).join("\n")
     : "  （暂无已发布教材）";
 
-  return `你是北京林业大学森林培育学科的专业教学助手，严格基于以下教材内容回答学生问题：
+  return `你是北京林业大学森林培育学科的教材问答助手。你只能基于下方提供的教材片段回答问题，绝对禁止使用任何教材以外的知识。
+
+参考教材：
 ${titleList}
 
-规则：
-1. 只能基于提供的教材片段回答。
-2. 不得使用教材外知识。
-3. 若教材未涉及，found_in_materials=false，且明确说明”教材中未涉及此内容”。
-4. 如果有多个观点，必须完整列出。
-5. 使用 **加粗**（Markdown格式）标记答案中的关键术语、定义和重要概念，便于学生快速抓住重点。
-6. 返回 JSON：{ “answer”: “...”, “found_in_materials”: true/false, “confidence”: 0-1, “citation_indices”: [] }`;
+严格规则：
+1. 【核心原则】你的回答必须100%来源于提供的教材片段，每一句话都必须能在片段中找到依据。禁止添加、推断、补充任何教材中没有明确写到的内容。
+2. 【引用要求】回答中的每个要点都必须通过 citation_indices 标注来源片段编号，让学生可以对照原文验证。
+3. 【无法回答】如果提供的教材片段中没有相关内容，必须设置 found_in_materials=false，并回答”教材中未涉及此内容，建议查阅教材其他章节或咨询授课教师。”。绝对不能用自己的知识凑出一个答案。
+4. 【多观点处理】如果教材中有多个观点或说法，必须完整列出，不能只取其中一个。
+5. 【忠于原文】使用教材中的原始术语和表述，不要用自己的话改写。可以适当组织结构，但核心内容必须忠实于原文。
+6. 【格式要求】使用 **加粗** 标记教材中的关键术语、定义和重要概念。
+7. 返回 JSON：{ “answer”: “...”, “found_in_materials”: true/false, “confidence”: 0-1, “citation_indices”: [] }`;
 }
 
 export function buildUserPrompt(
@@ -138,24 +192,40 @@ export async function generateAnswer(req: QARequest): Promise<QAResponse> {
   let mainResult: CallLLMResult;
   let enAnswer: string | undefined;
   let enSources: QuerySource[] | undefined;
+  let fromCache = false;
 
-  if (questionLanguage === "en") {
-    const enResults = await semanticSearch(req.question, undefined, 8, "en");
-    mainResult = await callLLM(req.question, enResults, "en", "en");
+  // 检查缓存
+  const cached = getCachedAnswer(req.question);
+  if (cached) {
+    mainResult = cached.mainResult;
+    enAnswer = cached.enAnswer;
+    enSources = cached.enSources;
+    fromCache = true;
   } else {
-    const [zhResults, enResults] = await Promise.all([
-      semanticSearch(req.question, undefined, 8, "zh"),
-      semanticSearch(req.question, undefined, 5, "en"),
-    ]);
+    // 缓存未命中，调用 LLM
+    if (questionLanguage === "en") {
+      const enResults = await semanticSearch(req.question, undefined, 8, "en");
+      mainResult = await callLLM(req.question, enResults, "en", "en");
+    } else {
+      const [zhResults, enResults] = await Promise.all([
+        semanticSearch(req.question, undefined, 8, "zh"),
+        semanticSearch(req.question, undefined, 5, "en"),
+      ]);
 
-    mainResult = await callLLM(req.question, zhResults, "zh", "zh");
+      mainResult = await callLLM(req.question, zhResults, "zh", "zh");
 
-    if (enResults.length > 0) {
-      const enResult = await callLLM(req.question, enResults, "zh", "en");
-      if (enResult.foundInMaterials) {
-        enAnswer = enResult.answer;
-        enSources = enResult.sources;
+      if (enResults.length > 0) {
+        const enResult = await callLLM(req.question, enResults, "zh", "en");
+        if (enResult.foundInMaterials) {
+          enAnswer = enResult.answer;
+          enSources = enResult.sources;
+        }
       }
+    }
+
+    // 只缓存教材中找到内容的答案
+    if (mainResult.foundInMaterials) {
+      setCachedAnswer(req.question, { mainResult, enAnswer, enSources, questionLanguage });
     }
   }
 
@@ -165,7 +235,7 @@ export async function generateAnswer(req: QARequest): Promise<QAResponse> {
     question: req.question,
     answer: mainResult.answer,
     sources: mainResult.sources,
-    modelUsed: mainResult.modelUsed,
+    modelUsed: fromCache ? `${mainResult.modelUsed}(cached)` : mainResult.modelUsed,
     responseTimeMs,
     visitorIp: req.visitorIp,
     visitorCity: req.visitorCity,

@@ -26,7 +26,7 @@ import {
   getUploadSession,
   updateUploadSession,
 } from "./db";
-import { generateAnswer } from "./qaService";
+import { generateAnswer, clearAnswerCache } from "./qaService";
 import { processMaterial } from "./pdfProcessor";
 import { invalidateMaterialCache } from "./vectorSearch";
 import { getGeoInfo, extractIp } from "./geoip";
@@ -231,9 +231,11 @@ export const appRouter = router({
         });
 
         // 异步处理文档（不阻塞响应）
-        processMaterial(materialId, fullBuffer, session.filename).catch((err) => {
-          console.error(`[Router] 教材 ${materialId} 处理失败:`, err);
-        });
+        processMaterial(materialId, fullBuffer, session.filename)
+          .then(() => clearAnswerCache()) // 教材更新后清空答案缓存
+          .catch((err) => {
+            console.error(`[Router] 教材 ${materialId} 处理失败:`, err);
+          });
 
         return { materialId, status: "processing" };
       }),
@@ -244,6 +246,7 @@ export const appRouter = router({
         const mat = await getMaterialById(input.id);
         if (!mat) throw new TRPCError({ code: "NOT_FOUND" });
         invalidateMaterialCache(input.id);
+        clearAnswerCache(); // 教材删除后清空答案缓存
         await deleteMaterial(input.id);
         return { success: true };
       }),
