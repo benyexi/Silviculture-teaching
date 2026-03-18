@@ -101,16 +101,36 @@ class SDKServer {
       throw ForbiddenError("Invalid session cookie");
     }
 
-    const user = await db.getUserByOpenId(session.openId);
+    let user = await db.getUserByOpenId(session.openId);
+
+    // If user not in DB (e.g. DB upsert failed during login), create them now
+    if (!user && session.openId.startsWith("local_")) {
+      try {
+        await db.upsertUser({
+          openId: session.openId,
+          name: session.name,
+          loginMethod: "local",
+          role: "admin",
+          lastSignedIn: new Date(),
+        });
+        user = await db.getUserByOpenId(session.openId);
+      } catch (err) {
+        console.error("[Auth] Failed to auto-create local user:", err);
+      }
+    }
 
     if (!user) {
       throw ForbiddenError("User not found");
     }
 
-    await db.upsertUser({
-      openId: user.openId,
-      lastSignedIn: new Date(),
-    });
+    try {
+      await db.upsertUser({
+        openId: user.openId,
+        lastSignedIn: new Date(),
+      });
+    } catch {
+      // non-fatal
+    }
 
     return user;
   }
