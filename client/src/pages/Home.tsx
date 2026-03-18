@@ -116,10 +116,15 @@ export default function Home() {
                   setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
                 } else if (currentEvent === "token") {
                   accumulatedAnswer += parsed.t;
-                  setStreamAnswer(accumulatedAnswer);
+                  // 实时清理引用标记
+                  const cleaned = accumulatedAnswer
+                    .replace(/\[引用\d+\]/g, "")
+                    .replace(/\[citation_indices?:\s*[\d,\s]+\]/gi, "")
+                    .replace(/【?片段\d+】?/g, "")
+                    .replace(/片段\[?\d+\]?至?\[?\d*\]?/g, "");
+                  setStreamAnswer(cleaned);
                 } else if (currentEvent === "done") {
                   // 完成
-                  setStreamElapsed(Date.now() - Date.now()); // will be recalculated
                 } else if (currentEvent === "error") {
                   setStreamError(parsed.message);
                 }
@@ -193,7 +198,7 @@ export default function Home() {
               <span className="font-bold text-white text-base tracking-wide" style={{ fontFamily: "'Noto Serif SC', serif" }}>
                 森林培育学
               </span>
-              <span className="text-emerald-300/70 text-xs ml-2 font-light tracking-widest hidden sm:inline">SILVICULTURE Q&amp;A</span>
+              <span className="text-emerald-300/70 text-xs ml-2 font-light tracking-widest hidden sm:inline">SILVICULTURE INTELLIGENT Q&amp;A</span>
             </div>
           </div>
           <div className="flex items-center gap-4">
@@ -235,11 +240,14 @@ export default function Home() {
 
           {/* 主标题：中英文双行 */}
           <h1 className="text-4xl md:text-6xl font-bold text-white mb-2 drop-shadow-lg" style={{ fontFamily: "'Noto Serif SC', serif" }}>
-            森林培育学知识问答系统
+            森林培育学知识智能问答系统
           </h1>
-          <p className="text-emerald-300/80 text-sm md:text-base tracking-[0.25em] uppercase mb-6 font-light">
-            Silviculture Knowledge Q&amp;A System
-          </p>
+          <div className="flex items-center justify-center gap-3 mb-6">
+            <p className="text-emerald-300/80 text-sm md:text-base tracking-[0.25em] uppercase font-light">
+              Silviculture Intelligent Q&amp;A System
+            </p>
+            <span className="text-xs font-mono text-emerald-400/70 border border-emerald-400/30 rounded px-1.5 py-0.5">V1.0</span>
+          </div>
           <p className="text-white/80 text-sm md:text-base max-w-2xl mx-auto leading-relaxed mb-10 drop-shadow">
             Grounded in authoritative textbooks &middot; 严格基于教材内容回答 &middot; Every answer is fully cited
           </p>

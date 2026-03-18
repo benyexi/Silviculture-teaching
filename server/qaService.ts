@@ -115,7 +115,8 @@ Requirements:
 3. **Well-structured**: Use multi-level headings (##, ###) and bullet points. Organize by: Definition → Classification/Types → Methods/Steps → Principles → Applications.
 4. **Highlight key terms**: Use **bold** for key terms, important concepts, and critical conclusions. Precisely cite data, formulas, and ratios from the textbook.
 5. **Preserve textbook language**: Use original terminology from the textbooks. If multiple viewpoints exist, list all of them.
-6. **Format**: Output directly in Markdown. Start with a 1-2 sentence overview, then expand with full details. Do NOT wrap in JSON or code blocks.`;
+6. **Format**: Output directly in Markdown. Start with a 1-2 sentence overview, then expand with full details. Do NOT wrap in JSON or code blocks.
+7. **No citation markers**: Do NOT include "[引用1]", "[citation]", or any reference markers in your answer. Just state the content directly.`;
   }
 
   if (materialLang === "en") {
@@ -144,7 +145,8 @@ ${titleList}
 3. **结构清晰**：使用多级标题组织内容（如"## 一、xxx"、"### （一）xxx"），善用列表和缩进体现层次关系。按照"定义与概述→分类/类型→具体方法/步骤→原则与注意事项→应用场景"等逻辑顺序组织。
 4. **突出重点**：使用 **加粗** 标记关键术语、重要概念和核心结论。对于教材中的数据、公式、比例等要精确引用。
 5. **保留教材表述**：尽量使用教材中的原始术语和表述，可以适当组织和概括，但核心信息必须来自教材。如果教材中有多个观点或说法，应完整列出。
-6. **格式规范**：直接输出 Markdown 格式，不要包裹在 JSON 或代码块中。开头先用1-2句话概括主题，再展开详细内容。`;
+6. **格式规范**：直接输出 Markdown 格式，不要包裹在 JSON 或代码块中。开头先用1-2句话概括主题，再展开详细内容。
+7. **禁止引用标记**：回答中绝对不要出现"[引用1]"、"[引用2]"等引用编号标记，也不要出现"片段[引用N]"、"[citation]"等任何形式的引用标注。直接陈述内容即可。`;
 }
 
 export function buildUserPrompt(
@@ -164,7 +166,7 @@ export function buildUserPrompt(
         .filter(Boolean)
         .join(" · ");
 
-      return `[引用${idx + 1}] 来源：${location}\n${r.content}`;
+      return `【片段${idx + 1}】来源：${location}\n${r.content}`;
     })
     .join("\n\n---\n\n");
 
@@ -317,11 +319,13 @@ async function callLLM(
   };
 }
 
-/** 清除 LLM 回答中残留的 citation 标记，如 [citation_indices: 3] 或 [citation_indices: 3, 6] */
+/** 清除 LLM 回答中残留的 citation 标记 */
 function stripCitationMarkers(text: string): string {
   return text
     .replace(/\[citation_indices?:\s*[\d,\s]+\]/gi, "")
     .replace(/\[引用\d+\]/g, "")
+    .replace(/【?片段\d+】?/g, "")
+    .replace(/片段\[?\d+\]?至?\[?\d*\]?/g, "")
     .replace(/\s{2,}/g, " ")
     .trim();
 }

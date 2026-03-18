@@ -67,7 +67,9 @@ const SYNONYM_MAP: Record<string, string[]> = {
   '修枝': ['整枝', '剪枝', '林木修枝'],
 
   // 混交林
-  '混交林': ['混交造林', '针阔混交', '乔灌混交'],
+  '混交林': ['混交造林', '针阔混交', '乔灌混交', '混交方式', '混交类型'],
+  '混交方式': ['混交类型', '混交林', '株间混交', '行间混交', '带状混交', '块状混交', '星状混交', '植生组混交', '混交方法'],
+  '混交类型': ['混交方式', '混交方法', '混交林类型'],
   '纯林': ['单一树种林', '单树种造林'],
 
   // 种子与繁殖
@@ -77,6 +79,20 @@ const SYNONYM_MAP: Record<string, string[]> = {
   // 保护与病虫害
   '病虫害': ['森林病害', '森林虫害', '林木病虫', '病害防治'],
   '防护林': ['防风林', '水土保持林', '水源涵养林'],
+
+  // 水分管理
+  '灌溉': ['灌水', '浇水', '合理灌溉', '灌溉方法', '水分管理'],
+  '合理灌溉': ['灌溉', '灌水', '浇水', '水分管理', '灌溉制度'],
+  '排水': ['排涝', '排水沟', '排水系统'],
+
+  // 土壤管理
+  '除草': ['草害', '杂草防治', '化学除草', '除草剂'],
+  '松土': ['中耕', '松土除草', '土壤管理'],
+
+  // 造林方法
+  '植苗造林': ['栽植', '植苗', '苗木栽植'],
+  '直播造林': ['播种造林', '直播', '飞播造林'],
+  '分殖造林': ['营养繁殖造林', '插条造林'],
 };
 
 function expandWithSynonyms(keywords: string[]): string[] {
@@ -188,14 +204,22 @@ export function extractKeywordsEn(text: string): string[] {
   return [...new Set(keywords)].slice(0, 15);
 }
 
+// ─── 通用高频词（2字），在评分时大幅降权 ──────────────────────────────────────
+const GENERIC_2CHAR_WORDS = new Set([
+  '合理', '基本', '主要', '一般', '常见', '重要', '特殊', '正常',
+  '适当', '有效', '相关', '具体', '实际', '作用', '方法', '原则',
+  '条件', '因素', '类型', '特点', '标准', '要求', '技术', '管理',
+  '质量', '数量', '关系', '过程', '阶段', '时期', '措施', '问题',
+]);
+
 // ─── 计算文本与关键词的匹配分数（改进版 TF-IDF 启发式）──────────────────────
 function scoreChunk(content: string, keywords: string[], originalQuestion: string, chapter?: string): number {
   if (keywords.length === 0) return 0;
   const lowerContent = content.toLowerCase();
   let score = 0;
 
-  // 提取原始问题中的核心词（长度>=3的词优先）
-  const coreKeywords = keywords.filter(k => k.length >= 3);
+  // 从原始问题中提取核心专业词（非通用词，长度>=2）
+  const coreKeywords = keywords.filter(k => k.length >= 3 || (k.length === 2 && !GENERIC_2CHAR_WORDS.has(k)));
 
   for (const kw of keywords) {
     const lowerKw = kw.toLowerCase();
@@ -206,38 +230,49 @@ function scoreChunk(content: string, keywords: string[], originalQuestion: strin
       pos += lowerKw.length;
     }
     if (count > 0) {
+      // 通用2字词大幅降权
+      const isGeneric = kw.length === 2 && GENERIC_2CHAR_WORDS.has(kw);
+      const genericPenalty = isGeneric ? 0.1 : 1.0;
+
       // 长关键词权重更高（指数级），短词权重较低
       const lengthWeight = Math.pow(kw.length, 1.5);
       // TF 分数：出现次数 / 内容长度
       const tf = count / (content.length / 100);
-      score += tf * lengthWeight;
+      score += tf * lengthWeight * genericPenalty;
     }
   }
 
-  // 核心关键词覆盖率加权
+  // 核心关键词覆盖率加权（排除通用词后的覆盖率）
   const coreCoverage = coreKeywords.length > 0
     ? coreKeywords.filter(k => lowerContent.includes(k.toLowerCase())).length / coreKeywords.length
     : 0;
 
-  // 如果原始问题中的关键词（4字以上）直接出现在内容中，大幅加分
-  const longPhrases = keywords.filter(k => k.length >= 4);
+  // 原始问题完整短语匹配：最高优先级
+  // 如果原始问题的完整文本（去掉问号等标点）出现在 chunk 中，大幅加分
+  const cleanedQuestion = originalQuestion.replace(/[？?！!。，,、\s]+/g, '');
+  if (cleanedQuestion.length >= 3 && lowerContent.includes(cleanedQuestion.toLowerCase())) {
+    score += cleanedQuestion.length * 10;
+  }
+
+  // 如果原始问题中的关键词（3字以上）直接出现在内容中，大幅加分
+  const longPhrases = keywords.filter(k => k.length >= 3);
   let phraseBonus = 0;
   for (const phrase of longPhrases) {
     if (lowerContent.includes(phrase.toLowerCase())) {
-      phraseBonus += phrase.length * 2;
+      phraseBonus += phrase.length * 3;
     }
   }
 
-  // 新增：章节标题匹配加分
+  // 章节标题匹配加分
   if (chapter) {
-    for (const kw of keywords) {
+    for (const kw of coreKeywords) {
       if (chapter.includes(kw)) {
-        score += kw.length * 3;
+        score += kw.length * 5;
       }
     }
   }
 
-  return (score * (0.4 + 0.6 * coreCoverage)) + phraseBonus;
+  return (score * (0.3 + 0.7 * coreCoverage)) + phraseBonus;
 }
 
 // ─── 混合检索 Top-K（关键词 + 向量语义） ──────────────────────────────────────
@@ -257,6 +292,14 @@ export async function semanticSearch(
 
   // 同义词扩展：增加检索召回率
   const keywords = questionLang === "en" ? rawKeywords : expandWithSynonyms(rawKeywords);
+
+  // 将原始问题的完整核心短语加入关键词（去掉问号等标点和常见提问词）
+  const cleanedQ = question
+    .replace(/[，。？！、；：""''（）【】《》？!?,;:"'()\[\]\s]+/g, "")
+    .replace(/什么是|如何|怎么|怎样|为什么|哪些|请问|介绍|说明|解释|试述|分析|比较|请说明|请介绍|阐述|论述/g, "");
+  if (cleanedQ.length >= 2 && cleanedQ.length <= 10 && !keywords.includes(cleanedQ)) {
+    keywords.unshift(cleanedQ); // 放在最前面，最高优先级
+  }
 
   // ─── 路径1：关键词检索 ─────────────────────────────────────────────────────
   let keywordCandidates: typeof vectorCandidates = [];
