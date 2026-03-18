@@ -490,13 +490,165 @@ ${analysis.conciseDefinition
   : "请综合以上所有教材片段，给出全面、详尽、结构清晰的回答。不要遗漏任何片段中的相关信息。"} `;
 }
 
+const FOCUS_TERM_STOPWORDS = new Set([
+  "什么",
+  "哪些",
+  "如何",
+  "怎么",
+  "怎样",
+  "为什么",
+  "提高",
+  "方法",
+  "步骤",
+  "分类",
+  "类型",
+  "包括",
+  "介绍",
+  "说明",
+  "解释",
+  "森林",
+  "培育",
+  "学",
+  "的",
+  "了",
+  "在",
+  "和",
+  "是",
+]);
+
+function normalizeForFocus(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[，。？！、；：""''（）【】《》\s]/g, "")
+    .replace(/[?,;:!"'()\[\]\s]/g, "");
+}
+
+function pickFocusTerms(
+  question: string,
+  questionLang: "zh" | "en",
+  analysis: QuestionAnalysis
+): string[] {
+  const terms = [question, ...analysis.keywords]
+    .map((term) => normalizeForFocus(term))
+    .filter((term) => term.length >= (questionLang === "en" ? 4 : 2))
+    .filter((term) => !FOCUS_TERM_STOPWORDS.has(term))
+    .sort((a, b) => b.length - a.length);
+
+  const unique: string[] = [];
+  const seen = new Set<string>();
+  for (const term of terms) {
+    if (seen.has(term)) continue;
+    seen.add(term);
+    unique.push(term);
+  }
+  return unique.slice(0, 8);
+}
+
+function focusResultsByChapter(
+  question: string,
+  searchResults: SearchResult[],
+  questionLang: "zh" | "en",
+  analysis: QuestionAnalysis
+): SearchResult[] {
+  if (searchResults.length <= 6) return searchResults;
+
+  const focusTerms = pickFocusTerms(question, questionLang, analysis);
+  if (focusTerms.length === 0) return searchResults;
+
+  const sorted = [...searchResults].sort((a, b) => b.similarity - a.similarity);
+  const chapterBuckets = new Map<
+    string,
+    {
+      chapter: string;
+      rows: SearchResult[];
+      score: number;
+      chapterHit: number;
+    }
+  >();
+
+  for (const row of sorted) {
+    const chapter = (row.chapter || "").trim();
+    if (!chapter) continue;
+    const chapterKey = normalizeForFocus(chapter);
+    if (!chapterKey) continue;
+
+    const chapterMatchCount = focusTerms.filter((term) => chapterKey.includes(term)).length;
+    const contentMatchCount = focusTerms
+      .slice(0, 4)
+      .filter((term) => normalizeForFocus(row.content).includes(term)).length;
+
+    const bucket = chapterBuckets.get(chapterKey) ?? {
+      chapter,
+      rows: [],
+      score: 0,
+      chapterHit: 0,
+    };
+
+    bucket.rows.push(row);
+    bucket.score += row.similarity * 2.6 + chapterMatchCount * 2.2 + contentMatchCount * 0.7;
+    if (chapterMatchCount > 0) bucket.chapterHit += 1;
+
+    chapterBuckets.set(chapterKey, bucket);
+  }
+
+  if (chapterBuckets.size === 0) return sorted;
+
+  const rankedBuckets = Array.from(chapterBuckets.values()).sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    if (b.rows.length !== a.rows.length) return b.rows.length - a.rows.length;
+    return b.chapterHit - a.chapterHit;
+  });
+
+  const best = rankedBuckets[0];
+  const second = rankedBuckets[1];
+  const dominance = second ? best.score / Math.max(second.score, 0.0001) : 10;
+  const coverageRatio = best.rows.length / sorted.length;
+  const hasStrongChapterSignal = best.chapterHit >= 2;
+
+  const shouldFocus =
+    (coverageRatio >= 0.4 && dominance >= 1.1) ||
+    (hasStrongChapterSignal && best.rows.length >= 3 && dominance >= 1.05);
+
+  if (!shouldFocus) return sorted;
+
+  const keepTarget = Math.max(4, Math.min(sorted.length, pickTopK(questionLang, analysis)));
+  const focused = best.rows
+    .slice()
+    .sort((a, b) => b.similarity - a.similarity)
+    .slice(0, keepTarget);
+
+  if (focused.length >= Math.min(4, sorted.length)) return focused;
+
+  const pickedIds = new Set(focused.map((row) => row.chunkId));
+  for (const row of sorted) {
+    if (pickedIds.has(row.chunkId)) continue;
+    focused.push(row);
+    pickedIds.add(row.chunkId);
+    if (focused.length >= keepTarget) break;
+  }
+
+  return focused;
+}
+
+function pickSourceLimit(questionLang: "zh" | "en", analysis: QuestionAnalysis): number {
+  if (analysis.conciseAnswer) return 3;
+  if (analysis.intent === "definition") return questionLang === "en" ? 4 : 5;
+  if (analysis.requestDetail) return questionLang === "en" ? 8 : 9;
+  if (analysis.expectsFullCoverage) return questionLang === "en" ? 6 : 7;
+  return questionLang === "en" ? 5 : 6;
+}
+
 function pickTopK(questionLang: "zh" | "en", analysis: QuestionAnalysis, forAuxEnglish = false): number {
   if (analysis.conciseAnswer) {
     if (questionLang === "en") return forAuxEnglish ? 1 : 3;
     return forAuxEnglish ? 2 : 4;
   }
-  if (analysis.intent === "definition") return questionLang === "en" ? 6 : 10;
-  return questionLang === "en" ? 8 : 20;
+  if (analysis.intent === "definition") return questionLang === "en" ? 5 : 8;
+  if (analysis.expectsFullCoverage) {
+    if (analysis.requestDetail) return questionLang === "en" ? 10 : 14;
+    return questionLang === "en" ? 7 : 10;
+  }
+  return questionLang === "en" ? 6 : 8;
 }
 
 export async function generateAnswer(req: QARequest): Promise<QAResponse> {
@@ -601,12 +753,16 @@ async function callLLM(
     };
   }
 
-  const materialTitles = Array.from(new Set(searchResults.map((r) => r.materialTitle)));
+  const effectiveResults = focusResultsByChapter(question, searchResults, questionLang, analysis);
+  const sourceLimit = pickSourceLimit(questionLang, analysis);
+  const materialTitles = Array.from(new Set(effectiveResults.map((r) => r.materialTitle)));
   const keywords = questionLang === "en" ? extractKeywordsEn(question) : extractKeywords(question);
-  const extractive = analysis.conciseAnswer ? buildExtractiveAnswer(question, searchResults, questionLang, analysis) : null;
+  const extractive = analysis.conciseAnswer
+    ? buildExtractiveAnswer(question, effectiveResults, questionLang, analysis)
+    : null;
   if (extractive) {
-    const conciseResults = searchResults.filter((r) => extractive.usedChunkIds.includes(r.chunkId));
-    const sources = buildSources(conciseResults, true, keywords);
+    const conciseResults = effectiveResults.filter((r) => extractive.usedChunkIds.includes(r.chunkId));
+    const sources = buildSources(conciseResults, true, keywords, sourceLimit);
     return {
       answer: extractive.answer,
       sources,
@@ -617,7 +773,7 @@ async function callLLM(
   }
 
   const systemPrompt = buildSystemPrompt(materialTitles, questionLang, materialLang, analysis);
-  const userMessage = buildUserPrompt(question, searchResults, questionLang, analysis);
+  const userMessage = buildUserPrompt(question, effectiveResults, questionLang, analysis);
 
   const llmResponse = await invokeLLMWithConfig(
     [{ role: "user", content: userMessage }],
@@ -640,13 +796,13 @@ async function callLLM(
     answer = enforceConciseDefinition(answer, questionLang);
   }
 
-  const localReview = assessAnswerLocally(answer, searchResults, analysis, questionLang);
+  const localReview = assessAnswerLocally(answer, effectiveResults, analysis, questionLang);
   let review = localReview;
 
   if (!analysis.conciseAnswer && !localReview.complete) {
     try {
       const reviewResponse = await invokeLLMWithConfig(
-        [{ role: "user", content: buildAnswerReviewPrompt(question, answer, searchResults, questionLang, analysis) }],
+        [{ role: "user", content: buildAnswerReviewPrompt(question, answer, effectiveResults, questionLang, analysis) }],
         questionLang === "en"
           ? "You are a strict answer reviewer. Return JSON only."
           : "你是严格的答案审校器，只返回 JSON。", 
@@ -665,7 +821,7 @@ async function callLLM(
   if (!analysis.conciseAnswer && review.shouldRetry) {
     try {
       const revisionResponse = await invokeLLMWithConfig(
-        [{ role: "user", content: buildRevisionPrompt(question, answer, searchResults, questionLang, analysis, review.issues) }],
+        [{ role: "user", content: buildRevisionPrompt(question, answer, effectiveResults, questionLang, analysis, review.issues) }],
         buildSystemPrompt(materialTitles, questionLang, materialLang, analysis)
       );
       const revisionParsed = parseLLMOutput(revisionResponse.content);
@@ -675,12 +831,12 @@ async function callLLM(
     }
   }
 
-  const finalReview = assessAnswerLocally(answer, searchResults, analysis, questionLang);
-  const grounding = assessGrounding(answer, searchResults, questionLang);
+  const finalReview = assessAnswerLocally(answer, effectiveResults, analysis, questionLang);
+  const grounding = assessGrounding(answer, effectiveResults, questionLang);
   if (!grounding.grounded) {
     try {
       const groundedRewrite = await invokeLLMWithConfig(
-        [{ role: "user", content: buildGroundedRewritePrompt(question, searchResults, questionLang, analysis) }],
+        [{ role: "user", content: buildGroundedRewritePrompt(question, effectiveResults, questionLang, analysis) }],
         questionLang === "en"
           ? "You are a strict extractive tutor. Use only the provided excerpts."
           : "你是严格的教材抽取式助手，只能使用给定片段原意回答。",
@@ -702,7 +858,7 @@ async function callLLM(
   const notFoundPhrases = ["未涉及", "not cover", "没有相关", "未找到", "not found"];
   const foundInMaterials = !notFoundPhrases.some((p) => answer.toLowerCase().includes(p));
 
-  const sources = buildSources(searchResults, foundInMaterials, keywords);
+  const sources = buildSources(effectiveResults, foundInMaterials, keywords, sourceLimit);
 
   const confidence = finalReview.complete ? 0.82 : review.shouldRetry ? 0.58 : 0.68;
 
@@ -1001,16 +1157,43 @@ function appendDegradationNote(answer: string, note: string): string {
   return `${answer}\n\n> ${note}`;
 }
 
-function buildSources(searchResults: SearchResult[], foundInMaterials: boolean, keywords: string[]): QuerySource[] {
-  return (foundInMaterials ? searchResults : []).map((r) => ({
-    materialId: r.materialId,
-    materialTitle: r.materialTitle,
-    chapter: r.chapter,
-    pageStart: r.pageStart,
-    pageEnd: r.pageEnd,
-    excerpt: r.content.substring(0, 200) + (r.content.length > 200 ? "..." : ""),
-    highlightedExcerpt: extractHighlightSentence(r.content, keywords),
-  }));
+function buildSources(
+  searchResults: SearchResult[],
+  foundInMaterials: boolean,
+  keywords: string[],
+  maxSources: number
+): QuerySource[] {
+  if (!foundInMaterials || maxSources <= 0) return [];
+
+  const selected = searchResults.slice(0, Math.max(1, maxSources * 2));
+  const deduped: QuerySource[] = [];
+  const seen = new Set<string>();
+
+  for (const row of selected) {
+    const dedupeKey = [
+      row.materialId,
+      row.chunkIndex,
+      row.chapter || "",
+      row.pageStart ?? -1,
+      row.pageEnd ?? -1,
+    ].join("|");
+    if (seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
+
+    deduped.push({
+      materialId: row.materialId,
+      materialTitle: row.materialTitle,
+      chapter: row.chapter,
+      pageStart: row.pageStart,
+      pageEnd: row.pageEnd,
+      excerpt: row.content.substring(0, 200) + (row.content.length > 200 ? "..." : ""),
+      highlightedExcerpt: extractHighlightSentence(row.content, keywords),
+    });
+
+    if (deduped.length >= maxSources) break;
+  }
+
+  return deduped;
 }
 
 function enforceConciseDefinition(answer: string, questionLang: "zh" | "en"): string {
@@ -1224,8 +1407,10 @@ export async function generateAnswerStream(
     } else {
       searchResults = await semanticSearch(req.question, undefined, pickTopK("zh", questionAnalysis), "zh", useRAG);
     }
+    const effectiveResults = focusResultsByChapter(req.question, searchResults, questionLanguage, questionAnalysis);
+    const sourceLimit = pickSourceLimit(questionLanguage, questionAnalysis);
 
-    if (searchResults.length === 0) {
+    if (effectiveResults.length === 0) {
       const answer = questionLanguage === "en"
         ? "The provided textbook excerpts do not cover this topic."
         : "教材中未涉及此内容。建议查阅其他章节或咨询教师。";
@@ -1243,11 +1428,11 @@ export async function generateAnswerStream(
 
     const keywords = questionLanguage === "en" ? extractKeywordsEn(req.question) : extractKeywords(req.question);
     const extractive = questionAnalysis.conciseAnswer
-      ? buildExtractiveAnswer(req.question, searchResults, questionLanguage, questionAnalysis)
+      ? buildExtractiveAnswer(req.question, effectiveResults, questionLanguage, questionAnalysis)
       : null;
     if (extractive) {
-      const conciseResults = searchResults.filter((r) => extractive.usedChunkIds.includes(r.chunkId));
-      const sources = buildSources(conciseResults, true, keywords);
+      const conciseResults = effectiveResults.filter((r) => extractive.usedChunkIds.includes(r.chunkId));
+      const sources = buildSources(conciseResults, true, keywords, sourceLimit);
       const answer = extractive.answer;
       const responseTimeMs = Date.now() - startTime;
       const queryId = await createQuery({
@@ -1277,10 +1462,10 @@ export async function generateAnswerStream(
       return;
     }
 
-    const materialTitles = Array.from(new Set(searchResults.map((r) => r.materialTitle)));
+    const materialTitles = Array.from(new Set(effectiveResults.map((r) => r.materialTitle)));
     const systemPrompt = buildSystemPrompt(materialTitles, questionLanguage, questionLanguage, questionAnalysis);
-    const userMessage = buildUserPrompt(req.question, searchResults, questionLanguage, questionAnalysis);
-    const sources = buildSources(searchResults, true, keywords);
+    const userMessage = buildUserPrompt(req.question, effectiveResults, questionLanguage, questionAnalysis);
+    const sources = buildSources(effectiveResults, true, keywords, sourceLimit);
 
     // 先发送元数据（sources），让前端立刻展示引用来源
     onMeta({
@@ -1311,7 +1496,7 @@ export async function generateAnswerStream(
     // 判断是否找到内容
     const notFoundPhrases = ["未涉及", "not cover", "没有相关", "未找到", "not found"];
     const foundInMaterials = !notFoundPhrases.some((p) => fullAnswer.toLowerCase().includes(p));
-    const finalReview = assessAnswerLocally(fullAnswer, searchResults, questionAnalysis, questionLanguage);
+    const finalReview = assessAnswerLocally(fullAnswer, effectiveResults, questionAnalysis, questionLanguage);
     if (!finalReview.complete) {
       fullAnswer = appendDegradationNote(fullAnswer, finalReview.downgradeNote);
     }
