@@ -135,7 +135,7 @@ export async function testLLMConnection(config: {
   apiBaseUrl?: string | null;
 }): Promise<{ success: boolean; message: string; latencyMs?: number }> {
   const baseURL = getProviderBaseUrl(config.provider, config.apiBaseUrl);
-  const apiKey = config.apiKey?.trim() || "ollama";
+  const apiKey = config.apiKey?.trim() || (config.provider === "ollama" ? "ollama" : "");
   const client = buildOpenAIClient(apiKey, baseURL);
 
   const start = Date.now();

@@ -350,7 +350,7 @@ function EditConfigForm({
       </div>
 
       <div className="flex gap-2">
-        <TestConnectionButton provider={config.provider} modelName={modelName} apiKey={apiKey} apiBaseUrl={apiBaseUrl} />
+        <TestConnectionButton provider={config.provider} modelName={modelName} apiKey={apiKey} apiBaseUrl={apiBaseUrl} configId={config.id} />
         <Button onClick={handleSubmit} disabled={updateMutation.isPending} className="flex-1">
           {updateMutation.isPending ? (
             <><Loader2 className="h-4 w-4 mr-2 animate-spin" />保存中...</>
@@ -369,11 +369,13 @@ function TestConnectionButton({
   modelName,
   apiKey,
   apiBaseUrl,
+  configId,
 }: {
   provider: string;
   modelName: string;
   apiKey: string;
   apiBaseUrl: string;
+  configId?: number;
 }) {
   const testMutation = trpc.llmConfig.testConnection.useMutation({
     onSuccess: (result) => {
@@ -397,6 +399,7 @@ function TestConnectionButton({
           modelName,
           apiKey: apiKey || undefined,
           apiBaseUrl: apiBaseUrl || undefined,
+          configId,
         });
       }}
       disabled={testMutation.isPending}
