@@ -44,8 +44,9 @@ export function getSessionCookieOptions(
   return {
     httpOnly: true,
     path: "/",
-    // sameSite: "none" requires secure=true; fall back to "lax" for non-HTTPS
-    sameSite: secure ? "none" : "lax",
+    // Use "lax" for same-origin apps — "none" is only needed for cross-site
+    // cookies and can cause browsers to reject or not send the cookie.
+    sameSite: "lax",
     secure,
   };
 }
