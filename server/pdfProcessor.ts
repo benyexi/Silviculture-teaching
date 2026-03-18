@@ -20,7 +20,7 @@ type TextChunk = {
 };
 
 const HEADING_PATTERN =
-  /^(第[一二三四五六七八九十百\d]+[章节]|[\d]+\.[\d]+[\s\S]{0,30}|[一二三四五六七八九十]+[、．])/;
+  /^(第[一二三四五六七八九十百零\d]+[章节篇部编]|[\d]+\.[\d]+[\s\S]{0,30}|[一二三四五六七八九十]+[、．.]\s*\S|Chapter\s+\d+|CHAPTER\s+\d+|Part\s+[IVX\d]+)/i;
 
 // ─── 支持的文件类型 ──────────────────────────────────────────────────────────
 function getFileType(filename: string): "pdf" | "docx" | "doc" {
@@ -225,103 +225,176 @@ async function extractDocText(
 }
 
 // ─── 智能文本分块 ─────────────────────────────────────────────────────────────
+// 改进策略：
+//   1. 按段落/句子自然边界切割，不在句子中间断开
+//   2. 加 overlap（前后重叠），保证上下文连贯
+//   3. 每个 chunk 前缀加上所属章节标题，提升检索命中率
+const MAX_CHUNK_SIZE = 600;
+const MIN_CHUNK_SIZE = 80;
+const OVERLAP_SIZE = 120;
+
+/** 在自然断句处切割文本，返回不超过 maxLen 的文本 */
+function splitAtNaturalBoundary(text: string, maxLen: number): number {
+  if (text.length <= maxLen) return text.length;
+
+  // 优先在段落换行处切割
+  const paragraphBreak = text.lastIndexOf("\n", maxLen);
+  if (paragraphBreak > maxLen * 0.4) return paragraphBreak + 1;
+
+  // 其次在句号/问号/感叹号处切割（中文+英文标点）
+  // 从后往前找最后一个句子结束符
+  let lastSentenceEnd = -1;
+  const searchRange = text.substring(0, maxLen);
+  for (let i = searchRange.length - 1; i > maxLen * 0.3; i--) {
+    const ch = searchRange[i];
+    if (ch === '。' || ch === '！' || ch === '？' || ch === '.' || ch === '!' || ch === '?') {
+      lastSentenceEnd = i + 1;
+      break;
+    }
+  }
+  if (lastSentenceEnd > maxLen * 0.4) return lastSentenceEnd;
+
+  // 最后在分号/逗号处切割
+  for (let i = searchRange.length - 1; i > maxLen * 0.5; i--) {
+    const ch = searchRange[i];
+    if (ch === '；' || ch === '，' || ch === ';' || ch === ',') {
+      return i + 1;
+    }
+  }
+
+  // 实在找不到就硬切
+  return maxLen;
+}
+
+/** 将连续文本按段落/句子边界分块，带 overlap */
+function splitTextWithOverlap(text: string, chapter: string | null): { content: string; overlapContent: string }[] {
+  const results: { content: string; overlapContent: string }[] = [];
+  const chapterPrefix = chapter ? `【${chapter}】\n` : "";
+  // 实际可用的内容长度要减去章节前缀
+  const effectiveMax = MAX_CHUNK_SIZE - chapterPrefix.length;
+
+  let offset = 0;
+  while (offset < text.length) {
+    const remaining = text.substring(offset);
+    if (remaining.trim().length < MIN_CHUNK_SIZE) break;
+
+    const cutPos = splitAtNaturalBoundary(remaining, effectiveMax);
+    const rawContent = remaining.substring(0, cutPos).trim();
+
+    if (rawContent.length >= MIN_CHUNK_SIZE) {
+      // chunk 正文带章节前缀
+      const content = chapterPrefix + rawContent;
+      results.push({ content, overlapContent: rawContent });
+    }
+
+    // 下一个 chunk 从 overlap 位置开始
+    const advance = Math.max(cutPos - OVERLAP_SIZE, 1);
+    offset += advance;
+
+    // 如果剩余文本不多，直接结束避免产生过小的尾巴
+    if (text.length - offset < MIN_CHUNK_SIZE) break;
+  }
+
+  return results;
+}
+
 function splitIntoChunks(text: string, pageTexts: string[]): TextChunk[] {
   const chunks: TextChunk[] = [];
-  const MAX_CHUNK_SIZE = 800;
-  const MIN_CHUNK_SIZE = 50;
 
-  const splitByHeading = (input: string, maxChunkSize = 800): string[] => {
-    const lines = input.split("\n");
-    const localChunks: string[] = [];
-    let currentChunk = "";
-
-    for (const rawLine of lines) {
-      const line = rawLine.trim();
-      if (!line) continue;
-
-      const isHeading = HEADING_PATTERN.test(line);
-      if (isHeading && currentChunk.trim().length > 100) {
-        localChunks.push(currentChunk.trim());
-        currentChunk = `${line}\n`;
-      } else if (currentChunk.length + line.length > maxChunkSize) {
-        if (currentChunk.trim()) localChunks.push(currentChunk.trim());
-        currentChunk = `${line}\n`;
-      } else {
-        currentChunk += `${line}\n`;
-      }
-    }
-
-    if (currentChunk.trim()) localChunks.push(currentChunk.trim());
-
-    const merged: string[] = [];
-    for (const c of localChunks.filter((c) => c.length >= MIN_CHUNK_SIZE)) {
-      const last = merged[merged.length - 1];
-      if (last && last.length < 120 && last.length + c.length <= maxChunkSize) {
-        merged[merged.length - 1] = `${last}\n${c}`;
-      } else {
-        merged.push(c);
-      }
-    }
-    return merged;
-  };
+  // 第一步：按章节/小节标题把全文分成 sections
+  type Section = { chapter: string | null; text: string; pageStart: number | null; pageEnd: number | null };
+  const sections: Section[] = [];
 
   if (pageTexts.length > 0) {
     let currentChapter: string | null = null;
+    let currentText = "";
+    let sectionPageStart: number | null = 1;
+    let sectionPageEnd: number | null = 1;
 
     for (let pageIdx = 0; pageIdx < pageTexts.length; pageIdx++) {
       const pageText = pageTexts[pageIdx].trim();
       if (!pageText) continue;
-
       const pageNum = pageIdx + 1;
-      const pageChunks = splitByHeading(pageText, MAX_CHUNK_SIZE);
 
-      for (const piece of pageChunks) {
-        const firstLine = piece.split("\n")[0]?.trim() || "";
-        if (HEADING_PATTERN.test(firstLine)) {
-          currentChapter = firstLine.substring(0, 100);
+      const lines = pageText.split("\n");
+      for (const rawLine of lines) {
+        const line = rawLine.trim();
+        if (!line) continue;
+
+        if (HEADING_PATTERN.test(line)) {
+          // 遇到新标题，保存当前 section
+          if (currentText.trim().length >= MIN_CHUNK_SIZE) {
+            sections.push({
+              chapter: currentChapter,
+              text: currentText.trim(),
+              pageStart: sectionPageStart,
+              pageEnd: sectionPageEnd,
+            });
+          }
+          currentChapter = line.substring(0, 100);
+          currentText = line + "\n";
+          sectionPageStart = pageNum;
+          sectionPageEnd = pageNum;
+        } else {
+          currentText += line + "\n";
+          sectionPageEnd = pageNum;
         }
-
-        chunks.push({
-          content: piece,
-          chapter: currentChapter,
-          pageStart: pageNum,
-          pageEnd: pageNum,
-          tokenCount: estimateTokens(piece),
-        });
       }
     }
+    // 最后一个 section
+    if (currentText.trim().length >= MIN_CHUNK_SIZE) {
+      sections.push({
+        chapter: currentChapter,
+        text: currentText.trim(),
+        pageStart: sectionPageStart,
+        pageEnd: sectionPageEnd,
+      });
+    }
   } else {
-    const fullChunks = splitByHeading(text, MAX_CHUNK_SIZE);
-    for (const piece of fullChunks) {
-      const firstLine = piece.split("\n")[0]?.trim() || "";
+    // 没有页面信息的情况（Word 等）
+    let currentChapter: string | null = null;
+    let currentText = "";
+
+    const lines = text.split("\n");
+    for (const rawLine of lines) {
+      const line = rawLine.trim();
+      if (!line) continue;
+
+      if (HEADING_PATTERN.test(line)) {
+        if (currentText.trim().length >= MIN_CHUNK_SIZE) {
+          sections.push({ chapter: currentChapter, text: currentText.trim(), pageStart: null, pageEnd: null });
+        }
+        currentChapter = line.substring(0, 100);
+        currentText = line + "\n";
+      } else {
+        currentText += line + "\n";
+      }
+    }
+    if (currentText.trim().length >= MIN_CHUNK_SIZE) {
+      sections.push({ chapter: currentChapter, text: currentText.trim(), pageStart: null, pageEnd: null });
+    }
+  }
+
+  // 如果没有检测到任何 section（比如教材格式特殊），整体作为一个 section
+  if (sections.length === 0 && text.trim().length >= MIN_CHUNK_SIZE) {
+    sections.push({ chapter: null, text: text.trim(), pageStart: 1, pageEnd: pageTexts.length || null });
+  }
+
+  // 第二步：对每个 section 做带 overlap 的自然边界分块
+  for (const section of sections) {
+    const pieces = splitTextWithOverlap(section.text, section.chapter);
+    for (const piece of pieces) {
       chunks.push({
-        content: piece,
-        chapter: HEADING_PATTERN.test(firstLine) ? firstLine.substring(0, 100) : null,
-        pageStart: null,
-        pageEnd: null,
-        tokenCount: estimateTokens(piece),
+        content: piece.content,
+        chapter: section.chapter,
+        pageStart: section.pageStart,
+        pageEnd: section.pageEnd,
+        tokenCount: estimateTokens(piece.content),
       });
     }
   }
 
   return chunks.filter((c) => c.content.trim().length >= MIN_CHUNK_SIZE);
-}
-
-// ─── 滑动窗口分割 ─────────────────────────────────────────────────────────────
-function slidingWindowSplit(
-  text: string,
-  maxSize: number,
-  overlap: number
-): string[] {
-  const chunks: string[] = [];
-  let start = 0;
-  while (start < text.length) {
-    const end = Math.min(start + maxSize, text.length);
-    chunks.push(text.slice(start, end));
-    start += maxSize - overlap;
-    if (start >= text.length) break;
-  }
-  return chunks;
 }
 
 // ─── Token 估算（中文约 1.5 字符/token，英文约 4 字符/token）────────────────
