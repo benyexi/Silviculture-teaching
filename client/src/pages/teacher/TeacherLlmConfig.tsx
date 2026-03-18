@@ -419,6 +419,7 @@ function AddConfigForm({ onSuccess }: { onSuccess: () => void }) {
   const [name, setName] = useState("");
   const [provider, setProvider] = useState<LlmProvider>("openai");
   const [modelName, setModelName] = useState("");
+  const [customModel, setCustomModel] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [apiBaseUrl, setApiBaseUrl] = useState("");
   const [temperature, setTemperature] = useState("0.1");
@@ -447,14 +448,15 @@ function AddConfigForm({ onSuccess }: { onSuccess: () => void }) {
   };
 
   const handleSubmit = () => {
-    if (!name.trim() || !modelName.trim()) {
+    const finalModel = modelName === "__custom__" ? customModel : modelName;
+    if (!name.trim() || !finalModel.trim()) {
       toast.error("请填写配置名称和模型名称");
       return;
     }
     createMutation.mutate({
       name,
       provider,
-      modelName,
+      modelName: finalModel,
       apiKey: apiKey || undefined,
       apiBaseUrl: apiBaseUrl || undefined,
       temperature: parseFloat(temperature) || 0.1,
@@ -518,8 +520,8 @@ function AddConfigForm({ onSuccess }: { onSuccess: () => void }) {
           )}
           {modelName === "__custom__" && (
             <Input
-              value=""
-              onChange={(e) => setModelName(e.target.value)}
+              autoFocus
+              onChange={(e) => setCustomModel(e.target.value)}
               placeholder="输入自定义模型名称"
               className="mt-1"
             />
@@ -609,7 +611,7 @@ function AddConfigForm({ onSuccess }: { onSuccess: () => void }) {
       </div>
 
       <div className="flex gap-2">
-        <TestConnectionButton provider={provider} modelName={modelName} apiKey={apiKey} apiBaseUrl={apiBaseUrl} />
+        <TestConnectionButton provider={provider} modelName={modelName === "__custom__" ? customModel : modelName} apiKey={apiKey} apiBaseUrl={apiBaseUrl} />
         <Button
           onClick={handleSubmit}
           disabled={createMutation.isPending}

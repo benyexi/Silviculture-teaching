@@ -71,9 +71,16 @@ export async function processMaterial(
     // 先测试 Embedding 是否可用
     try {
       await getEmbedding("test");
-    } catch {
+    } catch (err: any) {
       embeddingEnabled = false;
-      console.log(`[Doc] Embedding 未配置，仅使用全文检索模式`);
+      const msg = err?.message || String(err);
+      if (msg.includes("401") || msg.includes("Authentication") || msg.includes("invalid")) {
+        console.warn(`[Doc] ⚠️ Embedding API Key 无效，降级为全文检索模式。请检查 API Key 配置。错误: ${msg}`);
+      } else if (msg.includes("未配置")) {
+        console.log(`[Doc] Embedding 未配置，仅使用全文检索模式`);
+      } else {
+        console.warn(`[Doc] Embedding 不可用（${msg}），降级为全文检索模式`);
+      }
     }
 
     for (let i = 0; i < chunks.length; i += BATCH_SIZE) {

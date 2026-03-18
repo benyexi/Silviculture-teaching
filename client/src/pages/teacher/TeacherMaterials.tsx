@@ -89,7 +89,11 @@ export default function TeacherMaterials() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => reprocessAllMutation.mutate()}
+            onClick={() => {
+              if (confirm("确认重新处理所有教材？这可能需要较长时间。")) {
+                reprocessAllMutation.mutate();
+              }
+            }}
             disabled={reprocessAllMutation.isPending}
           >
             {reprocessAllMutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-1" />}

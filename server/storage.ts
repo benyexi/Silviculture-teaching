@@ -17,7 +17,14 @@ function getUploadDir(): string {
 }
 
 function normalizeKey(relKey: string): string {
-  return relKey.replace(/^\/+/, "");
+  // 移除前导斜杠，并防止路径遍历攻击
+  const cleaned = relKey.replace(/^\/+/, "");
+  const uploadDir = getUploadDir();
+  const resolved = path.resolve(uploadDir, cleaned);
+  if (!resolved.startsWith(path.resolve(uploadDir))) {
+    throw new Error(`非法路径: ${relKey}`);
+  }
+  return cleaned;
 }
 
 export async function storagePut(
