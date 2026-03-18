@@ -444,12 +444,23 @@ export const appRouter = router({
         modelName: z.string(),
         apiKey: z.string().optional(),
         apiBaseUrl: z.string().optional(),
+        configId: z.number().optional(), // 编辑时传入，用于获取已存储的 key
       }))
       .mutation(async ({ input }) => {
+        let apiKey = input.apiKey?.trim();
+        // 编辑时如果没有输入新 key，从数据库获取已存储的 key
+        if (!apiKey && input.configId) {
+          const configs = await getLlmConfigs();
+          const existing = configs.find((c) => c.id === input.configId);
+          if (existing?.apiKey) apiKey = existing.apiKey;
+        }
+        if (!apiKey && input.provider !== "ollama") {
+          return { success: false, message: "请输入 API Key" };
+        }
         return testLLMConnection({
           provider: input.provider,
           modelName: input.modelName,
-          apiKey: input.apiKey?.trim(),
+          apiKey: apiKey || null,
           apiBaseUrl: input.apiBaseUrl?.trim() || null,
         });
       }),
