@@ -101,9 +101,16 @@ class SDKServer {
       throw ForbiddenError("Invalid session cookie");
     }
 
-    let user = await db.getUserByOpenId(session.openId);
+    let user: User | undefined;
 
-    // If user not in DB (e.g. DB upsert failed during login), create them now
+    try {
+      user = await db.getUserByOpenId(session.openId);
+    } catch (err) {
+      console.error("[Auth] DB query failed for getUserByOpenId:", err);
+      // DB is unavailable — fall through to fallback below
+    }
+
+    // If user not in DB (e.g. DB upsert failed during login, or table missing), create them now
     if (!user && session.openId.startsWith("local_")) {
       try {
         await db.upsertUser({
@@ -117,6 +124,23 @@ class SDKServer {
       } catch (err) {
         console.error("[Auth] Failed to auto-create local user:", err);
       }
+    }
+
+    // Fallback: if DB is completely unavailable, construct a user from the JWT session
+    // so that the app remains functional for authenticated local users
+    if (!user && session.openId.startsWith("local_")) {
+      console.warn("[Auth] DB unavailable, using JWT session as fallback user");
+      user = {
+        id: 0,
+        openId: session.openId,
+        name: session.name || null,
+        email: null,
+        loginMethod: "local",
+        role: "admin",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        lastSignedIn: new Date(),
+      };
     }
 
     if (!user) {

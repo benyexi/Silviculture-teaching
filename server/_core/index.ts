@@ -7,6 +7,7 @@ import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
+import { runMigrations } from "../db";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -28,6 +29,14 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 }
 
 async function startServer() {
+  // Run database migrations on startup to ensure tables exist
+  try {
+    await runMigrations();
+    console.log("[Server] Database migrations completed");
+  } catch (err) {
+    console.error("[Server] Database migration failed (app will continue with degraded DB):", err);
+  }
+
   const app = express();
   const server = createServer(app);
   // Trust proxy headers (Railway, Render, etc. use reverse proxies)
@@ -37,52 +46,6 @@ async function startServer() {
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   app.get("/healthz", (_req, res) => {
     res.status(200).json({ status: "ok" });
-  });
-
-  // Debug endpoint — visit /api/debug/auth in browser after login to diagnose cookie issues
-  app.get("/api/debug/auth", async (req, res) => {
-    const { parse: parseCookie } = await import("cookie");
-    const { COOKIE_NAME } = await import("@shared/const");
-    const { sdk } = await import("./sdk");
-
-    const cookieHeader = req.headers.cookie;
-    const cookies = cookieHeader ? parseCookie(cookieHeader) : {};
-    const sessionCookie = cookies[COOKIE_NAME];
-    let sessionResult: unknown = null;
-    let dbUser: unknown = null;
-
-    if (sessionCookie) {
-      try {
-        sessionResult = await sdk.verifySession(sessionCookie);
-      } catch (e) {
-        sessionResult = { error: String(e) };
-      }
-
-      if (sessionResult && typeof sessionResult === "object" && "openId" in (sessionResult as any)) {
-        try {
-          const { getUserByOpenId } = await import("../db");
-          dbUser = await getUserByOpenId((sessionResult as any).openId);
-        } catch (e) {
-          dbUser = { error: String(e) };
-        }
-      }
-    }
-
-    res.json({
-      hasCookieHeader: !!cookieHeader,
-      cookieNames: Object.keys(cookies),
-      hasSessionCookie: !!sessionCookie,
-      sessionCookieLength: sessionCookie?.length ?? 0,
-      jwtVerifyResult: sessionResult,
-      dbUser_raw: dbUser,
-      dbUser_keys: dbUser ? Object.keys(dbUser as any) : null,
-      dbUser_type: typeof dbUser,
-      dbUser_json: dbUser ? JSON.stringify(dbUser) : null,
-      protocol: req.protocol,
-      xForwardedProto: req.headers["x-forwarded-proto"],
-      jwtSecretSet: !!(process.env.JWT_SECRET),
-      jwtSecretLength: (process.env.JWT_SECRET ?? "").length,
-    });
   });
 
   // Auth routes (local login)

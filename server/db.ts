@@ -1,5 +1,7 @@
 import { eq, desc, sql, and, gte, lte, like, count } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
+import { migrate } from "drizzle-orm/mysql2/migrator";
+import path from "path";
 import {
   InsertUser,
   users,
@@ -31,6 +33,16 @@ export async function getDb() {
     }
   }
   return _db;
+}
+
+export async function runMigrations() {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot run migrations: database not available");
+    return;
+  }
+  const migrationsFolder = path.resolve(process.cwd(), "drizzle");
+  await migrate(db, { migrationsFolder });
 }
 
 // ─── Users ────────────────────────────────────────────────────────────────────
