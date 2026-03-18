@@ -22,6 +22,180 @@ type TextChunk = {
 const HEADING_PATTERN =
   /^(第[一二三四五六七八九十百零\d]+[章节篇部编]|[\d]+\.[\d]+[\s\S]{0,30}|[一二三四五六七八九十]+[、．.]\s*\S|Chapter\s+\d+|CHAPTER\s+\d+|Part\s+[IVX\d]+)/i;
 
+const LIST_ITEM_PATTERN =
+  /^(?:[（(]?(?:[一二三四五六七八九十百千零\d]+|[a-zA-Z]+)[)）.、．]|(?:\d+|[ivxlcdmIVXLCDM]+)[)）.、．]|[-*•·●○])\s*\S/;
+
+type ChunkingProfile = {
+  targetSize: number;
+  minSize: number;
+  maxSize: number;
+  overlapSize: number;
+  sectionMergeSize: number;
+};
+
+function getChunkingProfile(language: "zh" | "en" | string | null | undefined): ChunkingProfile {
+  if (language === "en") {
+    return {
+      targetSize: 1500,
+      minSize: 800,
+      maxSize: 1850,
+      overlapSize: 220,
+      sectionMergeSize: 900,
+    };
+  }
+
+  return {
+    targetSize: 860,
+    minSize: 420,
+    maxSize: 1080,
+    overlapSize: 150,
+    sectionMergeSize: 500,
+  };
+}
+
+function isListItemLine(line: string): boolean {
+  return LIST_ITEM_PATTERN.test(line.trim());
+}
+
+function isStructuralBoundaryLine(line: string): boolean {
+  const trimmed = line.trim();
+  return HEADING_PATTERN.test(trimmed) || isListItemLine(trimmed);
+}
+
+function mergeSectionText(a: string, b: string): string {
+  return `${a.trim()}\n${b.trim()}`.trim();
+}
+
+function mergeShortSections(
+  sections: { chapter: string | null; text: string; pageStart: number | null; pageEnd: number | null }[],
+  minSize: number
+) {
+  const merged: typeof sections = [];
+
+  for (const section of sections) {
+    const current = { ...section, text: section.text.trim() };
+    if (current.text.length === 0) continue;
+
+    const last = merged[merged.length - 1];
+    if (!last) {
+      merged.push(current);
+      continue;
+    }
+
+    const shouldMerge =
+      last.text.length < minSize ||
+      current.text.length < minSize ||
+      last.text.length + current.text.length <= minSize * 1.8;
+
+    if (shouldMerge) {
+      last.text = mergeSectionText(last.text, current.text);
+      last.pageEnd = current.pageEnd ?? last.pageEnd;
+      if (!last.chapter && current.chapter) last.chapter = current.chapter;
+      continue;
+    }
+
+    merged.push(current);
+  }
+
+  if (merged.length > 1 && merged[merged.length - 1].text.length < minSize) {
+    const tail = merged.pop();
+    if (tail) {
+      const prev = merged[merged.length - 1];
+      if (prev) {
+        prev.text = mergeSectionText(prev.text, tail.text);
+        prev.pageEnd = tail.pageEnd ?? prev.pageEnd;
+      } else {
+        merged.push(tail);
+      }
+    }
+  }
+
+  return merged;
+}
+
+function splitIntoSemanticBlocks(text: string): string[] {
+  const normalized = text.replace(/\r\n?/g, "\n").trim();
+  if (!normalized) return [];
+
+  const blocks: string[] = [];
+  const lines = normalized.split("\n").map((line) => line.trim()).filter(Boolean);
+  let buffer: string[] = [];
+
+  const flushBuffer = () => {
+    if (buffer.length === 0) return;
+    const joined = buffer.join(" ").replace(/\s+/g, " ").trim();
+    if (joined) blocks.push(joined);
+    buffer = [];
+  };
+
+  for (const line of lines) {
+    if (isStructuralBoundaryLine(line)) {
+      flushBuffer();
+      blocks.push(line);
+      continue;
+    }
+
+    if (line.length <= 36 && (HEADING_PATTERN.test(line) || /[:：]$/.test(line))) {
+      flushBuffer();
+      blocks.push(line);
+      continue;
+    }
+
+    buffer.push(line);
+  }
+
+  flushBuffer();
+  return blocks;
+}
+
+function takeOverlapTail(text: string, overlapSize: number): string {
+  const trimmed = text.trim();
+  if (trimmed.length <= overlapSize) return trimmed;
+
+  const searchStart = Math.max(0, trimmed.length - overlapSize * 2);
+  const windowText = trimmed.slice(searchStart);
+
+  for (let i = 0; i < windowText.length; i++) {
+    const ch = windowText[i];
+    if (ch === "\n" || ch === "。" || ch === "！" || ch === "？" || ch === "." || ch === "!" || ch === "?") {
+      const candidate = windowText.slice(i + 1).trim();
+      if (candidate.length >= Math.floor(overlapSize * 0.5)) {
+        return candidate;
+      }
+    }
+  }
+
+  return trimmed.slice(Math.max(0, trimmed.length - overlapSize)).trim();
+}
+
+function splitLongTextByBoundary(text: string, profile: ChunkingProfile): string[] {
+  const pieces: string[] = [];
+  let remaining = text.trim();
+
+  while (remaining.length > profile.maxSize) {
+    const cutPos = splitAtNaturalBoundary(remaining, profile.targetSize);
+    let piece = remaining.slice(0, cutPos).trim();
+
+    if (piece.length < profile.minSize) {
+      const fallbackCut = Math.min(remaining.length, profile.maxSize);
+      piece = remaining.slice(0, fallbackCut).trim();
+    }
+
+    if (!piece) break;
+    pieces.push(piece);
+
+    const overlapTail = takeOverlapTail(piece, profile.overlapSize);
+    const nextStart = Math.max(0, piece.length - overlapTail.length);
+    remaining = remaining.slice(nextStart).trimStart();
+
+    if (remaining.length === 0) break;
+  }
+
+  if (remaining.trim()) pieces.push(remaining.trim());
+
+  return pieces.filter((piece) => piece.length > 0);
+}
+
 // ─── 支持的文件类型 ──────────────────────────────────────────────────────────
 function getFileType(filename: string): "pdf" | "docx" | "doc" {
   const ext = filename.toLowerCase().split(".").pop();
@@ -60,7 +234,7 @@ export async function processMaterial(
 
     // 2. 智能分块
     console.log(`[Doc] 开始分块，总文本长度: ${text.length} 字符`);
-    const chunks = splitIntoChunks(text, pageTexts);
+    const chunks = splitIntoChunks(text, pageTexts, detectedLanguage);
     console.log(`[Doc] 分块完成，共 ${chunks.length} 个块`);
 
     // 3. 存储文本块到数据库 + 按需生成 Embedding
@@ -255,10 +429,6 @@ async function extractDocText(
 //   1. 按段落/句子自然边界切割，不在句子中间断开
 //   2. 加 overlap（前后重叠），保证上下文连贯
 //   3. 每个 chunk 前缀加上所属章节标题，提升检索命中率
-const MAX_CHUNK_SIZE = 1000;
-const MIN_CHUNK_SIZE = 80;
-const OVERLAP_SIZE = 200;
-
 /** 在自然断句处切割文本，返回不超过 maxLen 的文本 */
 function splitAtNaturalBoundary(text: string, maxLen: number): number {
   if (text.length <= maxLen) return text.length;
@@ -267,10 +437,23 @@ function splitAtNaturalBoundary(text: string, maxLen: number): number {
   const paragraphBreak = text.lastIndexOf("\n", maxLen);
   if (paragraphBreak > maxLen * 0.4) return paragraphBreak + 1;
 
+  // 再优先在列表或小节边界切割
+  let lastStructuralBoundary = -1;
+  const searchRange = text.substring(0, maxLen);
+  for (let i = searchRange.length - 1; i > maxLen * 0.3; i--) {
+    if (searchRange[i] !== "\n") continue;
+    const nextLine = searchRange.slice(i + 1).trimStart();
+    if (!nextLine) continue;
+    if (isStructuralBoundaryLine(nextLine)) {
+      lastStructuralBoundary = i + 1;
+      break;
+    }
+  }
+  if (lastStructuralBoundary > maxLen * 0.35) return lastStructuralBoundary;
+
   // 其次在句号/问号/感叹号处切割（中文+英文标点）
   // 从后往前找最后一个句子结束符
   let lastSentenceEnd = -1;
-  const searchRange = text.substring(0, maxLen);
   for (let i = searchRange.length - 1; i > maxLen * 0.3; i--) {
     const ch = searchRange[i];
     if (ch === '。' || ch === '！' || ch === '？' || ch === '.' || ch === '!' || ch === '?') {
@@ -293,39 +476,100 @@ function splitAtNaturalBoundary(text: string, maxLen: number): number {
 }
 
 /** 将连续文本按段落/句子边界分块，带 overlap */
-function splitTextWithOverlap(text: string, chapter: string | null): { content: string; overlapContent: string }[] {
+function splitTextWithOverlap(
+  text: string,
+  chapter: string | null,
+  profile: ChunkingProfile
+): { content: string; overlapContent: string }[] {
   const results: { content: string; overlapContent: string }[] = [];
   const chapterPrefix = chapter ? `【${chapter}】\n` : "";
-  // 实际可用的内容长度要减去章节前缀
-  const effectiveMax = MAX_CHUNK_SIZE - chapterPrefix.length;
+  const adjustedProfile = {
+    ...profile,
+    targetSize: Math.max(profile.targetSize - chapterPrefix.length, profile.minSize),
+    maxSize: Math.max(profile.maxSize - chapterPrefix.length, profile.targetSize),
+  };
 
-  let offset = 0;
-  while (offset < text.length) {
-    const remaining = text.substring(offset);
-    if (remaining.trim().length < MIN_CHUNK_SIZE) break;
+  const blocks = splitIntoSemanticBlocks(text);
+  if (blocks.length === 0) return [];
 
-    const cutPos = splitAtNaturalBoundary(remaining, effectiveMax);
-    const rawContent = remaining.substring(0, cutPos).trim();
+  let current = "";
 
-    if (rawContent.length >= MIN_CHUNK_SIZE) {
-      // chunk 正文带章节前缀
-      const content = chapterPrefix + rawContent;
-      results.push({ content, overlapContent: rawContent });
+  const emitCurrent = () => {
+    const trimmed = current.trim();
+    if (!trimmed) {
+      current = "";
+      return;
     }
 
-    // 下一个 chunk 从 overlap 位置开始
-    const advance = Math.max(cutPos - OVERLAP_SIZE, 1);
-    offset += advance;
+    if (trimmed.length < adjustedProfile.minSize && results.length > 0) {
+      const merged = mergeSectionText(results[results.length - 1].overlapContent, trimmed);
+      results[results.length - 1] = {
+        content: chapterPrefix + merged,
+        overlapContent: merged,
+      };
+    } else {
+      results.push({
+        content: chapterPrefix + trimmed,
+        overlapContent: trimmed,
+      });
+    }
 
-    // 如果剩余文本不多，直接结束避免产生过小的尾巴
-    if (text.length - offset < MIN_CHUNK_SIZE) break;
+    current = "";
+  };
+
+  for (const block of blocks) {
+    if (!block) continue;
+
+    if (block.length > adjustedProfile.maxSize) {
+      emitCurrent();
+      const pieces = splitLongTextByBoundary(block, adjustedProfile);
+      for (const piece of pieces) {
+        const trimmedPiece = piece.trim();
+        if (!trimmedPiece) continue;
+        if (results.length > 0 && trimmedPiece.length < adjustedProfile.minSize) {
+          const merged = mergeSectionText(results[results.length - 1].overlapContent, trimmedPiece);
+          results[results.length - 1] = {
+            content: chapterPrefix + merged,
+            overlapContent: merged,
+          };
+        } else {
+          results.push({
+            content: chapterPrefix + trimmedPiece,
+            overlapContent: trimmedPiece,
+          });
+        }
+      }
+      continue;
+    }
+
+    if (!current) {
+      current = block;
+      continue;
+    }
+
+    const projectedLength = current.length + 1 + block.length;
+    const shouldBreakBeforeBlock =
+      current.length >= adjustedProfile.minSize &&
+      (isStructuralBoundaryLine(block) || projectedLength > adjustedProfile.targetSize);
+
+    if (shouldBreakBeforeBlock) {
+      emitCurrent();
+      const overlap = results.length > 0 ? takeOverlapTail(results[results.length - 1].overlapContent, adjustedProfile.overlapSize) : "";
+      current = overlap ? `${overlap}\n${block}` : block;
+      continue;
+    }
+
+    current = `${current}\n${block}`;
   }
 
+  emitCurrent();
   return results;
 }
 
-function splitIntoChunks(text: string, pageTexts: string[]): TextChunk[] {
+function splitIntoChunks(text: string, pageTexts: string[], language: "zh" | "en" | string = "zh"): TextChunk[] {
   const chunks: TextChunk[] = [];
+  const profile = getChunkingProfile(language);
+  const sectionThreshold = Math.max(80, Math.floor(profile.minSize * 0.35));
 
   // 第一步：按章节/小节标题把全文分成 sections
   type Section = { chapter: string | null; text: string; pageStart: number | null; pageEnd: number | null };
@@ -349,7 +593,7 @@ function splitIntoChunks(text: string, pageTexts: string[]): TextChunk[] {
 
         if (HEADING_PATTERN.test(line)) {
           // 遇到新标题，保存当前 section
-          if (currentText.trim().length >= MIN_CHUNK_SIZE) {
+          if (currentText.trim().length >= sectionThreshold) {
             sections.push({
               chapter: currentChapter,
               text: currentText.trim(),
@@ -368,7 +612,7 @@ function splitIntoChunks(text: string, pageTexts: string[]): TextChunk[] {
       }
     }
     // 最后一个 section
-    if (currentText.trim().length >= MIN_CHUNK_SIZE) {
+    if (currentText.trim().length >= sectionThreshold) {
       sections.push({
         chapter: currentChapter,
         text: currentText.trim(),
@@ -387,7 +631,7 @@ function splitIntoChunks(text: string, pageTexts: string[]): TextChunk[] {
       if (!line) continue;
 
       if (HEADING_PATTERN.test(line)) {
-        if (currentText.trim().length >= MIN_CHUNK_SIZE) {
+        if (currentText.trim().length >= sectionThreshold) {
           sections.push({ chapter: currentChapter, text: currentText.trim(), pageStart: null, pageEnd: null });
         }
         currentChapter = line.substring(0, 100);
@@ -396,19 +640,21 @@ function splitIntoChunks(text: string, pageTexts: string[]): TextChunk[] {
         currentText += line + "\n";
       }
     }
-    if (currentText.trim().length >= MIN_CHUNK_SIZE) {
+    if (currentText.trim().length >= sectionThreshold) {
       sections.push({ chapter: currentChapter, text: currentText.trim(), pageStart: null, pageEnd: null });
     }
   }
 
   // 如果没有检测到任何 section（比如教材格式特殊），整体作为一个 section
-  if (sections.length === 0 && text.trim().length >= MIN_CHUNK_SIZE) {
+  if (sections.length === 0 && text.trim().length >= sectionThreshold) {
     sections.push({ chapter: null, text: text.trim(), pageStart: 1, pageEnd: pageTexts.length || null });
   }
 
+  const normalizedSections = mergeShortSections(sections, profile.sectionMergeSize);
+
   // 第二步：对每个 section 做带 overlap 的自然边界分块
-  for (const section of sections) {
-    const pieces = splitTextWithOverlap(section.text, section.chapter);
+  for (const section of normalizedSections) {
+    const pieces = splitTextWithOverlap(section.text, section.chapter, profile);
     for (const piece of pieces) {
       chunks.push({
         content: piece.content,
@@ -420,7 +666,7 @@ function splitIntoChunks(text: string, pageTexts: string[]): TextChunk[] {
     }
   }
 
-  return chunks.filter((c) => c.content.trim().length >= MIN_CHUNK_SIZE);
+  return chunks.filter((c) => c.content.trim().length >= sectionThreshold);
 }
 
 // ─── Token 估算（中文约 1.5 字符/token，英文约 4 字符/token）────────────────
