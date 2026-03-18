@@ -9,6 +9,8 @@ import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { runMigrations } from "../db";
 import { ENV } from "./env";
+import { generateAnswerStream } from "../qaService";
+import { getGeoInfo, extractIp } from "../geoip";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -59,6 +61,59 @@ async function startServer() {
   // Serve uploaded files — use ENV.uploadDir for consistency
   const uploadDir = ENV.uploadDir;
   app.use("/uploads", express.static(uploadDir));
+
+  // SSE 流式问答端点
+  app.post("/api/stream/ask", async (req, res) => {
+    const { question } = req.body || {};
+    if (!question || typeof question !== "string" || question.length < 2 || question.length > 1000) {
+      res.status(400).json({ error: "问题长度需在 2-1000 字之间" });
+      return;
+    }
+
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no"); // Nginx 反向代理不缓冲
+    res.flushHeaders();
+
+    const ip = extractIp(req as any);
+    const geo = await getGeoInfo(ip);
+
+    let closed = false;
+    req.on("close", () => { closed = true; });
+
+    const sendSSE = (event: string, data: unknown) => {
+      if (closed) return;
+      res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    };
+
+    try {
+      await generateAnswerStream(
+        {
+          question,
+          visitorIp: ip,
+          visitorCity: geo.city || undefined,
+          visitorRegion: geo.region || undefined,
+          visitorCountry: geo.country || undefined,
+          visitorLat: geo.lat || undefined,
+          visitorLng: geo.lng || undefined,
+        },
+        (meta) => sendSSE("meta", meta),
+        (token) => sendSSE("token", { t: token }),
+        (fullAnswer) => {
+          sendSSE("done", { answer: fullAnswer });
+          res.end();
+        },
+        (error) => {
+          sendSSE("error", { message: error });
+          res.end();
+        }
+      );
+    } catch (err: any) {
+      sendSSE("error", { message: err?.message || "未知错误" });
+      res.end();
+    }
+  });
 
   // tRPC API
   app.use(
