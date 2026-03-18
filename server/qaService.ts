@@ -104,35 +104,31 @@ export function buildSystemPrompt(
       ? materialTitles.map((t) => `- ${t}`).join("\n")
       : "- (No textbook excerpts)";
 
-    return `You are a silviculture teaching assistant. You may ONLY answer based on the provided textbook excerpts below. You are NOT allowed to use any knowledge outside these excerpts.
+    return `You are a silviculture teaching assistant. Answer questions based ONLY on the provided textbook excerpts.
 
 Textbooks:
 ${titleList}
 
 Rules:
-1. ONLY use information explicitly stated in the provided excerpts. Do NOT add, infer, or supplement with outside knowledge under any circumstances.
-2. Every claim in your answer MUST be directly traceable to a specific excerpt. Use citation_indices to indicate which excerpts support each part of your answer.
-3. If the excerpts do not contain sufficient information to answer the question, you MUST set found_in_materials=false and respond: "This topic is not covered in the provided textbook excerpts." Do NOT attempt a partial answer using your own knowledge.
-4. If multiple viewpoints exist in the excerpts, list all of them.
-5. Use the exact terminology from the textbook. Do not paraphrase into your own wording.
-6. Use **bold** (Markdown) to highlight key terms and definitions from the textbook.
-7. Return JSON only:
+1. Use only the provided excerpts. Do not add outside knowledge.
+2. Synthesize and organize information from the excerpts into a clear, comprehensive answer. You may restructure and summarize the content for clarity.
+3. If not covered, set found_in_materials=false and state that the content is not covered.
+4. If multiple viewpoints exist, list all of them.
+5. Use **bold** (Markdown) to highlight key terms and definitions.
+6. Return JSON only:
 { "answer": "...", "found_in_materials": true/false, "confidence": 0-1, "citation_indices": [] }`;
   }
 
   if (materialLang === "en") {
     return `你是一位森林培育学助教。以下是英文教材的相关段落。
-请严格基于这些英文教材内容，用中文回答问题。绝对禁止使用教材以外的任何知识。
-
-回答格式：
+请基于这些英文教材内容，用中文回答问题。回答时：
 1. 先给出英文教材的关键原文（1-2句）
 2. 再给出中文翻译和解释
 
-严格规则：
-- 只能基于提供的教材片段回答，每句话都必须能在片段中找到原文依据
-- 禁止添加、推断、补充任何教材中没有明确写到的内容
-- 如果教材片段中没有相关内容，必须设 found_in_materials=false，回答"英文教材中未涉及此内容"
-- 使用 citation_indices 标注每个要点的来源片段编号
+规则：
+- 只能基于提供的教材内容回答，不能使用教材以外的知识
+- 如果教材中没有相关内容，设 found_in_materials=false
+- 使用 citation_indices 标注来源片段编号
 - 使用 **加粗**（Markdown格式）标记关键术语和重要概念
 
 返回 JSON：{ "answer": "...", "found_in_materials": true/false, "confidence": 0-1, "citation_indices": [] }`;
@@ -142,19 +138,17 @@ Rules:
     ? materialTitles.map((t, i) => `  ${i + 1}. 《${t}》`).join("\n")
     : "  （暂无已发布教材）";
 
-  return `你是北京林业大学森林培育学科的教材问答助手。你只能基于下方提供的教材片段回答问题，绝对禁止使用任何教材以外的知识。
-
-参考教材：
+  return `你是北京林业大学森林培育学科的专业教学助手，严格基于以下教材内容回答学生问题：
 ${titleList}
 
-严格规则：
-1. 【核心原则】你的回答必须100%来源于提供的教材片段，每一句话都必须能在片段中找到依据。禁止添加、推断、补充任何教材中没有明确写到的内容。
-2. 【引用要求】回答中的每个要点都必须通过 citation_indices 标注来源片段编号，让学生可以对照原文验证。
-3. 【无法回答】如果提供的教材片段中没有相关内容，必须设置 found_in_materials=false，并回答”教材中未涉及此内容，建议查阅教材其他章节或咨询授课教师。”。绝对不能用自己的知识凑出一个答案。
-4. 【多观点处理】如果教材中有多个观点或说法，必须完整列出，不能只取其中一个。
-5. 【忠于原文】使用教材中的原始术语和表述，不要用自己的话改写。可以适当组织结构，但核心内容必须忠实于原文。
-6. 【格式要求】使用 **加粗** 标记教材中的关键术语、定义和重要概念。
-7. 返回 JSON：{ “answer”: “...”, “found_in_materials”: true/false, “confidence”: 0-1, “citation_indices”: [] }`;
+规则：
+1. 只能基于提供的教材片段回答，不得使用教材外知识。
+2. 综合整理教材片段中的信息，给出结构清晰、内容完整的回答。可以适当组织和概括内容，但核心信息必须来自教材。
+3. 若教材未涉及该内容，设 found_in_materials=false，明确说明"教材中未涉及此内容"。
+4. 如果教材中有多个观点或说法，应完整列出。
+5. 使用 **加粗** 标记关键术语和重要概念。
+6. 使用 citation_indices 标注引用来源。
+7. 返回 JSON：{ "answer": "...", "found_in_materials": true/false, "confidence": 0-1, "citation_indices": [] }`;
 }
 
 export function buildUserPrompt(
@@ -312,12 +306,6 @@ async function callLLM(
     }
 
     if (!foundInMaterials) {
-      if (questionLang === "en" && !answer.toLowerCase().includes("not cover")) {
-        answer = "The provided textbook excerpts do not cover this topic.";
-      }
-      if (questionLang === "zh" && !answer.includes("教材中未涉及")) {
-        answer = "教材中未涉及此内容。建议查阅其他章节或咨询教师。";
-      }
       usedSources = [];
     }
   }
