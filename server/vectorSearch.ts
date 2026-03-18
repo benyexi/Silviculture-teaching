@@ -240,7 +240,7 @@ function scoreChunk(content: string, keywords: string[], originalQuestion: strin
   return (score * (0.4 + 0.6 * coreCoverage)) + phraseBonus;
 }
 
-// ─── 关键词检索 Top-K ─────────────────────────────────────────────────────────
+// ─── 混合检索 Top-K（关键词 + 向量语义） ──────────────────────────────────────
 export async function semanticSearch(
   question: string,
   materialIds?: number[],
@@ -253,55 +253,167 @@ export async function semanticSearch(
   const questionLang = detectLanguage(question);
   const rawKeywords =
     questionLang === "en" ? extractKeywordsEn(question) : extractKeywords(question);
-  if (rawKeywords.length === 0) return [];
 
   // 同义词扩展：增加检索召回率
   const keywords = questionLang === "en" ? rawKeywords : expandWithSynonyms(rawKeywords);
 
-  // 从数据库获取所有已发布教材的 chunks
-  // 策略：使用所有关键词（包括长词和同义词）做 SQL 过滤，OR 条件
-  // 优先使用长关键词（更精确），最多使用 10 个
-  const sortedKeywords = [...keywords].sort((a, b) => b.length - a.length);
-  const sqlKeywords = sortedKeywords.slice(0, 10);
+  // ─── 路径1：关键词检索 ─────────────────────────────────────────────────────
+  let keywordCandidates: typeof vectorCandidates = [];
+  if (keywords.length > 0) {
+    const sortedKeywords = [...keywords].sort((a, b) => b.length - a.length);
+    const sqlKeywords = sortedKeywords.slice(0, 10);
 
-  const likeConditions = sqlKeywords.map(kw =>
-    like(materialChunks.content, `%${kw}%`)
-  );
+    const likeConditions = sqlKeywords.map(kw =>
+      like(materialChunks.content, `%${kw}%`)
+    );
 
-  const baseWhere = and(
-    eq(materials.status, 'published'),
-    languageFilter !== "all" ? eq(materials.language, languageFilter) : undefined,
-    materialIds && materialIds.length > 0
-      ? inArray(materialChunks.materialId, materialIds)
-      : undefined,
-    or(...likeConditions)
-  );
+    const kwWhere = and(
+      eq(materials.status, 'published'),
+      languageFilter !== "all" ? eq(materials.language, languageFilter) : undefined,
+      materialIds && materialIds.length > 0
+        ? inArray(materialChunks.materialId, materialIds)
+        : undefined,
+      or(...likeConditions)
+    );
 
-  const candidates = await db
-    .select({
-      id: materialChunks.id,
-      materialId: materialChunks.materialId,
-      content: materialChunks.content,
-      chapter: materialChunks.chapter,
-      pageStart: materialChunks.pageStart,
-      pageEnd: materialChunks.pageEnd,
-    })
-    .from(materialChunks)
-    .innerJoin(materials, eq(materialChunks.materialId, materials.id))
-    .where(baseWhere)
-    .limit(300); // 候选集最多300个，再在应用层精排
+    keywordCandidates = await db
+      .select({
+        id: materialChunks.id,
+        materialId: materialChunks.materialId,
+        content: materialChunks.content,
+        chapter: materialChunks.chapter,
+        pageStart: materialChunks.pageStart,
+        pageEnd: materialChunks.pageEnd,
+        embedding: materialChunks.embedding,
+      })
+      .from(materialChunks)
+      .innerJoin(materials, eq(materialChunks.materialId, materials.id))
+      .where(kwWhere)
+      .limit(300);
+  }
 
-  if (candidates.length === 0) return [];
+  // ─── 路径2：向量语义检索 ───────────────────────────────────────────────────
+  let questionEmbedding: number[] | null = null;
+  let vectorCandidates: {
+    id: number;
+    materialId: number;
+    content: string;
+    chapter: string | null;
+    pageStart: number | null;
+    pageEnd: number | null;
+    embedding: number[] | null;
+  }[] = [];
 
-  // 应用层精排：计算每个 chunk 的关键词匹配分数
-  const scored = candidates.map(chunk => ({
-    ...chunk,
-    score: scoreChunk(chunk.content, keywords, question, chunk.chapter ?? undefined),
-  }));
+  try {
+    const { getEmbedding } = await import("./llmDriver");
+    questionEmbedding = await getEmbedding(question);
 
-  // 按分数降序排列，取 Top-K
-  scored.sort((a, b) => b.score - a.score);
-  const topResults = scored.slice(0, topK).filter(r => r.score > 0);
+    // 获取所有有 embedding 的 chunks（向量检索走全表扫描，对 <10000 chunks 完全可行）
+    const vecWhere = and(
+      eq(materials.status, 'published'),
+      languageFilter !== "all" ? eq(materials.language, languageFilter) : undefined,
+      materialIds && materialIds.length > 0
+        ? inArray(materialChunks.materialId, materialIds)
+        : undefined,
+      eq(materialChunks.vectorId, "embedded")
+    );
+
+    vectorCandidates = await db
+      .select({
+        id: materialChunks.id,
+        materialId: materialChunks.materialId,
+        content: materialChunks.content,
+        chapter: materialChunks.chapter,
+        pageStart: materialChunks.pageStart,
+        pageEnd: materialChunks.pageEnd,
+        embedding: materialChunks.embedding,
+      })
+      .from(materialChunks)
+      .innerJoin(materials, eq(materialChunks.materialId, materials.id))
+      .where(vecWhere);
+  } catch {
+    // Embedding 未配置，仅用关键词检索
+  }
+
+  // ─── 合并评分 ──────────────────────────────────────────────────────────────
+  // 用 Map 去重，以 chunk id 为 key
+  const scoreMap = new Map<number, {
+    id: number;
+    materialId: number;
+    content: string;
+    chapter: string | null;
+    pageStart: number | null;
+    pageEnd: number | null;
+    keywordScore: number;
+    vectorScore: number;
+    finalScore: number;
+  }>();
+
+  // 关键词评分
+  for (const chunk of keywordCandidates) {
+    const kwScore = scoreChunk(chunk.content, keywords, question, chunk.chapter ?? undefined);
+    scoreMap.set(chunk.id, {
+      id: chunk.id,
+      materialId: chunk.materialId,
+      content: chunk.content,
+      chapter: chunk.chapter,
+      pageStart: chunk.pageStart,
+      pageEnd: chunk.pageEnd,
+      keywordScore: kwScore,
+      vectorScore: 0,
+      finalScore: 0,
+    });
+  }
+
+  // 向量评分
+  if (questionEmbedding) {
+    const { cosineSimilarity } = await import("./llmDriver");
+    for (const chunk of vectorCandidates) {
+      if (!chunk.embedding) continue;
+      const vecScore = cosineSimilarity(questionEmbedding, chunk.embedding);
+
+      const existing = scoreMap.get(chunk.id);
+      if (existing) {
+        existing.vectorScore = vecScore;
+      } else {
+        scoreMap.set(chunk.id, {
+          id: chunk.id,
+          materialId: chunk.materialId,
+          content: chunk.content,
+          chapter: chunk.chapter,
+          pageStart: chunk.pageStart,
+          pageEnd: chunk.pageEnd,
+          keywordScore: 0,
+          vectorScore: vecScore,
+          finalScore: 0,
+        });
+      }
+    }
+  }
+
+  if (scoreMap.size === 0) return [];
+
+  // 计算混合分数：关键词和向量各自归一化后加权合并
+  const entries = Array.from(scoreMap.values());
+  const maxKwScore = Math.max(...entries.map(e => e.keywordScore), 1);
+  const hasVector = entries.some(e => e.vectorScore > 0);
+
+  for (const entry of entries) {
+    const normKw = entry.keywordScore / maxKwScore; // 归一化到 0-1
+    const normVec = entry.vectorScore; // 余弦相似度本身就是 0-1
+
+    if (hasVector) {
+      // 混合模式：关键词 40% + 向量 60%
+      entry.finalScore = normKw * 0.4 + normVec * 0.6;
+    } else {
+      // 纯关键词模式
+      entry.finalScore = normKw;
+    }
+  }
+
+  // 排序取 Top-K
+  entries.sort((a, b) => b.finalScore - a.finalScore);
+  const topResults = entries.slice(0, topK).filter(r => r.finalScore > 0);
 
   if (topResults.length === 0) return [];
 
@@ -322,7 +434,7 @@ export async function semanticSearch(
     pageStart: r.pageStart,
     pageEnd: r.pageEnd,
     content: r.content,
-    similarity: Math.min(r.score / 20, 1), // 归一化到 0-1
+    similarity: r.finalScore,
   }));
 }
 

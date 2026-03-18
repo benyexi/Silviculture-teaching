@@ -7,6 +7,7 @@ import { materials, materialChunks } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
 import { storeChunkVector } from "./vectorSearch";
 import { detectDocumentLanguage } from "./languageDetect";
+import { getEmbedding } from "./llmDriver";
 import mammoth from "mammoth";
 import WordExtractor from "word-extractor";
 
@@ -63,36 +64,54 @@ export async function processMaterial(
     const chunks = splitIntoChunks(text, pageTexts);
     console.log(`[Doc] 分块完成，共 ${chunks.length} 个块`);
 
-    // 3. 存储文本块到数据库
-    const insertedChunks: number[] = [];
-    for (let i = 0; i < chunks.length; i++) {
-      const chunk = chunks[i];
-      const result = await db.insert(materialChunks).values({
-        materialId,
-        chunkIndex: i,
-        content: chunk.content,
-        chapter: chunk.chapter,
-        pageStart: chunk.pageStart,
-        pageEnd: chunk.pageEnd,
-        tokenCount: chunk.tokenCount,
-      });
-      insertedChunks.push(Number((result as any).insertId));
+    // 3. 存储文本块到数据库 + 生成 Embedding
+    console.log(`[Doc] 存储文本块并生成 Embedding...`);
+    let embeddingEnabled = true;
+    const BATCH_SIZE = 10;
+
+    // 先测试 Embedding 是否可用
+    try {
+      await getEmbedding("test");
+    } catch {
+      embeddingEnabled = false;
+      console.log(`[Doc] Embedding 未配置，仅使用全文检索模式`);
     }
 
-    // 4. 全文检索模式：标记所有 chunks 为已处理（无需向量化）
-    console.log(`[Doc] 全文检索模式，标记 ${insertedChunks.length} 个块为已处理...`);
-    const BATCH_SIZE = 50;
-    for (let i = 0; i < insertedChunks.length; i += BATCH_SIZE) {
-      const batchIds = insertedChunks.slice(i, i + BATCH_SIZE);
+    for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
+      const batch = chunks.slice(i, i + BATCH_SIZE);
       await Promise.all(
-        batchIds.map(async (chunkId) => {
-          try {
-            await storeChunkVector(chunkId, []); // fulltext 模式，vector 为空数组
-          } catch (err) {
-            console.error(`[Doc] 标记块 ${chunkId} 失败:`, err);
+        batch.map(async (chunk, batchIdx) => {
+          const idx = i + batchIdx;
+          let embedding: number[] | undefined;
+
+          // 生成 Embedding（如果已配置）
+          if (embeddingEnabled) {
+            try {
+              embedding = await getEmbedding(chunk.content);
+            } catch (err) {
+              console.warn(`[Doc] 块 ${idx} Embedding 生成失败:`, err);
+            }
+          }
+
+          const result = await db.insert(materialChunks).values({
+            materialId,
+            chunkIndex: idx,
+            content: chunk.content,
+            chapter: chunk.chapter,
+            pageStart: chunk.pageStart,
+            pageEnd: chunk.pageEnd,
+            tokenCount: chunk.tokenCount,
+            embedding: embedding || undefined,
+            vectorId: embedding ? "embedded" : "fulltext",
+          });
+
+          const chunkId = Number((result as any).insertId);
+          if (!embedding) {
+            await storeChunkVector(chunkId, []);
           }
         })
       );
+      console.log(`[Doc] 已处理 ${Math.min(i + BATCH_SIZE, chunks.length)}/${chunks.length} 个块`);
     }
 
     // 5. 更新教材状态为已发布
