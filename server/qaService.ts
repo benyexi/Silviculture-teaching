@@ -286,9 +286,7 @@ Only information explicitly stated in the excerpts is included.`;
     return `示例（简洁定义题）：
 用户问题：什么是森林培育？
 回答：
-森林培育是按既定目标和自然规律开展的综合培育活动，涵盖从种子、苗木到成林成熟的全过程。
-森林培育学是研究上述培育活动理论与实践的学科。
-仅回答教材明确给出的定义，不扩展历史或延伸内容。`;
+**森林培育**是按既定目标和自然规律开展的综合培育活动，涵盖从种子、苗木到成林成熟的全过程[1]。**森林培育学**是研究上述培育活动理论与实践的学科[1]。`;
   }
 
   if (questionLang === "en") {
@@ -297,11 +295,11 @@ Example 1 (classification):
 Q: What types are mentioned?
 A:
 ## Overview
-The excerpts clearly mention several types.
+The excerpts clearly mention several types [1][2].
 ## Types
-1. Type A: ...
-2. Type B: ...
-3. Type C: ...
+1. **Type A**: ... [1]
+2. **Type B**: ... [2]
+3. **Type C**: ... [3]
 ## Completeness note
 Only the items explicitly mentioned in the excerpts are listed.
 
@@ -309,11 +307,11 @@ Example 2 (method):
 Q: What methods or steps are described?
 A:
 ## Overview
-The excerpts provide a complete list of the described methods/steps.
+The excerpts provide a complete list of the described methods/steps [1].
 ## Methods / steps
-1. ...
-2. ...
-3. ...
+1. **Method 1**: ... [1]
+2. **Method 2**: ... [2]
+3. **Method 3**: ... [3]
 ## Notes
 If the excerpts only cover part of the topic, say so explicitly.`;
   }
@@ -322,11 +320,11 @@ If the excerpts only cover part of the topic, say so explicitly.`;
 用户问题：某对象有哪些类型？
 回答：
 ## 一、概述
-教材明确出现若干类型。
+教材明确提到了若干类型[1][2]。
 ## 二、类型清单
-1. 第一类：...
-2. 第二类：...
-3. 第三类：...
+1. **第一类**：...[1]
+2. **第二类**：...[2]
+3. **第三类**：...[3]
 ## 三、完整性说明
 以上仅列出教材明确出现的项目，不额外补充。
 
@@ -334,11 +332,11 @@ If the excerpts only cover part of the topic, say so explicitly.`;
 用户问题：某操作有哪些方法或步骤？
 回答：
 ## 一、概述
-教材给出了完整或部分的方法/步骤。
+教材给出了完整或部分的方法/步骤[1]。
 ## 二、方法/步骤清单
-1. ...
-2. ...
-3. ...
+1. **方法一**：...[1]
+2. **方法二**：...[2]
+3. **方法三**：...[3]
 ## 三、注意事项
 如教材只覆盖部分内容，应明确说明。`;
 }
@@ -362,7 +360,7 @@ Answering protocol:
 3. Do not stop at a summary sentence when the question asks for types, methods, steps, or differences.
 4. If the excerpts only cover part of the topic, say so plainly and do not invent missing items.
 5. Use Markdown only. Do not wrap the final answer in JSON or code fences.
-6. Do not include citation markers like [citation] or [引用1].
+6. CITATION REQUIRED: For every factual claim, add an inline citation marker like [1], [2] matching the excerpt number. Example: "Silviculture covers the full cultivation cycle [1] including thinning operations [3]."
 7. Never add background history or external knowledge not supported by excerpts.`;
   }
 
@@ -377,11 +375,11 @@ ${materialNote}
 回答协议：
 1. 先识别问题意图：${describeIntent(analysis.intent, "zh")}。
 2. 如果问题是分类、方法、步骤或比较题，必须完整列出教材中明确出现的项目，不得只给总述。
-3. 分类题先给“总览 + 完整清单 + 逐项说明”；方法/步骤题先给“总览 + 完整清单 + 逐项说明”；比较题先给“对比表/分点对比 + 结论”。
-4. 如果教材只覆盖部分内容，要明确说明“教材只明确提到以下项目”，不要补外部知识。
+3. 分类题先给"总览 + 完整清单 + 逐项说明"；方法/步骤题先给"总览 + 完整清单 + 逐项说明"；比较题先给"对比表/分点对比 + 结论"。
+4. 如果教材只覆盖部分内容，要明确说明"教材只明确提到以下项目"，不要补外部知识。
 5. 回答前先在内部检查一次：是否覆盖所有相关片段、是否存在漏项、是否还带有教材外补充。检查不过就重写。
 6. 直接输出 Markdown，不要包裹在 JSON 或代码块中。
-7. 不要出现"[引用1]"、"[citation]"、"片段[1]"等引用标记。
+7. 引用标注：每个事实性陈述后必须添加引用标记 [1]、[2]，对应片段编号。例如："森林培育涵盖从种子到成林的全过程[1]，包括间伐经营[3]。"
 8. 严禁扩展教材外知识，不要凭常识或通用知识补充。`;
 }
 
@@ -408,7 +406,7 @@ Requirements:
 4. Key terms: use **bold** for key terms, important concepts, and critical conclusions. Precisely preserve numeric data, formulas, and ratios from the textbook.
 5. Textbook language: preserve original terminology. If multiple viewpoints exist, list them all.
 6. ${analysis.conciseDefinition ? "Format: output plain concise Markdown in 2-4 sentences; do not use long sectioned expansion." : "Format: output directly in Markdown. Start with a 1-2 sentence overview, then expand with full details."}
-7. No citation markers: do not include "[引用1]", "[citation]", or any reference markers.
+7. Inline citations: add [1], [2], [3] etc. after each factual claim, matching the excerpt number it came from. Every key statement must have at least one citation.
 
 ${analysis.conciseDefinition ? "8. This is a concise definition question. Answer in 2-4 sentences only; do not add history, classification, purpose, development, or other extensions." : ""}
 
@@ -443,12 +441,12 @@ ${titleList}
 回答要求：
 1. 知识来源：只能基于提供的教材片段回答，不得使用教材外知识。如果教材未涉及该内容，明确回复"教材中未涉及此内容"。
 2. ${analysis.conciseDefinition ? "简洁定义模式：仅基于教材给出定义本身，控制在2-4句，不做延伸讲解。" : "全面完整：综合所有提供的教材片段信息，给出尽可能全面、详尽的回答。对于分类、类型、方法、步骤、比较等题目，要完整列出每一项，并逐项说明。"}
-3. 结构清晰：${analysis.conciseDefinition ? `直接按“定义句 + 1-2句补充说明”输出。` : `按照"定义与概述→分类/类型→具体方法/步骤→原则与注意事项→应用场景"等逻辑顺序组织。`} ${buildAnswerBlueprint(analysis, questionLang)}
+3. 结构清晰：${analysis.conciseDefinition ? `直接按"定义句 + 1-2句补充说明"输出。` : `按照"定义与概述→分类/类型→具体方法/步骤→原则与注意事项→应用场景"等逻辑顺序组织。`} ${buildAnswerBlueprint(analysis, questionLang)}
 4. 突出重点：使用 **加粗** 标记关键术语、重要概念和核心结论。对于教材中的数据、公式、比例等要精确引用。
 5. 保留教材表述：尽量使用教材中的原始术语和表述，可以适当组织和概括，但核心信息必须来自教材。如果教材中有多个观点或说法，应完整列出。
 6. 格式规范：${analysis.conciseDefinition ? "直接输出 Markdown，2-4句即可，不要使用长篇多级标题。" : "直接输出 Markdown 格式，不要包裹在 JSON 或代码块中。开头先用1-2句话概括主题，再展开详细内容。"}
-7. 禁止引用标记：回答中绝对不要出现"[引用1]"、"[引用2]"等引用编号标记，也不要出现"片段[引用N]"、"[citation]"等任何形式的引用标注。直接陈述内容即可。
-${analysis.conciseDefinition ? "\n8. 当前是“简洁定义题”，仅回答定义本身（2-4句），不得扩展到历史、分类、目的、发展、问题等延伸内容。" : ""}
+7. 内联引用标注：每个事实性陈述后必须添加 [1]、[2]、[3] 等标记，对应其来自的片段编号。每个关键陈述至少有一个引用标记。例如：造林密度取决于立地条件[2]和树种特性[4]。
+${analysis.conciseDefinition ? `\n8. 当前是简洁定义题，仅回答定义本身（2-4句），不得扩展到历史、分类、目的、发展、问题等延伸内容。` : ""}
 
 ${buildFewShot(questionLang, analysis)}`;
 }
@@ -484,8 +482,10 @@ ${question}
 Answer blueprint:
 ${buildAnswerBlueprint(analysis, questionLang)}
 
-Completion constraints:
-- Use only the excerpts below.
+Completion constraints (Strict Grounding Mode):
+- You may ONLY use the excerpts below. Never use pre-trained knowledge to fabricate content.
+- If the excerpts don't contain the answer, say "The provided textbook excerpts do not cover this topic."
+- Add citation markers [1], [2] etc. after every factual claim, referencing the excerpt number.
 - If the question asks for types, methods, steps, or comparisons, list every item explicitly mentioned in the excerpts.
 - Do not stop at a summary sentence.
 - If the excerpts only cover part of the topic, say so clearly.
@@ -505,11 +505,13 @@ ${question}
 【回答蓝图】
 ${buildAnswerBlueprint(analysis, questionLang)}
 
-【完整性约束】
-- 只能使用下方教材片段。
+【完整性约束（严格 Grounding 模式）】
+- 你只能基于下方教材片段回答，绝对不能根据预训练知识编造内容。
+- 如果片段中没有答案，直接告知"教材中未涉及此内容"。
+- 每个事实性陈述后必须标注来源片段编号，如 [1]、[2]。
 - 如果是分类/方法/步骤/比较题，必须把教材中明确出现的项目全部列出。
 - 不要只写概述，必须先总述再逐项展开。
-- 如果教材只覆盖部分内容，要明确说明“教材只明确提到以下项目”。
+- 如果教材只覆盖部分内容，要明确说明"教材只明确提到以下项目"。
 ${analysis.conciseDefinition ? "- 这是简洁定义题：只用2-4句话回答定义本身，禁止历史背景/分类/目的等延伸。" : ""}
 
 【教材内容片段（共 ${chunks.length} 条）】
@@ -893,17 +895,20 @@ async function callLLM(
   };
 }
 
-/** 清除 LLM 回答中残留的 citation 标记 */
+/** V2: 清理非标准引用格式，但保留正规的 [1] [2] 引用标记 */
 function stripCitationMarkers(text: string): string {
-  const withoutCitation = text
+  const cleaned = text
     .replace(/\r\n/g, "\n")
     .replace(/\r/g, "\n")
+    // 清除非标准格式（如 [citation_indices: 1,2]、[引用1]、【片段1】）
     .replace(/\[citation_indices?:\s*[\d,\s]+\]/gi, "")
     .replace(/\[引用\d+\]/g, "")
     .replace(/【?片段\d+】?/g, "")
-    .replace(/片段\[?\d+\]?至?\[?\d*\]?/g, "");
+    .replace(/片段\[?\d+\]?至?\[?\d*\]?/g, "")
+    // 标准化引用标记格式：确保 [1] [2] 等格式一致
+    .replace(/\[\s*(\d+)\s*\]/g, "[$1]");
 
-  return normalizeMarkdownSpacing(withoutCitation);
+  return normalizeMarkdownSpacing(cleaned);
 }
 
 function normalizeMarkdownSpacing(text: string): string {
@@ -1363,7 +1368,8 @@ ${sourceTexts}`;
 要求：
 1. 只能使用片段中出现的信息，不得发挥。
 2. 可适度改写表述，但不能新增事实。
-3. ${analysis.conciseDefinition ? "这是简洁定义题，仅用2-4句。禁止历史背景和延伸。" : "按问题类型组织结构，但不要超出片段。"}
+3. 每个事实性陈述后添加引用标记 [1]、[2] 对应片段编号。
+4. ${analysis.conciseDefinition ? "这是简洁定义题，仅用2-4句。禁止历史背景和延伸。" : "按问题类型组织结构，但不要超出片段。"}
 
 教材片段：
 ${sourceTexts}`;
@@ -1644,7 +1650,7 @@ function buildExtractiveAnswer(
 
   const prefix = questionLang === "en"
     ? `Direct excerpt-grounded information about "${question.trim()}":`
-    : `教材中关于“${question.trim()}”的直接信息：`;
+    : `教材中关于"${question.trim()}"的直接信息：`;
 
   return {
     answer: `${prefix}\n${lines.join("\n")}`.replace(/[ \t]+\n/g, "\n").trim(),

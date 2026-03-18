@@ -37,10 +37,13 @@ function normalizeAnswerMarkdown(text: string): string {
   return text
     .replace(/\r\n/g, "\n")
     .replace(/\r/g, "\n")
+    // 清除非标准引用格式，但保留 [1] [2] 等正规引用标记
     .replace(/\[引用\d+\]/g, "")
     .replace(/\[citation_indices?:\s*[\d,\s]+\]/gi, "")
     .replace(/【?片段\d+】?/g, "")
     .replace(/片段\[?\d+\]?至?\[?\d*\]?/g, "")
+    // 标准化引用格式
+    .replace(/\[\s*(\d+)\s*\]/g, "[$1]")
     .replace(/([^\n])\s+(#{1,6}\s+)/g, "$1\n\n$2")
     .replace(/\n[ \t]*([#>-])/g, "\n$1")
     .replace(/[ \t]+\n/g, "\n")
@@ -258,7 +261,7 @@ export default function Home() {
             <p className="text-emerald-300/80 text-sm md:text-base tracking-[0.25em] uppercase font-light">
               Silviculture Intelligent Q&amp;A System
             </p>
-            <span className="text-xs font-mono text-emerald-400/70 border border-emerald-400/30 rounded px-1.5 py-0.5">V1.0</span>
+            <span className="text-xs font-mono text-emerald-400/70 border border-emerald-400/30 rounded px-1.5 py-0.5">V2.0</span>
           </div>
           <p className="text-white/80 text-sm md:text-base max-w-2xl mx-auto leading-relaxed mb-10 drop-shadow">
             Grounded in authoritative textbooks &middot; 严格基于教材内容回答 &middot; Every answer is fully cited
@@ -361,7 +364,7 @@ export default function Home() {
                     </CardHeader>
                     <CardContent>
                       <div className="prose prose-sm max-w-none text-foreground leading-relaxed">
-                        <Streamdown>{displayAnswer}</Streamdown>
+                        <CitedAnswer answer={displayAnswer} sourceCount={displaySources.length} />
                       </div>
 
                       {!isStreaming && displayFoundInMaterials && (
@@ -457,6 +460,54 @@ export default function Home() {
   );
 }
 
+// ─── NotebookLM 风格引用标注答案 ──────────────────────────────────────────────
+function CitedAnswer({ answer, sourceCount }: { answer: string; sourceCount: number }) {
+  // 将 [1] [2] 等引用标记渲染为可点击的角标
+  const processedAnswer = answer.replace(
+    /\[(\d+)\]/g,
+    (match, num) => {
+      const n = parseInt(num, 10);
+      if (n >= 1 && n <= sourceCount) {
+        return `<cite-ref data-idx="${n}">[${n}]</cite-ref>`;
+      }
+      return match;
+    }
+  );
+
+  // 使用 Streamdown 渲染 markdown，然后后处理 cite-ref 标签
+  return (
+    <div
+      className="cited-answer"
+      ref={(el) => {
+        if (!el) return;
+        // 将 <cite-ref> 转换为可点击的角标
+        const refs = el.querySelectorAll("cite-ref");
+        refs.forEach((ref) => {
+          if (ref.getAttribute("data-processed")) return;
+          ref.setAttribute("data-processed", "1");
+          const idx = ref.getAttribute("data-idx");
+          if (!idx) return;
+          const badge = document.createElement("sup");
+          badge.className = "inline-flex items-center justify-center min-w-[1.1rem] h-[1.1rem] rounded-full bg-primary/15 text-primary text-[0.65rem] font-bold cursor-pointer hover:bg-primary/30 transition-colors mx-0.5 px-0.5 align-super";
+          badge.textContent = idx;
+          badge.title = `查看来源 ${idx}`;
+          badge.onclick = () => {
+            const target = document.getElementById(`source-${idx}`);
+            if (target) {
+              target.scrollIntoView({ behavior: "smooth", block: "center" });
+              target.classList.add("ring-2", "ring-primary", "ring-offset-2");
+              setTimeout(() => target.classList.remove("ring-2", "ring-primary", "ring-offset-2"), 2000);
+            }
+          };
+          ref.replaceWith(badge);
+        });
+      }}
+    >
+      <Streamdown>{processedAnswer}</Streamdown>
+    </div>
+  );
+}
+
 // ─── 引用来源卡片组件 ─────────────────────────────────────────────────────────
 function SourceCard({
   source,
@@ -479,7 +530,7 @@ function SourceCard({
     : pageLabel || "未标注章节";
 
   return (
-    <div className="border-l-4 border-primary/50 bg-primary/5 rounded-r-lg p-3">
+    <div id={`source-${index}`} className="border-l-4 border-primary/50 bg-primary/5 rounded-r-lg p-3 transition-all duration-300">
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1 flex-wrap">

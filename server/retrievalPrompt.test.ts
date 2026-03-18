@@ -172,7 +172,7 @@ describe("prompt builders", () => {
     expect(prompt).toContain("定义与概述→分类/类型→具体方法/步骤→原则与注意事项→应用场景");
     expect(prompt).toContain("示例1（分类题）");
     expect(prompt).toContain("示例2（方法题）");
-    expect(prompt).toContain("禁止引用标记");
+    expect(prompt).toContain("内联引用标注");
   });
 
   it("includes an explicit output skeleton in the user prompt", () => {
