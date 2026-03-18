@@ -347,20 +347,39 @@ export async function semanticSearch(
     questionLang === "en" ? extractKeywordsEn(question) : extractKeywords(question);
   if (rawKeywords.length === 0) return [];
 
-  // 同义词扩展：增加检索召回率
-  const keywords = questionLang === "en" ? rawKeywords : expandWithSynonyms(rawKeywords);
+  // 将原始问题的完整核心短语加入关键词（去掉问号等标点和常见提问词）
+  const cleanedQ = question
+    .replace(/[，。？！、；：""''（）【】《》？!?,;:"'()\[\]\s]+/g, "")
+    .replace(/什么是|如何|怎么|怎样|为什么|哪些|请问|介绍|说明|解释|试述|分析|比较|请说明|请介绍|阐述|论述/g, "");
+  if (cleanedQ.length >= 2 && cleanedQ.length <= 10 && !rawKeywords.includes(cleanedQ)) {
+    rawKeywords.unshift(cleanedQ);
+  }
+
+  // 同义词扩展：仅用于评分/排序，不用于 SQL 检索
+  const scoringKeywords = questionLang === "en" ? rawKeywords : expandWithSynonyms(rawKeywords);
+
+  // SQL 检索使用原始关键词（精准召回），确保基础词不被同义词挤掉
+  // 同时加入少量同义词中最重要的（长度>=4 的精确词）
+  const sqlKeywordsSet = new Set(rawKeywords);
+  for (const kw of scoringKeywords) {
+    if (kw.length >= 4 && sqlKeywordsSet.size < 15) {
+      sqlKeywordsSet.add(kw);
+    }
+  }
+  const sqlKeywords = Array.from(sqlKeywordsSet);
 
   console.log(`[Search] question="${question}", rawKeywords=[${rawKeywords.join(', ')}]`);
-  console.log(`[Search] expanded keywords=[${keywords.slice(0, 20).join(', ')}]`);
-
-  // 从数据库获取候选 chunks
-  // 优先使用长关键词（更精确），最多使用 10 个做 SQL 过滤
-  const sortedKeywords = [...keywords].sort((a, b) => b.length - a.length);
-  const sqlKeywords = sortedKeywords.slice(0, 10);
+  console.log(`[Search] sqlKeywords=[${sqlKeywords.join(', ')}]`);
+  console.log(`[Search] scoringKeywords=[${scoringKeywords.slice(0, 20).join(', ')}]`);
 
   const likeConditions = sqlKeywords.map(kw =>
     like(materialChunks.content, `%${kw}%`)
   );
+
+  // 也搜索章节标题（仅用 ≥4 字的关键词，避免"方法"等短词匹配无关章节）
+  const chapterConditions = rawKeywords
+    .filter(kw => kw.length >= 4)
+    .map(kw => like(materialChunks.chapter, `%${kw}%`));
 
   const baseWhere = and(
     eq(materials.status, 'published'),
@@ -368,7 +387,7 @@ export async function semanticSearch(
     materialIds && materialIds.length > 0
       ? inArray(materialChunks.materialId, materialIds)
       : undefined,
-    or(...likeConditions)
+    or(...likeConditions, ...chapterConditions)
   );
 
   const candidates = await db
@@ -389,37 +408,15 @@ export async function semanticSearch(
 
   if (candidates.length === 0) return [];
 
-  // 应用层精排：计算每个 chunk 的关键词匹配分数
+  // 应用层精排：用同义词扩展后的关键词评分（比 SQL 更精细的排序）
   const scored = candidates.map(chunk => ({
     ...chunk,
-    score: scoreChunk(chunk.content, keywords, question, chunk.chapter ?? undefined),
+    score: scoreChunk(chunk.content, scoringKeywords, question, chunk.chapter ?? undefined),
   }));
 
-  // 按分数降序排列，取 Top-K（带质量门槛）
+  // 按分数降序排列，取 Top-K
   scored.sort((a, b) => b.score - a.score);
-
-  // 最低分数门槛：过滤掉仅靠通用词匹配的噪声 chunk
-  const MIN_SCORE_THRESHOLD = 5;
-  const aboveThreshold = scored.filter(r => r.score >= MIN_SCORE_THRESHOLD);
-
-  // 分数断崖检测：如果相邻 chunk 分数骤降超过 60%，截断
-  let cutoffIdx = Math.min(aboveThreshold.length, topK);
-  if (aboveThreshold.length > 1) {
-    for (let i = 1; i < Math.min(aboveThreshold.length, topK); i++) {
-      if (aboveThreshold[i].score < aboveThreshold[0].score * 0.15) {
-        // 分数低于最高分的 15%，后面的都是噪声
-        cutoffIdx = i;
-        break;
-      }
-      if (i >= 3 && aboveThreshold[i].score < aboveThreshold[i - 1].score * 0.4) {
-        // 从第4个开始，如果比前一个骤降60%以上，截断
-        cutoffIdx = i;
-        break;
-      }
-    }
-  }
-
-  const topResults = aboveThreshold.slice(0, cutoffIdx);
+  const topResults = scored.slice(0, topK).filter(r => r.score > 0);
 
   for (const r of topResults.slice(0, 5)) {
     console.log(`[Search]   #${r.id} score=${r.score.toFixed(1)} "${r.content.substring(0, 60)}..."`);

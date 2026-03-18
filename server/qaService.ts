@@ -110,14 +110,13 @@ Textbooks:
 ${titleList}
 
 Requirements:
-1. **Strictly textbook-based**: Use ONLY information explicitly stated in the provided excerpts. Do NOT add outside knowledge, infer, extrapolate, or fill in details not explicitly present in the excerpts. If an excerpt only mentions a term in passing without elaboration, do not elaborate on it yourself.
-2. **Relevance check**: If the provided excerpts are NOT directly relevant to the question (they merely happen to contain a word from the question but are not actually discussing that topic), reply: "The provided textbook excerpts do not cover this topic." Do not force an answer from unrelated excerpts.
-3. **Comprehensive but faithful**: For excerpts that ARE relevant, synthesize them thoroughly. List every classification, method, or step mentioned with specific details from the textbook. But never add information not found in the excerpts.
-4. **Well-structured**: Use multi-level headings (##, ###) and bullet points. Organize by: Definition → Classification/Types → Methods/Steps → Principles → Applications.
-5. **Highlight key terms**: Use **bold** for key terms, important concepts, and critical conclusions. Precisely cite data, formulas, and ratios from the textbook.
-6. **Preserve textbook language**: Use original terminology from the textbooks. Every statement must be traceable to the provided excerpts. If multiple viewpoints exist, list all of them.
-7. **Format**: Output directly in Markdown. Start with a 1-2 sentence overview, then expand with full details. Do NOT wrap in JSON or code blocks.
-8. **No citation markers**: Do NOT include "[引用1]", "[citation]", or any reference markers in your answer. Just state the content directly.`;
+1. **Source**: Use only the provided excerpts. Do not add outside knowledge. If not covered, reply: "The provided textbook excerpts do not cover this topic."
+2. **Comprehensive**: Synthesize ALL provided excerpts thoroughly. Do not omit any relevant information. For classifications, methods, or steps mentioned in the textbooks, list every item with its specific details.
+3. **Well-structured**: Use multi-level headings (##, ###) and bullet points. Organize by: Definition → Classification/Types → Methods/Steps → Principles → Applications.
+4. **Highlight key terms**: Use **bold** for key terms, important concepts, and critical conclusions. Precisely cite data, formulas, and ratios from the textbook.
+5. **Preserve textbook language**: Use original terminology from the textbooks. If multiple viewpoints exist, list all of them.
+6. **Format**: Output directly in Markdown. Start with a 1-2 sentence overview, then expand with full details. Do NOT wrap in JSON or code blocks.
+7. **No citation markers**: Do NOT include "[引用1]", "[citation]", or any reference markers in your answer. Just state the content directly.`;
   }
 
   if (materialLang === "en") {
@@ -141,14 +140,13 @@ Requirements:
 ${titleList}
 
 回答要求：
-1. **严格基于教材原文**：只能基于提供的教材片段中**明确写出的内容**回答，绝对不得使用教材外知识，不得自行推理、延伸、补充或编造任何教材中没有明确陈述的内容。如果片段中只是顺带提到某个概念但没有详细展开，不要自行补充细节。
-2. **判断相关性**：如果提供的教材片段与学生问题**不直接相关**（片段只是偶然包含了问题中的某个词，但并非在讨论该主题），应回复"教材中未涉及此内容"。不要勉强从不相关的片段中拼凑答案。
-3. **全面但忠实**：对于确实相关的片段，综合其信息给出全面回答。对于教材中提到的分类、类型、方法、步骤等，完整列出每一项并给出教材中的具体说明。但绝不添加教材片段中没有的信息。
-4. **结构清晰**：使用多级标题组织内容（如"## 一、xxx"、"### （一）xxx"），善用列表和缩进体现层次关系。按照"定义与概述→分类/类型→具体方法/步骤→原则与注意事项→应用场景"等逻辑顺序组织。
-5. **突出重点**：使用 **加粗** 标记关键术语、重要概念和核心结论。对于教材中的数据、公式、比例等要精确引用。
-6. **保留教材表述**：必须使用教材中的原始术语和表述。可以适当组织结构，但每一句话的信息都必须能在提供的片段中找到出处。如果教材中有多个观点或说法，应完整列出。
-7. **格式规范**：直接输出 Markdown 格式，不要包裹在 JSON 或代码块中。开头先用1-2句话概括主题，再展开详细内容。
-8. **禁止引用标记**：回答中绝对不要出现"[引用1]"、"[引用2]"等引用编号标记，也不要出现"片段[引用N]"、"[citation]"等任何形式的引用标注。直接陈述内容即可。`;
+1. **知识来源**：只能基于提供的教材片段回答，不得使用教材外知识。如果教材未涉及该内容，明确回复"教材中未涉及此内容"。
+2. **全面完整**：综合所有提供的教材片段信息，给出尽可能全面、详尽的回答。不要遗漏任何片段中的相关内容。对于教材中提到的分类、类型、方法、步骤等，要完整列出每一项，并对每项给出教材中的具体说明。
+3. **结构清晰**：使用多级标题组织内容（如"## 一、xxx"、"### （一）xxx"），善用列表和缩进体现层次关系。按照"定义与概述→分类/类型→具体方法/步骤→原则与注意事项→应用场景"等逻辑顺序组织。
+4. **突出重点**：使用 **加粗** 标记关键术语、重要概念和核心结论。对于教材中的数据、公式、比例等要精确引用。
+5. **保留教材表述**：尽量使用教材中的原始术语和表述，可以适当组织和概括，但核心信息必须来自教材。如果教材中有多个观点或说法，应完整列出。
+6. **格式规范**：直接输出 Markdown 格式，不要包裹在 JSON 或代码块中。开头先用1-2句话概括主题，再展开详细内容。
+7. **禁止引用标记**：回答中绝对不要出现"[引用1]"、"[引用2]"等引用编号标记，也不要出现"片段[引用N]"、"[citation]"等任何形式的引用标注。直接陈述内容即可。`;
 }
 
 export function buildUserPrompt(
@@ -206,7 +204,7 @@ export async function generateAnswer(req: QARequest): Promise<QAResponse> {
       mainResult = await callLLM(req.question, enResults, "en", "en");
     } else {
       const [zhResults, enResults] = await Promise.all([
-        semanticSearch(req.question, undefined, 10, "zh", useRAG),
+        semanticSearch(req.question, undefined, 20, "zh", useRAG),
         semanticSearch(req.question, undefined, 5, "en", useRAG),
       ]);
 
@@ -457,7 +455,7 @@ export async function generateAnswerStream(
     if (questionLanguage === "en") {
       searchResults = await semanticSearch(req.question, undefined, 8, "en", useRAG);
     } else {
-      searchResults = await semanticSearch(req.question, undefined, 10, "zh", useRAG);
+      searchResults = await semanticSearch(req.question, undefined, 20, "zh", useRAG);
     }
 
     if (searchResults.length === 0) {
