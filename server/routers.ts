@@ -197,7 +197,8 @@ export const appRouter = router({
         const fs = await import("node:fs");
         const path = await import("node:path");
 
-        const uploadDir = process.env.UPLOAD_DIR || "./uploads";
+        const { ENV } = await import("./_core/env");
+        const uploadDir = ENV.uploadDir;
         const fileKey = `materials/${nanoid()}-${session.filename}`;
         const destPath = path.join(uploadDir, fileKey);
         const destDir = path.dirname(destPath);
@@ -311,8 +312,12 @@ export const appRouter = router({
         const published = allMaterials.filter(m => m.status === "published" || m.status === "error");
 
         let started = 0;
+        const failures: { title: string; reason: string }[] = [];
         for (const mat of published) {
-          if (!mat.fileKey) continue;
+          if (!mat.fileKey) {
+            failures.push({ title: mat.title, reason: "原始文件路径缺失" });
+            continue;
+          }
           try {
             const fileBuffer = await storageReadBuffer(mat.fileKey);
             await deleteChunksByMaterialId(mat.id);
@@ -324,12 +329,14 @@ export const appRouter = router({
             });
             started++;
           } catch (err) {
-            console.error(`[Router] 教材 ${mat.id} 文件读取失败:`, err);
+            const reason = err instanceof Error ? err.message : String(err);
+            console.error(`[Router] 教材 ${mat.id} (${mat.title}) 文件读取失败:`, err);
+            failures.push({ title: mat.title, reason });
           }
         }
 
         clearAnswerCache();
-        return { started, total: published.length };
+        return { started, total: published.length, failures };
       }),
   }),
 

@@ -8,6 +8,7 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { runMigrations } from "../db";
+import { ENV } from "./env";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -55,8 +56,8 @@ async function startServer() {
   // Auth routes (local login)
   registerOAuthRoutes(app);
 
-  // Serve uploaded files
-  const uploadDir = process.env.UPLOAD_DIR || "./uploads";
+  // Serve uploaded files — use ENV.uploadDir for consistency
+  const uploadDir = ENV.uploadDir;
   app.use("/uploads", express.static(uploadDir));
 
   // tRPC API
