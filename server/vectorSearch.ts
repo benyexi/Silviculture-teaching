@@ -63,6 +63,28 @@ type TermStats = {
 
 type DbConnection = NonNullable<Awaited<ReturnType<typeof getDb>>>;
 
+// ─── V2: 可配置的检索参数 ──────────────────────────────────────────────────
+// 通过环境变量或默认值配置，无需改代码即可调优
+const SEARCH_CONFIG = {
+  // BM25 参数
+  bm25K1: parseFloat(process.env.BM25_K1 || "1.2"),
+  bm25B: parseFloat(process.env.BM25_B || "0.75"),
+  // 多路召回权重
+  strictWeight: parseFloat(process.env.ROUTE_STRICT_WEIGHT || "5.8"),
+  phraseWeight: parseFloat(process.env.ROUTE_PHRASE_WEIGHT || "3.4"),
+  broadWeight: parseFloat(process.env.ROUTE_BROAD_WEIGHT || "1.5"),
+  // 多路召回上限
+  strictLimit: parseInt(process.env.ROUTE_STRICT_LIMIT || "100", 10),
+  phraseLimit: parseInt(process.env.ROUTE_PHRASE_LIMIT || "160", 10),
+  broadLimit: parseInt(process.env.ROUTE_BROAD_LIMIT || "260", 10),
+  // 邻接块加权系数
+  adjacencyBoost: parseFloat(process.env.ADJACENCY_BOOST || "0.82"),
+  // 最终融合权重
+  keywordFusionWeight: parseFloat(process.env.KEYWORD_FUSION_WEIGHT || "0.58"),
+  recallFusionWeight: parseFloat(process.env.RECALL_FUSION_WEIGHT || "0.27"),
+  adjacencyFusionWeight: parseFloat(process.env.ADJACENCY_FUSION_WEIGHT || "0.15"),
+} as const;
+
 // ─── 林业领域同义词扩展表 ───────────────────────────────────────────────────
 // 用于评分阶段（不用于SQL检索），帮助识别相关但措辞不同的chunk
 const SYNONYM_MAP: Record<string, string[]> = {
@@ -172,6 +194,54 @@ const SYNONYM_MAP: Record<string, string[]> = {
   // ── 种植点配置 ──
   '种植点配置': ['配置方式', '株行距', '正方形配置', '三角形配置', '长方形配置'],
   '株行距': ['种植间距', '行距', '株距', '种植点配置'],
+
+  // ── V2 补充：缺失的双向关联和常见术语 ──
+  '密度控制': ['密度调控', '造林密度', '密度管理', '合理密度'],
+  '密度调控': ['密度控制', '造林密度', '密度管理', '合理密度'],
+  '更新采伐': ['主伐', '采伐更新', '更新方式'],
+  '截干': ['修枝', '截头', '平茬', '截干更新'],
+  '郁闭': ['郁闭度', '林冠郁闭', '冠层覆盖'],
+  '平茬': ['截干', '萌芽更新', '平茬复壮'],
+  '萌芽更新': ['萌芽林', '萌生更新', '平茬', '根蘖更新'],
+  '根蘖更新': ['萌芽更新', '根蘖繁殖', '天然更新'],
+  '飞播造林': ['飞播', '直播造林', '播种造林', '航空造林'],
+
+  // ── 造林季节与时间 ──
+  '造林季节': ['造林时间', '造林时期', '栽植季节', '适宜造林期'],
+  '造林时间': ['造林季节', '造林时期', '栽植时间'],
+  '春季造林': ['造林季节', '春栽', '春植'],
+  '秋季造林': ['造林季节', '秋栽', '秋植'],
+  '雨季造林': ['造林季节', '雨季栽植'],
+
+  // ── 林地清理 ──
+  '林地清理': ['炼山', '清林', '割灌', '整地', '林地准备'],
+  '炼山': ['林地清理', '计划烧除', '火烧清理'],
+  '割灌': ['林地清理', '除灌', '灌木清理'],
+
+  // ── 种子处理 ──
+  '种子处理': ['种子消毒', '催芽', '浸种', '种子预处理'],
+  '浸种': ['浸种催芽', '种子浸泡', '种子处理'],
+  '层积催芽': ['沙藏催芽', '层积处理', '催芽'],
+
+  // ── 土壤与水 ──
+  '灌溉时间': ['灌溉时期', '灌水时间', '浇水时间', '灌溉季节'],
+  '灌水量': ['灌溉量', '灌溉定额', '灌水定额', '浇水量'],
+  '滴灌': ['灌溉方法', '节水灌溉', '微灌'],
+  '喷灌': ['灌溉方法', '喷洒灌溉'],
+  '漫灌': ['灌溉方法', '地面灌溉', '沟灌', '畦灌'],
+
+  // ── 森林生态 ──
+  '森林生态': ['森林生态系统', '林分生态', '森林环境'],
+  '生物多样性': ['物种多样性', '生物多样', '生态多样性'],
+  '水源涵养': ['水源涵养林', '涵养水源', '水源保护'],
+  '水土保持': ['水土流失', '保持水土', '水土保持林'],
+
+  // ── 林木生长 ──
+  '生长量': ['生长速率', '生长率', '年生长量', '林木生长'],
+  '生长规律': ['生长特点', '生长过程', '生长节律'],
+  '材积': ['蓄积量', '木材材积', '立木材积'],
+  '出材量': ['材积', '木材产量', '出材率'],
+  '出材率': ['出材量', '利用率', '材积利用率'],
 };
 
 const QUESTION_INTENT_WORDS = [
@@ -591,8 +661,8 @@ function scoreChunk(
 
   const avgLength = stats?.avgLength || Math.max(1, compactContent.length);
   const docCount = stats?.docCount || 1;
-  const k1 = 1.3;
-  const b = 0.72;
+  const k1 = SEARCH_CONFIG.bm25K1;
+  const b = SEARCH_CONFIG.bm25B;
 
   let bm25Score = 0;
   let matchedCore = 0;
@@ -903,7 +973,10 @@ async function fetchNeighborCandidates(
     indices.add(seed.chunkIndex + 1);
   }
 
-  const rows: CandidateRow[] = [];
+  // V2: 合并所有邻接块查询为并行批次，减少串行 SQL 延迟
+  const baseFilters = buildBaseFilters(materialIds, languageFilter);
+  const queryPromises: Promise<CandidateRow[]>[] = [];
+
   for (const [materialId, indices] of Array.from(needed.entries())) {
     const filtered: number[] = [];
     indices.forEach((index) => {
@@ -911,36 +984,37 @@ async function fetchNeighborCandidates(
     });
     if (filtered.length === 0) continue;
 
-    const baseFilters = buildBaseFilters(materialIds, languageFilter);
-    const neighborRows = await db
-      .select({
-        id: materialChunks.id,
-        materialId: materialChunks.materialId,
-        chunkIndex: materialChunks.chunkIndex,
-        content: materialChunks.content,
-        chapter: materialChunks.chapter,
-        pageStart: materialChunks.pageStart,
-        pageEnd: materialChunks.pageEnd,
-      })
-      .from(materialChunks)
-      .innerJoin(materials, eq(materialChunks.materialId, materials.id))
-      .where(and(...baseFilters, eq(materialChunks.materialId, materialId), inArray(materialChunks.chunkIndex, filtered)))
-      .limit(filtered.length + 2);
-
-    rows.push(
-      ...neighborRows.map((row) => ({
-        id: row.id,
-        materialId: row.materialId,
-        chunkIndex: row.chunkIndex,
-        content: row.content,
-        chapter: row.chapter,
-        pageStart: row.pageStart,
-        pageEnd: row.pageEnd,
-      }))
+    queryPromises.push(
+      db
+        .select({
+          id: materialChunks.id,
+          materialId: materialChunks.materialId,
+          chunkIndex: materialChunks.chunkIndex,
+          content: materialChunks.content,
+          chapter: materialChunks.chapter,
+          pageStart: materialChunks.pageStart,
+          pageEnd: materialChunks.pageEnd,
+        })
+        .from(materialChunks)
+        .innerJoin(materials, eq(materialChunks.materialId, materials.id))
+        .where(and(...baseFilters, eq(materialChunks.materialId, materialId), inArray(materialChunks.chunkIndex, filtered)))
+        .limit(filtered.length + 2)
+        .then((neighborRows) =>
+          neighborRows.map((row) => ({
+            id: row.id,
+            materialId: row.materialId,
+            chunkIndex: row.chunkIndex,
+            content: row.content,
+            chapter: row.chapter,
+            pageStart: row.pageStart,
+            pageEnd: row.pageEnd,
+          }))
+        )
     );
   }
 
-  return rows;
+  const results = await Promise.all(queryPromises);
+  return results.flat();
 }
 
 // ─── 混合检索 Top-K（纯关键词多路召回）──────────────────────────────────────
@@ -968,20 +1042,20 @@ export async function semanticSearch(
     {
       route: "strict",
       terms: strictTerms.length > 0 ? strictTerms : phraseTerms.slice(0, 3),
-      limit: 120,
-      weight: 6.2,
+      limit: SEARCH_CONFIG.strictLimit,
+      weight: SEARCH_CONFIG.strictWeight,
     },
     {
       route: "phrase",
       terms: phraseTerms.length > 0 ? phraseTerms : broadTerms.slice(0, 6),
-      limit: 180,
-      weight: 3.6,
+      limit: SEARCH_CONFIG.phraseLimit,
+      weight: SEARCH_CONFIG.phraseWeight,
     },
     {
       route: "broad",
       terms: broadTerms,
-      limit: 300,
-      weight: 1.6,
+      limit: SEARCH_CONFIG.broadLimit,
+      weight: SEARCH_CONFIG.broadWeight,
     },
   ];
 
@@ -990,18 +1064,16 @@ export async function semanticSearch(
 
   const candidateMap = new Map<number, CandidateState>();
 
-  for (const route of routePlan) {
-    if (route.terms.length === 0) continue;
-
-    const routeRows = await fetchRouteCandidates(
-      db,
-      route.route,
-      route.terms,
-      materialIds,
-      languageFilter,
-      route.limit
+  // V2: 并行执行三路召回，减少串行 SQL 延迟
+  const routePromises = routePlan
+    .filter((route) => route.terms.length > 0)
+    .map((route) =>
+      fetchRouteCandidates(db, route.route, route.terms, materialIds, languageFilter, route.limit)
+        .then((rows) => ({ route, rows }))
     );
+  const routeResults = await Promise.all(routePromises);
 
+  for (const { route, rows: routeRows } of routeResults) {
     const rankedRows = routeRows
       .map((row) => ({
         row,
@@ -1047,7 +1119,7 @@ export async function semanticSearch(
 
     for (const seed of seedCandidates) {
       if (seed.materialId === row.materialId && Math.abs(seed.chunkIndex - row.chunkIndex) === 1) {
-        adjacencyBoost = Math.max(adjacencyBoost, seed.finalScore * 0.78);
+        adjacencyBoost = Math.max(adjacencyBoost, seed.finalScore * SEARCH_CONFIG.adjacencyBoost);
       }
     }
 
@@ -1072,7 +1144,7 @@ export async function semanticSearch(
     const normKeyword = candidate.keywordScore / maxKeyword;
     const normRecall = candidate.recallScore / maxRecall;
     const normAdjacency = candidate.adjacencyScore / maxAdjacency;
-    candidate.finalScore = normKeyword * 0.58 + normRecall * 0.27 + normAdjacency * 0.15;
+    candidate.finalScore = normKeyword * SEARCH_CONFIG.keywordFusionWeight + normRecall * SEARCH_CONFIG.recallFusionWeight + normAdjacency * SEARCH_CONFIG.adjacencyFusionWeight;
   }
 
   candidates.sort((a, b) => b.finalScore - a.finalScore);

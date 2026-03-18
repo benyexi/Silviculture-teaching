@@ -94,7 +94,7 @@ type CallLLMResult = {
   confidence: number;
 };
 
-type QuestionIntent = "definition" | "classification" | "method" | "comparison" | "other";
+type QuestionIntent = "definition" | "classification" | "method" | "comparison" | "condition" | "advantage" | "other";
 
 type QuestionAnalysis = {
   intent: QuestionIntent;
@@ -152,6 +152,24 @@ function detectQuestionIntent(question: string, questionLang: "zh" | "en"): Ques
     intents.push("definition");
   }
 
+  // V2: 新增"条件/要求"意图
+  if (
+    questionLang === "zh"
+      ? /(条件|要求|前提|必须|需要满足|需要具备|要满足|应具备)/.test(q)
+      : /(conditions?|requirements?|prerequisites?|must|criteria)/.test(q)
+  ) {
+    intents.push("condition");
+  }
+
+  // V2: 新增"优缺点"意图
+  if (
+    questionLang === "zh"
+      ? /(优缺点|优点|缺点|利弊|好处|坏处|优势|劣势|长处|短处)/.test(q)
+      : /(advantages?|disadvantages?|pros?\b|cons?\b|benefits?|drawbacks?|strengths?|weaknesses?)/.test(q)
+  ) {
+    intents.push("advantage");
+  }
+
   if (intents.length === 0) intents.push("other");
 
   const requestDetail =
@@ -173,7 +191,7 @@ function detectQuestionIntent(question: string, questionLang: "zh" | "en"): Ques
   return {
     intent,
     intents,
-    expectsEnumeration: intents.includes("classification") || intents.includes("method"),
+    expectsEnumeration: intents.includes("classification") || intents.includes("method") || intents.includes("condition") || intents.includes("advantage"),
     expectsComparisonTable: intents.includes("comparison"),
     expectsFullCoverage: intents.some((intent) => intent !== "definition" && intent !== "other"),
     requestDetail,
@@ -190,6 +208,8 @@ function describeIntent(intent: QuestionIntent, lang: "zh" | "en"): string {
     classification: "分类题",
     method: "方法/步骤题",
     comparison: "比较题",
+    condition: "条件/要求题",
+    advantage: "优缺点题",
     other: "一般问答",
   };
   const enMap: Record<QuestionIntent, string> = {
@@ -197,6 +217,8 @@ function describeIntent(intent: QuestionIntent, lang: "zh" | "en"): string {
     classification: "classification question",
     method: "method/step question",
     comparison: "comparison question",
+    condition: "condition/requirement question",
+    advantage: "advantage/disadvantage question",
     other: "general question",
   };
   return lang === "en" ? enMap[intent] : zhMap[intent];
@@ -211,6 +233,10 @@ function buildAnswerBlueprint(analysis: QuestionAnalysis, questionLang: "zh" | "
         return `1. Short overview\n2. Complete list of methods/steps mentioned in the excerpts\n3. Details for each method/step\n4. Notes and constraints`;
       case "comparison":
         return `1. Objects being compared\n2. Side-by-side comparison table\n3. Key differences and conclusion`;
+      case "condition":
+        return `1. Short overview of the topic\n2. Complete list of conditions/requirements from the excerpts\n3. Brief explanation of each\n4. Completeness note`;
+      case "advantage":
+        return `1. Short overview\n2. Advantages listed from the excerpts\n3. Disadvantages listed from the excerpts\n4. Summary or recommendation if present`;
       case "definition":
         return analysis.conciseDefinition
           ? `1. One direct definition sentence\n2. 1-2 supporting sentences from excerpts\n3. Stop; no background expansion`
@@ -230,6 +256,10 @@ function buildAnswerBlueprint(analysis: QuestionAnalysis, questionLang: "zh" | "
       return `1. 一句话概述\n2. 完整列出教材明确出现的方法/步骤\n3. 逐项说明每一项的条件、要点或作用\n4. 说明是否存在教材未覆盖的部分`;
     case "comparison":
       return `1. 说明比较对象\n2. 用对比表或分点对比列出差异\n3. 给出结论`;
+    case "condition":
+      return `1. 简要概述主题\n2. 完整列出教材中明确出现的条件/要求\n3. 逐项简要说明\n4. 说明是否存在教材未覆盖的部分`;
+    case "advantage":
+      return `1. 简要概述\n2. 列出教材中明确出现的优点/优势\n3. 列出教材中明确出现的缺点/劣势\n4. 总结或建议（如教材有提及）`;
     case "definition":
       return analysis.conciseDefinition
         ? `1. 先给出一句最直接定义\n2. 再补1-2句教材内关键说明\n3. 到此结束，不延伸历史、分类、目的等`
@@ -802,37 +832,24 @@ async function callLLM(
   }
 
   const localReview = assessAnswerLocally(answer, effectiveResults, analysis, questionLang);
-  let review = localReview;
 
-  if (!analysis.conciseAnswer && !localReview.complete) {
+  // V2: 合并审校+重写为一次 LLM 调用（原来 review + revision = 2 次，现在最多 1 次）
+  // 跳过条件：简洁回答模式、本地审校已通过、或答案已足够充实（>200字且有结构化条目）
+  const compactLen = answer.replace(/\s+/g, "").length;
+  const structuredItems = countStructuredItems(answer);
+  const skipLLMReview = analysis.conciseAnswer || localReview.complete ||
+    (compactLen > 200 && structuredItems >= 3);
+
+  if (!skipLLMReview && localReview.shouldRetry) {
     try {
-      const reviewResponse = await invokeLLMWithConfig(
-        [{ role: "user", content: buildAnswerReviewPrompt(question, answer, effectiveResults, questionLang, analysis) }],
-        questionLang === "en"
-          ? "You are a strict answer reviewer. Return JSON only."
-          : "你是严格的答案审校器，只返回 JSON。", 
-        { responseFormat: "json_object", temperature: 0 }
-      );
-
-      const parsedReview = parseAnswerReview(reviewResponse.content);
-      if (parsedReview) {
-        review = parsedReview;
-      }
-    } catch {
-      // JSON 审校失败时回退到本地规则
-    }
-  }
-
-  if (!analysis.conciseAnswer && review.shouldRetry) {
-    try {
-      const revisionResponse = await invokeLLMWithConfig(
-        [{ role: "user", content: buildRevisionPrompt(question, answer, effectiveResults, questionLang, analysis, review.issues) }],
+      const reviewAndFixResponse = await invokeLLMWithConfig(
+        [{ role: "user", content: buildReviewAndFixPrompt(question, answer, effectiveResults, questionLang, analysis, localReview.issues) }],
         buildSystemPrompt(materialTitles, questionLang, materialLang, analysis)
       );
-      const revisionParsed = parseLLMOutput(revisionResponse.content);
-      answer = stripCitationMarkers(revisionParsed ? revisionParsed.answer : revisionResponse.content);
+      const fixedParsed = parseLLMOutput(reviewAndFixResponse.content);
+      answer = stripCitationMarkers(fixedParsed ? fixedParsed.answer : reviewAndFixResponse.content);
     } catch {
-      // 重写失败时保留原答案
+      // 审校修正失败时保留原答案
     }
   }
 
@@ -865,7 +882,7 @@ async function callLLM(
 
   const sources = buildSources(effectiveResults, foundInMaterials, keywords, sourceLimit);
 
-  const confidence = finalReview.complete ? 0.82 : review.shouldRetry ? 0.58 : 0.68;
+  const confidence = finalReview.complete ? 0.82 : localReview.shouldRetry ? 0.58 : 0.68;
 
   return {
     answer,
@@ -1106,6 +1123,72 @@ ${sourceTexts}
 - downgradeNote 用一句话说明教材片段覆盖范围有限时应如何表述。`;
 }
 
+/** V2: 合并审校+修正为一次 LLM 调用 */
+function buildReviewAndFixPrompt(
+  question: string,
+  answer: string,
+  searchResults: SearchResult[],
+  questionLang: "zh" | "en",
+  analysis: QuestionAnalysis,
+  localIssues: string[]
+): string {
+  const sourceTexts = searchResults
+    .map((r, idx) => {
+      const location = [
+        `《${r.materialTitle}》`,
+        r.chapter ? r.chapter : null,
+        r.pageStart ? `第${r.pageStart}页${r.pageEnd && r.pageEnd !== r.pageStart ? `~${r.pageEnd}页` : ""}` : null,
+      ]
+        .filter(Boolean)
+        .join(" · ");
+
+      return `【片段${idx + 1}】${location}\n${r.content}`;
+    })
+    .join("\n\n---\n\n");
+
+  if (questionLang === "en") {
+    return `Review the answer below and output a corrected, complete version directly.
+Question intent: ${describeIntent(analysis.intent, "en")}
+Question: ${question}
+
+Issues found:
+- ${localIssues.join("\n- ")}
+
+Current answer:
+${answer}
+
+Textbook excerpts:
+${sourceTexts}
+
+Instructions:
+1. Check if the answer covers all items explicitly mentioned in the excerpts.
+2. If incomplete, output the full corrected answer in Markdown.
+3. If already complete, output the answer unchanged.
+4. Do not mention the review process. Do not wrap in JSON.
+5. For classification/method/step/comparison questions, enumerate every item from the excerpts.`;
+  }
+
+  return `请审校下方答案，并直接输出修正后的完整版本。
+问题意图：${describeIntent(analysis.intent, "zh")}
+学生问题：${question}
+
+发现的问题：
+- ${localIssues.join("\n- ")}
+
+当前答案：
+${answer}
+
+教材片段：
+${sourceTexts}
+
+要求：
+1. 检查答案是否完整覆盖了教材片段中明确出现的项目。
+2. 如有遗漏，直接输出修正后的完整 Markdown 答案。
+3. 如果已经完整，原样输出。
+4. 不要提及审校过程。不要用 JSON 包裹。
+5. 分类/方法/步骤/比较题必须把教材中明确出现的项目全部列出。`;
+}
+
 function buildRevisionPrompt(
   question: string,
   answer: string,
@@ -1251,7 +1334,7 @@ function assessGrounding(
     if (sourceText.includes(kw.toLowerCase())) hit++;
   }
   const score = hit / keywords.length;
-  return { grounded: score >= 0.55, score };
+  return { grounded: score >= 0.62, score };
 }
 
 function buildGroundedRewritePrompt(
