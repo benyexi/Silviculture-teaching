@@ -255,9 +255,9 @@ async function extractDocText(
 //   1. 按段落/句子自然边界切割，不在句子中间断开
 //   2. 加 overlap（前后重叠），保证上下文连贯
 //   3. 每个 chunk 前缀加上所属章节标题，提升检索命中率
-const MAX_CHUNK_SIZE = 600;
+const MAX_CHUNK_SIZE = 1000;
 const MIN_CHUNK_SIZE = 80;
-const OVERLAP_SIZE = 120;
+const OVERLAP_SIZE = 200;
 
 /** 在自然断句处切割文本，返回不超过 maxLen 的文本 */
 function splitAtNaturalBoundary(text: string, maxLen: number): number {

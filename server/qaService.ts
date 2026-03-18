@@ -204,7 +204,7 @@ export async function generateAnswer(req: QARequest): Promise<QAResponse> {
       mainResult = await callLLM(req.question, enResults, "en", "en");
     } else {
       const [zhResults, enResults] = await Promise.all([
-        semanticSearch(req.question, undefined, 12, "zh", useRAG),
+        semanticSearch(req.question, undefined, 20, "zh", useRAG),
         semanticSearch(req.question, undefined, 5, "en", useRAG),
       ]);
 
@@ -454,7 +454,7 @@ export async function generateAnswerStream(
     if (questionLanguage === "en") {
       searchResults = await semanticSearch(req.question, undefined, 8, "en", useRAG);
     } else {
-      searchResults = await semanticSearch(req.question, undefined, 12, "zh", useRAG);
+      searchResults = await semanticSearch(req.question, undefined, 20, "zh", useRAG);
     }
 
     if (searchResults.length === 0) {
