@@ -31,7 +31,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { Plus, Trash2, CheckCircle, Settings, Zap, Loader2 } from "lucide-react";
+import { Plus, Trash2, CheckCircle, Settings, Zap, Loader2, Pencil } from "lucide-react";
 import { LLM_PROVIDER_LABELS, LLM_PROVIDER_DEFAULT_MODELS, type LlmProvider } from "@/types";
 
 const PROVIDERS: LlmProvider[] = ["openai", "deepseek", "qwen", "ollama", "custom"];
@@ -40,6 +40,16 @@ export default function TeacherLlmConfig() {
   const utils = trpc.useUtils();
   const { data: configs, isLoading } = trpc.llmConfig.list.useQuery();
   const [addOpen, setAddOpen] = useState(false);
+  const [editConfig, setEditConfig] = useState<{
+    id: number;
+    name: string;
+    modelName: string;
+    apiBaseUrl?: string | null;
+    temperature?: number | null;
+    maxTokens?: number | null;
+    embeddingModel?: string | null;
+    embeddingBaseUrl?: string | null;
+  } | null>(null);
 
   const setActiveMutation = trpc.llmConfig.setActive.useMutation({
     onSuccess: () => {
@@ -160,6 +170,23 @@ export default function TeacherLlmConfig() {
                         )}
                       </Button>
                     )}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-muted-foreground hover:text-primary"
+                      onClick={() => setEditConfig({
+                        id: config.id,
+                        name: config.name,
+                        modelName: config.modelName,
+                        apiBaseUrl: config.apiBaseUrl,
+                        temperature: config.temperature,
+                        maxTokens: config.maxTokens,
+                        embeddingModel: config.embeddingModel,
+                        embeddingBaseUrl: config.embeddingBaseUrl,
+                      })}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive">
@@ -191,6 +218,141 @@ export default function TeacherLlmConfig() {
           ))}
         </div>
       )}
+
+      {/* 编辑配置弹窗 */}
+      <Dialog open={!!editConfig} onOpenChange={(open) => { if (!open) setEditConfig(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>编辑模型配置</DialogTitle>
+          </DialogHeader>
+          {editConfig && (
+            <EditConfigForm
+              config={editConfig}
+              onSuccess={() => {
+                setEditConfig(null);
+                utils.llmConfig.list.invalidate();
+                utils.llmConfig.getActive.invalidate();
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// ─── 编辑配置表单 ─────────────────────────────────────────────────────────────
+function EditConfigForm({
+  config,
+  onSuccess,
+}: {
+  config: {
+    id: number;
+    name: string;
+    modelName: string;
+    apiBaseUrl?: string | null;
+    temperature?: number | null;
+    maxTokens?: number | null;
+    embeddingModel?: string | null;
+    embeddingBaseUrl?: string | null;
+  };
+  onSuccess: () => void;
+}) {
+  const [name, setName] = useState(config.name);
+  const [modelName, setModelName] = useState(config.modelName);
+  const [apiKey, setApiKey] = useState("");
+  const [apiBaseUrl, setApiBaseUrl] = useState(config.apiBaseUrl || "");
+  const [temperature, setTemperature] = useState(String(config.temperature ?? 0.1));
+  const [maxTokens, setMaxTokens] = useState(String(config.maxTokens ?? 4096));
+  const [embeddingModel, setEmbeddingModel] = useState(config.embeddingModel || "");
+  const [embeddingApiKey, setEmbeddingApiKey] = useState("");
+  const [embeddingBaseUrl, setEmbeddingBaseUrl] = useState(config.embeddingBaseUrl || "");
+
+  const updateMutation = trpc.llmConfig.update.useMutation({
+    onSuccess: () => { toast.success("配置已更新"); onSuccess(); },
+    onError: (e) => toast.error(`更新失败: ${e.message}`),
+  });
+
+  const handleSubmit = () => {
+    const data: Record<string, unknown> = { id: config.id };
+    if (name !== config.name) data.name = name;
+    if (modelName !== config.modelName) data.modelName = modelName;
+    if (apiKey) data.apiKey = apiKey; // 只在填写了新 key 时更新
+    if (apiBaseUrl !== (config.apiBaseUrl || "")) data.apiBaseUrl = apiBaseUrl || undefined;
+    if (parseFloat(temperature) !== (config.temperature ?? 0.1)) data.temperature = parseFloat(temperature);
+    if (parseInt(maxTokens) !== (config.maxTokens ?? 4096)) data.maxTokens = parseInt(maxTokens);
+    if (embeddingModel !== (config.embeddingModel || "")) data.embeddingModel = embeddingModel || undefined;
+    if (embeddingApiKey) data.embeddingApiKey = embeddingApiKey;
+    if (embeddingBaseUrl !== (config.embeddingBaseUrl || "")) data.embeddingBaseUrl = embeddingBaseUrl || undefined;
+
+    if (Object.keys(data).length <= 1) {
+      toast.info("没有需要更新的内容");
+      return;
+    }
+
+    updateMutation.mutate(data as Parameters<typeof updateMutation.mutate>[0]);
+  };
+
+  return (
+    <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+      <div className="grid grid-cols-2 gap-3">
+        <div className="col-span-2">
+          <Label>配置名称</Label>
+          <Input value={name} onChange={(e) => setName(e.target.value)} className="mt-1" />
+        </div>
+        <div className="col-span-2">
+          <Label>模型名称</Label>
+          <Input value={modelName} onChange={(e) => setModelName(e.target.value)} className="mt-1" />
+        </div>
+        <div className="col-span-2">
+          <Label>API Key（留空则不修改）</Label>
+          <Input
+            type="password"
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            placeholder="输入新的 API Key 以替换旧的"
+            className="mt-1"
+          />
+        </div>
+        <div className="col-span-2">
+          <Label>API Base URL</Label>
+          <Input value={apiBaseUrl} onChange={(e) => setApiBaseUrl(e.target.value)} className="mt-1" />
+        </div>
+        <div>
+          <Label>Temperature（0-2）</Label>
+          <Input type="number" min="0" max="2" step="0.1" value={temperature} onChange={(e) => setTemperature(e.target.value)} className="mt-1" />
+        </div>
+        <div>
+          <Label>Max Tokens</Label>
+          <Input type="number" min="100" max="32000" value={maxTokens} onChange={(e) => setMaxTokens(e.target.value)} className="mt-1" />
+        </div>
+      </div>
+
+      <div className="border-t border-border pt-4">
+        <p className="text-sm font-medium text-foreground mb-3">Embedding 配置</p>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label>Embedding 模型</Label>
+            <Input value={embeddingModel} onChange={(e) => setEmbeddingModel(e.target.value)} className="mt-1" />
+          </div>
+          <div>
+            <Label>Embedding API Key（留空则不修改）</Label>
+            <Input type="password" value={embeddingApiKey} onChange={(e) => setEmbeddingApiKey(e.target.value)} className="mt-1" />
+          </div>
+          <div className="col-span-2">
+            <Label>Embedding Base URL</Label>
+            <Input value={embeddingBaseUrl} onChange={(e) => setEmbeddingBaseUrl(e.target.value)} className="mt-1" />
+          </div>
+        </div>
+      </div>
+
+      <Button onClick={handleSubmit} disabled={updateMutation.isPending} className="w-full">
+        {updateMutation.isPending ? (
+          <><Loader2 className="h-4 w-4 mr-2 animate-spin" />保存中...</>
+        ) : (
+          "保存修改"
+        )}
+      </Button>
     </div>
   );
 }
