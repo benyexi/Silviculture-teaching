@@ -33,6 +33,7 @@ import {
   clearAllEmbeddings,
 } from "./db";
 import { generateAnswer, clearAnswerCache } from "./qaService";
+import { testLLMConnection } from "./llmDriver";
 import { processMaterial } from "./pdfProcessor";
 import { invalidateMaterialCache } from "./vectorSearch";
 import { getGeoInfo, extractIp } from "./geoip";
@@ -389,6 +390,8 @@ export const appRouter = router({
         const shouldActivate = !active;
         const id = await createLlmConfig({
           ...input,
+          apiKey: input.apiKey?.trim(),
+          embeddingApiKey: input.embeddingApiKey?.trim(),
           isActive: shouldActivate,
           isDefault: false,
         });
@@ -412,6 +415,8 @@ export const appRouter = router({
       )
       .mutation(async ({ input }) => {
         const { id, ...data } = input;
+        if (data.apiKey) data.apiKey = data.apiKey.trim();
+        if (data.embeddingApiKey) data.embeddingApiKey = data.embeddingApiKey.trim();
         await updateLlmConfig(id, data);
         clearAnswerCache(); // 配置变更后清空答案缓存
         return { success: true };
@@ -430,6 +435,23 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         await deleteLlmConfig(input.id);
         return { success: true };
+      }),
+
+    /** 测试 LLM 连接是否正常 */
+    testConnection: adminProcedure
+      .input(z.object({
+        provider: z.string(),
+        modelName: z.string(),
+        apiKey: z.string().optional(),
+        apiBaseUrl: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        return testLLMConnection({
+          provider: input.provider,
+          modelName: input.modelName,
+          apiKey: input.apiKey?.trim(),
+          apiBaseUrl: input.apiBaseUrl?.trim() || null,
+        });
       }),
   }),
 

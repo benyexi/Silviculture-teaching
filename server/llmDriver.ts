@@ -127,6 +127,44 @@ export async function getEmbedding(text: string): Promise<number[]> {
   );
 }
 
+// ─── 测试连接 ─────────────────────────────────────────────────────────────────
+export async function testLLMConnection(config: {
+  provider: string;
+  modelName: string;
+  apiKey?: string | null;
+  apiBaseUrl?: string | null;
+}): Promise<{ success: boolean; message: string; latencyMs?: number }> {
+  const baseURL = getProviderBaseUrl(config.provider, config.apiBaseUrl);
+  const apiKey = config.apiKey?.trim() || "ollama";
+  const client = buildOpenAIClient(apiKey, baseURL);
+
+  const start = Date.now();
+  try {
+    const response = await client.chat.completions.create({
+      model: config.modelName,
+      messages: [{ role: "user", content: "Hi" }],
+      max_tokens: 5,
+    });
+    const latencyMs = Date.now() - start;
+    const content = response.choices[0]?.message?.content || "";
+    return { success: true, message: `连接成功！模型响应: "${content}" (${latencyMs}ms)`, latencyMs };
+  } catch (err: any) {
+    const latencyMs = Date.now() - start;
+    const msg = err?.message || String(err);
+    // 提取关键错误信息
+    if (msg.includes("401") || msg.includes("Authentication") || msg.includes("invalid")) {
+      return { success: false, message: `API Key 无效。请检查 Key 是否正确、是否已过期、账户是否有余额。\n原始错误: ${msg}` };
+    }
+    if (msg.includes("404")) {
+      return { success: false, message: `模型 "${config.modelName}" 不存在或 Base URL 不正确。\n原始错误: ${msg}` };
+    }
+    if (msg.includes("ECONNREFUSED") || msg.includes("ENOTFOUND")) {
+      return { success: false, message: `无法连接到 API 服务器。请检查 Base URL 是否正确。\n原始错误: ${msg}` };
+    }
+    return { success: false, message: `连接失败: ${msg}` };
+  }
+}
+
 // ─── 余弦相似度计算 ───────────────────────────────────────────────────────────
 export function cosineSimilarity(a: number[], b: number[]): number {
   if (a.length !== b.length) return 0;
