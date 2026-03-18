@@ -6,7 +6,7 @@ export function detectLanguage(text: string): "zh" | "en" {
   const chineseChars = (text.match(/[\u4e00-\u9fff]/g) || []).length;
   const totalChars = text.replace(/\s/g, "").length;
   if (totalChars === 0) return "zh";
-  return chineseChars / totalChars > 0.15 ? "zh" : "en";
+  return chineseChars / totalChars > 0.3 ? "zh" : "en";
 }
 
 /**

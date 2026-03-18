@@ -8,6 +8,7 @@ import { eq } from "drizzle-orm";
 import { storeChunkVector } from "./vectorSearch";
 import { detectDocumentLanguage } from "./languageDetect";
 import mammoth from "mammoth";
+import WordExtractor from "word-extractor";
 
 // ─── 文本块类型 ───────────────────────────────────────────────────────────────
 type TextChunk = {
@@ -22,9 +23,10 @@ const HEADING_PATTERN =
   /^(第[一二三四五六七八九十百\d]+[章节]|[\d]+\.[\d]+[\s\S]{0,30}|[一二三四五六七八九十]+[、．])/;
 
 // ─── 支持的文件类型 ──────────────────────────────────────────────────────────
-function getFileType(filename: string): "pdf" | "docx" {
+function getFileType(filename: string): "pdf" | "docx" | "doc" {
   const ext = filename.toLowerCase().split(".").pop();
-  if (ext === "docx" || ext === "doc") return "docx";
+  if (ext === "doc") return "doc";
+  if (ext === "docx") return "docx";
   return "pdf";
 }
 
@@ -48,9 +50,11 @@ export async function processMaterial(
     // 1. 提取文档文本
     console.log(`[Doc] 开始提取教材 ${materialId} 的文本 (${fileType})...`);
     const { text, pageTexts } =
-      fileType === "docx"
-        ? await extractDocxText(fileBuffer)
-        : await extractPdfText(fileBuffer);
+      fileType === "doc"
+        ? await extractDocText(fileBuffer)
+        : fileType === "docx"
+          ? await extractDocxText(fileBuffer)
+          : await extractPdfText(fileBuffer);
     const detectedLanguage = detectDocumentLanguage(text);
     console.log(`[Doc] 检测到教材语言: ${detectedLanguage}`);
 
@@ -178,6 +182,41 @@ async function extractDocxText(
   }
 
   // 如果没有检测到章节划分，将整个文本作为一个 section
+  if (sections.length === 0 && text.trim()) {
+    sections.push(text.trim());
+  }
+
+  return { text, pageTexts: sections };
+}
+
+// ─── Word (.doc) 文本提取（旧版二进制格式）─────────────────────────────────
+async function extractDocText(
+  docBuffer: Buffer
+): Promise<{ text: string; pageTexts: string[] }> {
+  const extractor = new WordExtractor();
+  const doc = await extractor.extract(docBuffer);
+  const text = doc.getBody();
+
+  // 与 docx 一样，按章节标题分组模拟 "页面"
+  const lines = text.split("\n");
+  const sections: string[] = [];
+  let currentSection = "";
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    if (HEADING_PATTERN.test(trimmed) && currentSection.trim().length > 100) {
+      sections.push(currentSection.trim());
+      currentSection = trimmed + "\n";
+    } else {
+      currentSection += trimmed + "\n";
+    }
+  }
+  if (currentSection.trim()) {
+    sections.push(currentSection.trim());
+  }
+
   if (sections.length === 0 && text.trim()) {
     sections.push(text.trim());
   }
