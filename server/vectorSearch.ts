@@ -330,13 +330,14 @@ function scoreChunk(content: string, keywords: string[], originalQuestion: strin
   return (score * (0.3 + 0.7 * coreCoverage)) + phraseBonus;
 }
 
-// ─── 混合检索 Top-K（关键词 + 向量语义） ──────────────────────────────────────
+// ─── 关键词检索 Top-K ─────────────────────────────────────────────────────────
+// 回退到纯关键词检索：稳定可靠，不依赖 Embedding API
 export async function semanticSearch(
   question: string,
   materialIds?: number[],
   topK: number = 8,
   languageFilter: "zh" | "en" | "all" = "all",
-  useEmbedding: boolean = true
+  _useEmbedding: boolean = true  // 保留参数兼容性，但不再使用向量检索
 ): Promise<SearchResult[]> {
   const db = await getDb();
   if (!db) throw new Error("数据库不可用");
@@ -344,197 +345,67 @@ export async function semanticSearch(
   const questionLang = detectLanguage(question);
   const rawKeywords =
     questionLang === "en" ? extractKeywordsEn(question) : extractKeywords(question);
+  if (rawKeywords.length === 0) return [];
 
-  // 将原始问题的完整核心短语加入关键词（去掉标点、提问词和停用词）
-  const cleanedQ = question
-    .replace(/[，。？！、；：""''（）【】《》？!?,;:"'()\[\]\s]+/g, "")
-    .replace(/什么是|如何|怎么|怎样|为什么|哪些|请问|介绍|说明|解释|试述|分析|比较|请说明|请介绍|阐述|论述/g, "")
-    .replace(/[的了在是我有和就不人都一吗呢吧啊着过]/g, ""); // 去掉所有单字停用词
-  if (cleanedQ.length >= 2 && cleanedQ.length <= 10 && !rawKeywords.includes(cleanedQ)) {
-    rawKeywords.unshift(cleanedQ);
-  }
-
-  // 同义词扩展：仅用于评分/排序，不用于 SQL 检索
-  const scoringKeywords = questionLang === "en" ? rawKeywords : expandWithSynonyms(rawKeywords);
-
-  // SQL 检索使用原始关键词（广撒网），确保基础词不被挤掉
-  // 同时加入少量同义词中最重要的（长度>=4 的精确词）
-  const sqlKeywordsSet = new Set(rawKeywords);
-  // 从同义词中挑选 ≥4字的加入 SQL（作为额外召回）
-  for (const kw of scoringKeywords) {
-    if (kw.length >= 4 && sqlKeywordsSet.size < 15) {
-      sqlKeywordsSet.add(kw);
-    }
-  }
-  const sqlKeywords = Array.from(sqlKeywordsSet);
+  // 同义词扩展：增加检索召回率
+  const keywords = questionLang === "en" ? rawKeywords : expandWithSynonyms(rawKeywords);
 
   console.log(`[Search] question="${question}", rawKeywords=[${rawKeywords.join(', ')}]`);
-  console.log(`[Search] scoringKeywords=[${scoringKeywords.slice(0, 20).join(', ')}]`);
-  console.log(`[Search] sqlKeywords=[${sqlKeywords.join(', ')}]`);
+  console.log(`[Search] expanded keywords=[${keywords.slice(0, 20).join(', ')}]`);
 
-  // ─── 路径1：关键词检索 ─────────────────────────────────────────────────────
-  let keywordCandidates: typeof vectorCandidates = [];
-  if (sqlKeywords.length > 0) {
-    const likeConditions = sqlKeywords.map(kw =>
-      like(materialChunks.content, `%${kw}%`)
-    );
+  // 从数据库获取候选 chunks
+  // 优先使用长关键词（更精确），最多使用 10 个做 SQL 过滤
+  const sortedKeywords = [...keywords].sort((a, b) => b.length - a.length);
+  const sqlKeywords = sortedKeywords.slice(0, 10);
 
-    // 也搜索章节标题
-    const chapterConditions = rawKeywords
-      .filter(kw => kw.length >= 2)
-      .map(kw => like(materialChunks.chapter, `%${kw}%`));
+  const likeConditions = sqlKeywords.map(kw =>
+    like(materialChunks.content, `%${kw}%`)
+  );
 
-    const kwWhere = and(
-      eq(materials.status, 'published'),
-      languageFilter !== "all" ? eq(materials.language, languageFilter) : undefined,
-      materialIds && materialIds.length > 0
-        ? inArray(materialChunks.materialId, materialIds)
-        : undefined,
-      or(...likeConditions, ...chapterConditions)
-    );
+  // 也搜索章节标题
+  const chapterConditions = rawKeywords
+    .filter(kw => kw.length >= 2)
+    .map(kw => like(materialChunks.chapter, `%${kw}%`));
 
-    keywordCandidates = await db
-      .select({
-        id: materialChunks.id,
-        materialId: materialChunks.materialId,
-        content: materialChunks.content,
-        chapter: materialChunks.chapter,
-        pageStart: materialChunks.pageStart,
-        pageEnd: materialChunks.pageEnd,
-        embedding: materialChunks.embedding,
-      })
-      .from(materialChunks)
-      .innerJoin(materials, eq(materialChunks.materialId, materials.id))
-      .where(kwWhere)
-      .limit(300);
-  }
+  const baseWhere = and(
+    eq(materials.status, 'published'),
+    languageFilter !== "all" ? eq(materials.language, languageFilter) : undefined,
+    materialIds && materialIds.length > 0
+      ? inArray(materialChunks.materialId, materialIds)
+      : undefined,
+    or(...likeConditions, ...chapterConditions)
+  );
 
-  // ─── 路径2：向量语义检索（仅在 useEmbedding=true 时启用） ─────────────────
-  let questionEmbedding: number[] | null = null;
-  let vectorCandidates: {
-    id: number;
-    materialId: number;
-    content: string;
-    chapter: string | null;
-    pageStart: number | null;
-    pageEnd: number | null;
-    embedding: number[] | null;
-  }[] = [];
+  const candidates = await db
+    .select({
+      id: materialChunks.id,
+      materialId: materialChunks.materialId,
+      content: materialChunks.content,
+      chapter: materialChunks.chapter,
+      pageStart: materialChunks.pageStart,
+      pageEnd: materialChunks.pageEnd,
+    })
+    .from(materialChunks)
+    .innerJoin(materials, eq(materialChunks.materialId, materials.id))
+    .where(baseWhere)
+    .limit(300);
 
-  if (useEmbedding) try {
-    const { getEmbedding } = await import("./llmDriver");
-    questionEmbedding = await getEmbedding(question);
+  console.log(`[Search] candidates=${candidates.length}`);
 
-    // 获取所有有 embedding 的 chunks（向量检索走全表扫描，对 <10000 chunks 完全可行）
-    const vecWhere = and(
-      eq(materials.status, 'published'),
-      languageFilter !== "all" ? eq(materials.language, languageFilter) : undefined,
-      materialIds && materialIds.length > 0
-        ? inArray(materialChunks.materialId, materialIds)
-        : undefined,
-      eq(materialChunks.vectorId, "embedded")
-    );
+  if (candidates.length === 0) return [];
 
-    vectorCandidates = await db
-      .select({
-        id: materialChunks.id,
-        materialId: materialChunks.materialId,
-        content: materialChunks.content,
-        chapter: materialChunks.chapter,
-        pageStart: materialChunks.pageStart,
-        pageEnd: materialChunks.pageEnd,
-        embedding: materialChunks.embedding,
-      })
-      .from(materialChunks)
-      .innerJoin(materials, eq(materialChunks.materialId, materials.id))
-      .where(vecWhere);
-  } catch {
-    // Embedding 未配置，仅用关键词检索
-  }
+  // 应用层精排：计算每个 chunk 的关键词匹配分数
+  const scored = candidates.map(chunk => ({
+    ...chunk,
+    score: scoreChunk(chunk.content, keywords, question, chunk.chapter ?? undefined),
+  }));
 
-  // ─── 合并评分 ──────────────────────────────────────────────────────────────
-  // 用 Map 去重，以 chunk id 为 key
-  const scoreMap = new Map<number, {
-    id: number;
-    materialId: number;
-    content: string;
-    chapter: string | null;
-    pageStart: number | null;
-    pageEnd: number | null;
-    keywordScore: number;
-    vectorScore: number;
-    finalScore: number;
-  }>();
+  // 按分数降序排列，取 Top-K
+  scored.sort((a, b) => b.score - a.score);
+  const topResults = scored.slice(0, topK).filter(r => r.score > 0);
 
-  // 关键词评分
-  for (const chunk of keywordCandidates) {
-    const kwScore = scoreChunk(chunk.content, scoringKeywords, question, chunk.chapter ?? undefined);
-    scoreMap.set(chunk.id, {
-      id: chunk.id,
-      materialId: chunk.materialId,
-      content: chunk.content,
-      chapter: chunk.chapter,
-      pageStart: chunk.pageStart,
-      pageEnd: chunk.pageEnd,
-      keywordScore: kwScore,
-      vectorScore: 0,
-      finalScore: 0,
-    });
-  }
-
-  // 向量评分
-  if (questionEmbedding) {
-    const { cosineSimilarity } = await import("./llmDriver");
-    for (const chunk of vectorCandidates) {
-      if (!chunk.embedding) continue;
-      const vecScore = cosineSimilarity(questionEmbedding, chunk.embedding);
-
-      const existing = scoreMap.get(chunk.id);
-      if (existing) {
-        existing.vectorScore = vecScore;
-      } else {
-        scoreMap.set(chunk.id, {
-          id: chunk.id,
-          materialId: chunk.materialId,
-          content: chunk.content,
-          chapter: chunk.chapter,
-          pageStart: chunk.pageStart,
-          pageEnd: chunk.pageEnd,
-          keywordScore: 0,
-          vectorScore: vecScore,
-          finalScore: 0,
-        });
-      }
-    }
-  }
-
-  if (scoreMap.size === 0) return [];
-
-  // 计算混合分数：关键词和向量各自归一化后加权合并
-  const entries = Array.from(scoreMap.values());
-  const maxKwScore = Math.max(...entries.map(e => e.keywordScore), 1);
-  const hasVector = entries.some(e => e.vectorScore > 0);
-
-  for (const entry of entries) {
-    const normKw = entry.keywordScore / maxKwScore; // 归一化到 0-1
-    const normVec = entry.vectorScore; // 余弦相似度本身就是 0-1
-
-    if (hasVector) {
-      // 混合模式：关键词 40% + 向量 60%
-      entry.finalScore = normKw * 0.4 + normVec * 0.6;
-    } else {
-      // 纯关键词模式
-      entry.finalScore = normKw;
-    }
-  }
-
-  // 排序取 Top-K
-  entries.sort((a, b) => b.finalScore - a.finalScore);
-  const topResults = entries.slice(0, topK).filter(r => r.finalScore > 0);
-
-  console.log(`[Search] keywordCandidates=${keywordCandidates.length}, vectorCandidates=${vectorCandidates.length}, merged=${scoreMap.size}, topResults=${topResults.length}`);
   for (const r of topResults.slice(0, 5)) {
-    console.log(`[Search]   #${r.id} score=${r.finalScore.toFixed(3)} kw=${r.keywordScore.toFixed(1)} vec=${r.vectorScore.toFixed(3)} "${r.content.substring(0, 60)}..."`);
+    console.log(`[Search]   #${r.id} score=${r.score.toFixed(1)} "${r.content.substring(0, 60)}..."`);
   }
 
   if (topResults.length === 0) return [];
@@ -556,7 +427,7 @@ export async function semanticSearch(
     pageStart: r.pageStart,
     pageEnd: r.pageEnd,
     content: r.content,
-    similarity: r.finalScore,
+    similarity: Math.min(r.score / 20, 1), // 归一化到 0-1
   }));
 }
 
