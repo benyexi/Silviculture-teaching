@@ -362,18 +362,13 @@ export async function semanticSearch(
     like(materialChunks.content, `%${kw}%`)
   );
 
-  // 也搜索章节标题
-  const chapterConditions = rawKeywords
-    .filter(kw => kw.length >= 2)
-    .map(kw => like(materialChunks.chapter, `%${kw}%`));
-
   const baseWhere = and(
     eq(materials.status, 'published'),
     languageFilter !== "all" ? eq(materials.language, languageFilter) : undefined,
     materialIds && materialIds.length > 0
       ? inArray(materialChunks.materialId, materialIds)
       : undefined,
-    or(...likeConditions, ...chapterConditions)
+    or(...likeConditions)
   );
 
   const candidates = await db
