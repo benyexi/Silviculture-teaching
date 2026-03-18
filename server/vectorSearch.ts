@@ -98,8 +98,9 @@ const SYNONYM_MAP: Record<string, string[]> = {
 
   // ── 水分管理 ──
   '灌溉': ['灌水', '浇水', '合理灌溉', '灌溉方法', '水分管理', '灌溉技术'],
-  '灌溉方法': ['灌溉方式', '灌溉技术', '滴灌', '喷灌', '漫灌'],
-  '合理灌溉': ['灌溉', '灌水', '浇水', '水分管理', '灌溉制度', '灌溉原则'],
+  '灌溉方法': ['灌溉方式', '灌溉技术', '滴灌', '喷灌', '漫灌', '渗灌', '沟灌', '畦灌'],
+  '合理灌溉': ['灌溉', '灌水', '浇水', '水分管理', '灌溉制度', '灌溉原则',
+    '灌溉时间', '灌水量', '灌溉位置', '灌溉方式', '四合理'],
   '排水': ['排涝', '排水沟', '排水系统', '排水方法'],
 
   // ── 土壤管理 ──
@@ -414,12 +415,38 @@ export async function semanticSearch(
     score: scoreChunk(chunk.content, scoringKeywords, question, chunk.chapter ?? undefined),
   }));
 
-  // 按分数降序排列，取 Top-K
+  // 按分数降序排列
   scored.sort((a, b) => b.score - a.score);
-  const topResults = scored.slice(0, topK).filter(r => r.score > 0);
+
+  // 章节多样性选择：避免同一章节/来源的 chunk 独占 Top-K
+  // 每个章节最多选 maxPerChapter 个 chunk，剩余名额给其他章节
+  const maxPerChapter = Math.max(3, Math.ceil(topK * 0.4)); // 至少3个，最多占 topK 的 40%
+  const chapterCounts = new Map<string, number>();
+  const topResults: typeof scored = [];
+  const overflow: typeof scored = []; // 被多样性限制跳过的 chunk
+
+  for (const r of scored) {
+    if (r.score <= 0) break;
+    const chapterKey = `${r.materialId}:${r.chapter ?? ''}`;
+    const cnt = chapterCounts.get(chapterKey) ?? 0;
+    if (cnt < maxPerChapter) {
+      topResults.push(r);
+      chapterCounts.set(chapterKey, cnt + 1);
+      if (topResults.length >= topK) break;
+    } else {
+      overflow.push(r);
+    }
+  }
+  // 如果多样性选择后不够 topK，从 overflow 中补充
+  if (topResults.length < topK) {
+    for (const r of overflow) {
+      topResults.push(r);
+      if (topResults.length >= topK) break;
+    }
+  }
 
   for (const r of topResults.slice(0, 5)) {
-    console.log(`[Search]   #${r.id} score=${r.score.toFixed(1)} "${r.content.substring(0, 60)}..."`);
+    console.log(`[Search]   #${r.id} score=${r.score.toFixed(1)} ch="${r.chapter?.substring(0, 20) ?? '-'}" "${r.content.substring(0, 60)}..."`);
   }
 
   if (topResults.length === 0) return [];
