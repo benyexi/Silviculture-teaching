@@ -63,6 +63,7 @@ export const materialChunks = mysqlTable("material_chunks", {
   pageStart: int("pageStart"),                               // 起始页码
   pageEnd: int("pageEnd"),                                   // 结束页码
   vectorId: varchar("vectorId", { length: 256 }),            // Milvus/向量库中的ID
+  embedding: json("embedding").$type<number[]>(),           // Embedding 向量
   tokenCount: int("tokenCount"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
