@@ -4,8 +4,8 @@ import {
   extractKeywordsEn,
   type SearchResult,
 } from "./vectorSearch";
-import { invokeLLMWithConfig, getActiveLlmConfig } from "./llmDriver";
-import { createQuery, upsertVisitorStat } from "./db";
+import { invokeLLMWithConfig } from "./llmDriver";
+import { createQuery, upsertVisitorStat, getActiveLlmConfig } from "./db";
 import { detectLanguage } from "./languageDetect";
 import type { QuerySource } from "../drizzle/schema";
 
@@ -202,18 +202,15 @@ export async function generateAnswer(req: QARequest): Promise<QAResponse> {
     enAnswer = cached.enAnswer;
     enSources = cached.enSources;
     fromCache = true;
-  } else if (!useRAG) {
-    // 直接模式：不走 RAG，直接将问题发给 LLM
-    mainResult = await callLLMDirect(req.question, questionLanguage);
   } else {
-    // RAG 模式：检索教材片段后再问 LLM
+    // useRAG=true: 关键词+向量混合检索; useRAG=false: 仅关键词检索（两者都搜教材）
     if (questionLanguage === "en") {
-      const enResults = await semanticSearch(req.question, undefined, 8, "en");
+      const enResults = await semanticSearch(req.question, undefined, 8, "en", useRAG);
       mainResult = await callLLM(req.question, enResults, "en", "en");
     } else {
       const [zhResults, enResults] = await Promise.all([
-        semanticSearch(req.question, undefined, 8, "zh"),
-        semanticSearch(req.question, undefined, 5, "en"),
+        semanticSearch(req.question, undefined, 8, "zh", useRAG),
+        semanticSearch(req.question, undefined, 5, "en", useRAG),
       ]);
 
       mainResult = await callLLM(req.question, zhResults, "zh", "zh");
@@ -261,35 +258,6 @@ export async function generateAnswer(req: QARequest): Promise<QAResponse> {
     questionLanguage,
     enAnswer,
     enSources,
-  };
-}
-
-// ─── 直接模式：不走 RAG，直接问 LLM ─────────────────────────────────────────
-async function callLLMDirect(
-  question: string,
-  questionLang: "zh" | "en"
-): Promise<CallLLMResult> {
-  const systemPrompt =
-    questionLang === "en"
-      ? `You are a silviculture teaching assistant at Beijing Forestry University. Answer questions about silviculture thoroughly and accurately. Use **bold** for key terms. Structure your answer with clear headings and bullet points where appropriate.`
-      : `你是北京林业大学森林培育学科的专业教学助手。请详细、准确地回答学生关于森林培育学的问题。
-要求：
-1. 回答要结构清晰，使用标题和列表组织内容。
-2. 使用 **加粗** 标记关键术语和重要概念。
-3. 内容要全面、准确，适合大学本科教学水平。
-4. 直接输出回答内容（Markdown格式），不需要返回JSON。`;
-
-  const llmResponse = await invokeLLMWithConfig(
-    [{ role: "user", content: question }],
-    systemPrompt
-  );
-
-  return {
-    answer: llmResponse.content,
-    sources: [],
-    modelUsed: llmResponse.model,
-    foundInMaterials: true,
-    confidence: 0.8,
   };
 }
 

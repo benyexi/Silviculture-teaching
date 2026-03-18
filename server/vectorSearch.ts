@@ -245,7 +245,8 @@ export async function semanticSearch(
   question: string,
   materialIds?: number[],
   topK: number = 8,
-  languageFilter: "zh" | "en" | "all" = "all"
+  languageFilter: "zh" | "en" | "all" = "all",
+  useEmbedding: boolean = true
 ): Promise<SearchResult[]> {
   const db = await getDb();
   if (!db) throw new Error("数据库不可用");
@@ -292,7 +293,7 @@ export async function semanticSearch(
       .limit(300);
   }
 
-  // ─── 路径2：向量语义检索 ───────────────────────────────────────────────────
+  // ─── 路径2：向量语义检索（仅在 useEmbedding=true 时启用） ─────────────────
   let questionEmbedding: number[] | null = null;
   let vectorCandidates: {
     id: number;
@@ -304,7 +305,7 @@ export async function semanticSearch(
     embedding: number[] | null;
   }[] = [];
 
-  try {
+  if (useEmbedding) try {
     const { getEmbedding } = await import("./llmDriver");
     questionEmbedding = await getEmbedding(question);
 

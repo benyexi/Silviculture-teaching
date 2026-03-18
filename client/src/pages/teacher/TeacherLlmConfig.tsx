@@ -147,7 +147,7 @@ export default function TeacherLlmConfig() {
                         </Badge>
                       )}
                       <Badge variant="outline" className={`text-xs ${config.useRAG ? "border-amber-500 text-amber-600" : "border-blue-500 text-blue-600"}`}>
-                        {config.useRAG ? "RAG 检索增强" : "直接问答"}
+                        {config.useRAG ? "语义检索（Embedding）" : "关键词检索"}
                       </Badge>
                     </div>
                     <div className="flex items-center gap-3 mt-1 flex-wrap">
@@ -339,9 +339,9 @@ function EditConfigForm({
         </div>
       </div>
 
-      {/* 回答模式 */}
+      {/* 检索模式 */}
       <div className="border-t border-border pt-4">
-        <p className="text-sm font-medium text-foreground mb-2">回答模式</p>
+        <p className="text-sm font-medium text-foreground mb-2">检索模式</p>
         <div className="flex gap-2">
           <Button
             type="button"
@@ -349,7 +349,7 @@ function EditConfigForm({
             size="sm"
             onClick={() => setUseRAG(false)}
           >
-            直接问答
+            关键词检索
           </Button>
           <Button
             type="button"
@@ -357,18 +357,18 @@ function EditConfigForm({
             size="sm"
             onClick={() => setUseRAG(true)}
           >
-            RAG 检索增强
+            语义检索（Embedding）
           </Button>
         </div>
         <p className="text-xs text-muted-foreground mt-2">
           {useRAG
-            ? "检索教材片段后结合上下文回答（需配置 Embedding），答案基于教材内容"
-            : "直接用模型自身知识回答，不检索教材，回答质量取决于模型能力"}
+            ? "关键词 + Embedding 向量混合检索教材（需配置 Embedding 模型），召回更全面但需调优"
+            : "仅用关键词匹配检索教材片段，与之前的行为一致，效果稳定"}
         </p>
       </div>
 
       <div className="border-t border-border pt-4">
-        <p className="text-sm font-medium text-foreground mb-3">Embedding 配置（RAG 模式需要）</p>
+        <p className="text-sm font-medium text-foreground mb-3">Embedding 配置（语义检索模式需要）</p>
         <div className="grid grid-cols-2 gap-3">
           <div>
             <Label>Embedding 模型</Label>
@@ -613,9 +613,9 @@ function AddConfigForm({ onSuccess }: { onSuccess: () => void }) {
         </div>
       </div>
 
-      {/* 回答模式 */}
+      {/* 检索模式 */}
       <div className="border-t border-border pt-4">
-        <p className="text-sm font-medium text-foreground mb-2">回答模式</p>
+        <p className="text-sm font-medium text-foreground mb-2">检索模式</p>
         <div className="flex gap-2">
           <Button
             type="button"
@@ -623,7 +623,7 @@ function AddConfigForm({ onSuccess }: { onSuccess: () => void }) {
             size="sm"
             onClick={() => setUseRAG(false)}
           >
-            直接问答
+            关键词检索
           </Button>
           <Button
             type="button"
@@ -631,19 +631,19 @@ function AddConfigForm({ onSuccess }: { onSuccess: () => void }) {
             size="sm"
             onClick={() => setUseRAG(true)}
           >
-            RAG 检索增强
+            语义检索（Embedding）
           </Button>
         </div>
         <p className="text-xs text-muted-foreground mt-2">
           {useRAG
-            ? "检索教材片段后结合上下文回答（需配置 Embedding），答案基于教材内容"
-            : "直接用模型自身知识回答，不检索教材，回答质量取决于模型能力"}
+            ? "关键词 + Embedding 向量混合检索教材（需配置 Embedding 模型），召回更全面但需调优"
+            : "仅用关键词匹配检索教材片段，与之前的行为一致，效果稳定"}
         </p>
       </div>
 
       {/* Embedding 配置（可选） */}
       <div className="border-t border-border pt-4">
-        <p className="text-sm font-medium text-foreground mb-3">Embedding 配置（RAG 模式需要）</p>
+        <p className="text-sm font-medium text-foreground mb-3">Embedding 配置（语义检索模式需要）</p>
         <div className="grid grid-cols-2 gap-3">
           <div>
             <Label>Embedding 模型</Label>
