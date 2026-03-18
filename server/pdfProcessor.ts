@@ -5,7 +5,6 @@
 import { getDb } from "./db";
 import { materials, materialChunks } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
-import { storeChunkVector } from "./vectorSearch";
 import { detectDocumentLanguage } from "./languageDetect";
 import { getEmbedding } from "./llmDriver";
 import mammoth from "mammoth";
@@ -93,7 +92,7 @@ export async function processMaterial(
             }
           }
 
-          const result = await db.insert(materialChunks).values({
+          await db.insert(materialChunks).values({
             materialId,
             chunkIndex: idx,
             content: chunk.content,
@@ -104,11 +103,6 @@ export async function processMaterial(
             embedding: embedding || undefined,
             vectorId: embedding ? "embedded" : "fulltext",
           });
-
-          const chunkId = Number((result as any).insertId);
-          if (!embedding) {
-            await storeChunkVector(chunkId, []);
-          }
         })
       );
       console.log(`[Doc] 已处理 ${Math.min(i + BATCH_SIZE, chunks.length)}/${chunks.length} 个块`);
