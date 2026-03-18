@@ -380,9 +380,12 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ input }) => {
+        // 如果没有已激活的配置，自动激活新配置
+        const active = await getActiveLlmConfig();
+        const shouldActivate = !active;
         const id = await createLlmConfig({
           ...input,
-          isActive: false,
+          isActive: shouldActivate,
           isDefault: false,
         });
         return { id };
@@ -406,6 +409,7 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         const { id, ...data } = input;
         await updateLlmConfig(id, data);
+        clearAnswerCache(); // 配置变更后清空答案缓存
         return { success: true };
       }),
 
@@ -413,6 +417,7 @@ export const appRouter = router({
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
         await setActiveLlmConfig(input.id);
+        clearAnswerCache(); // 切换模型后清空答案缓存，确保使用新配置
         return { success: true };
       }),
 
