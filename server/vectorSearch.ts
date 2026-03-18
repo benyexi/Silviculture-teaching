@@ -395,9 +395,31 @@ export async function semanticSearch(
     score: scoreChunk(chunk.content, keywords, question, chunk.chapter ?? undefined),
   }));
 
-  // 按分数降序排列，取 Top-K
+  // 按分数降序排列，取 Top-K（带质量门槛）
   scored.sort((a, b) => b.score - a.score);
-  const topResults = scored.slice(0, topK).filter(r => r.score > 0);
+
+  // 最低分数门槛：过滤掉仅靠通用词匹配的噪声 chunk
+  const MIN_SCORE_THRESHOLD = 5;
+  const aboveThreshold = scored.filter(r => r.score >= MIN_SCORE_THRESHOLD);
+
+  // 分数断崖检测：如果相邻 chunk 分数骤降超过 60%，截断
+  let cutoffIdx = Math.min(aboveThreshold.length, topK);
+  if (aboveThreshold.length > 1) {
+    for (let i = 1; i < Math.min(aboveThreshold.length, topK); i++) {
+      if (aboveThreshold[i].score < aboveThreshold[0].score * 0.15) {
+        // 分数低于最高分的 15%，后面的都是噪声
+        cutoffIdx = i;
+        break;
+      }
+      if (i >= 3 && aboveThreshold[i].score < aboveThreshold[i - 1].score * 0.4) {
+        // 从第4个开始，如果比前一个骤降60%以上，截断
+        cutoffIdx = i;
+        break;
+      }
+    }
+  }
+
+  const topResults = aboveThreshold.slice(0, cutoffIdx);
 
   for (const r of topResults.slice(0, 5)) {
     console.log(`[Search]   #${r.id} score=${r.score.toFixed(1)} "${r.content.substring(0, 60)}..."`);
