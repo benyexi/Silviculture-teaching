@@ -220,14 +220,9 @@ export default function Home() {
                           <BookOpen className="h-5 w-5 text-primary" />
                           Answer &nbsp;<span className="text-muted-foreground font-normal text-base">教材答案</span>
                         </CardTitle>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="secondary" className="text-xs">
-                            {result.modelUsed}
-                          </Badge>
-                          <Badge variant="outline" className="text-xs text-muted-foreground">
-                            {(result.responseTimeMs / 1000).toFixed(1)}s
-                          </Badge>
-                        </div>
+                        <Badge variant="outline" className="text-xs text-muted-foreground">
+                          {(result.responseTimeMs / 1000).toFixed(1)}s
+                        </Badge>
                       </div>
                     </CardHeader>
                     <CardContent>
