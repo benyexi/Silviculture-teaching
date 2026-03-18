@@ -294,9 +294,10 @@ async function callLLM(
     answer = stripCitationMarkers(parsed.answer);
   }
 
-  // 判断是否在教材中找到了内容
+  // 判断是否在教材中找到了内容（只检查开头50字，避免中间提到"未涉及"被误判）
   const notFoundPhrases = ["未涉及", "not cover", "没有相关", "未找到", "not found"];
-  const foundInMaterials = !notFoundPhrases.some((p) => answer.toLowerCase().includes(p));
+  const answerStart = answer.substring(0, 50).toLowerCase();
+  const foundInMaterials = !notFoundPhrases.some((p) => answerStart.includes(p));
 
   const keywords = questionLang === "en" ? extractKeywordsEn(question) : extractKeywords(question);
 
@@ -511,9 +512,10 @@ export async function generateAnswerStream(
 
     fullAnswer = stripCitationMarkers(fullAnswer);
 
-    // 判断是否找到内容
+    // 判断是否找到内容（只检查开头50字，避免中间提到"未涉及"被误判）
     const notFoundPhrases = ["未涉及", "not cover", "没有相关", "未找到", "not found"];
-    const foundInMaterials = !notFoundPhrases.some((p) => fullAnswer.toLowerCase().includes(p));
+    const answerStart = fullAnswer.substring(0, 50).toLowerCase();
+    const foundInMaterials = !notFoundPhrases.some((p) => answerStart.includes(p));
 
     const responseTimeMs = Date.now() - startTime;
 
