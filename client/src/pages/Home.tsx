@@ -33,6 +33,21 @@ type StreamMeta = {
   responseTimeMs?: number;
 };
 
+function normalizeAnswerMarkdown(text: string): string {
+  return text
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .replace(/\[引用\d+\]/g, "")
+    .replace(/\[citation_indices?:\s*[\d,\s]+\]/gi, "")
+    .replace(/【?片段\d+】?/g, "")
+    .replace(/片段\[?\d+\]?至?\[?\d*\]?/g, "")
+    .replace(/([^\n])\s+(#{1,6}\s+)/g, "$1\n\n$2")
+    .replace(/\n[ \t]*([#>-])/g, "\n$1")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 export default function Home() {
   const { user } = useAuth();
   const [question, setQuestion] = useState("");
@@ -116,15 +131,12 @@ export default function Home() {
                   setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
                 } else if (currentEvent === "token") {
                   accumulatedAnswer += parsed.t;
-                  // 实时清理引用标记
-                  const cleaned = accumulatedAnswer
-                    .replace(/\[引用\d+\]/g, "")
-                    .replace(/\[citation_indices?:\s*[\d,\s]+\]/gi, "")
-                    .replace(/【?片段\d+】?/g, "")
-                    .replace(/片段\[?\d+\]?至?\[?\d*\]?/g, "");
-                  setStreamAnswer(cleaned);
+                  setStreamAnswer(normalizeAnswerMarkdown(accumulatedAnswer));
                 } else if (currentEvent === "done") {
-                  // 完成
+                  if (typeof parsed?.answer === "string" && parsed.answer.length > 0) {
+                    accumulatedAnswer = parsed.answer;
+                    setStreamAnswer(normalizeAnswerMarkdown(parsed.answer));
+                  }
                 } else if (currentEvent === "error") {
                   setStreamError(parsed.message);
                 }

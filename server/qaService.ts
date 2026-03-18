@@ -873,12 +873,24 @@ async function callLLM(
 
 /** 清除 LLM 回答中残留的 citation 标记 */
 function stripCitationMarkers(text: string): string {
-  return text
+  const withoutCitation = text
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
     .replace(/\[citation_indices?:\s*[\d,\s]+\]/gi, "")
     .replace(/\[引用\d+\]/g, "")
     .replace(/【?片段\d+】?/g, "")
-    .replace(/片段\[?\d+\]?至?\[?\d*\]?/g, "")
-    .replace(/\s{2,}/g, " ")
+    .replace(/片段\[?\d+\]?至?\[?\d*\]?/g, "");
+
+  return normalizeMarkdownSpacing(withoutCitation);
+}
+
+function normalizeMarkdownSpacing(text: string): string {
+  return text
+    .replace(/([^\n])\s+(#{1,6}\s+)/g, "$1\n\n$2")
+    .replace(/\n[ \t]*([#>-])/g, "\n$1")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
 
