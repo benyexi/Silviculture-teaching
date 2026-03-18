@@ -27,6 +27,10 @@ import {
   createUploadSession,
   getUploadSession,
   updateUploadSession,
+  getStorageStats,
+  purgeOldQueries,
+  purgeCompletedUploadSessions,
+  clearAllEmbeddings,
 } from "./db";
 import { generateAnswer, clearAnswerCache } from "./qaService";
 import { processMaterial } from "./pdfProcessor";
@@ -445,6 +449,33 @@ export const appRouter = router({
       .input(z.object({ limit: z.number().min(1).max(200).default(50) }))
       .query(async ({ input }) => {
         return getRecentQueries(input.limit);
+      }),
+
+    /** 数据库存储统计 */
+    storage: adminProcedure.query(async () => {
+      return getStorageStats();
+    }),
+
+    /** 清理旧数据释放存储空间 */
+    cleanup: adminProcedure
+      .input(z.object({
+        purgeQueriesOlderThanDays: z.number().min(7).max(365).optional(),
+        purgeUploadSessions: z.boolean().optional(),
+        clearEmbeddings: z.boolean().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const result: Record<string, unknown> = {};
+        if (input.purgeQueriesOlderThanDays) {
+          result.queriesPurged = await purgeOldQueries(input.purgeQueriesOlderThanDays);
+        }
+        if (input.purgeUploadSessions) {
+          result.sessionsPurged = await purgeCompletedUploadSessions();
+        }
+        if (input.clearEmbeddings) {
+          await clearAllEmbeddings();
+          result.embeddingsCleared = true;
+        }
+        return result;
       }),
   }),
 });

@@ -393,3 +393,67 @@ export async function updateUploadSession(id: string, data: Partial<InsertUpload
   if (!db) return;
   await db.update(uploadSessions).set(data).where(eq(uploadSessions.id, id));
 }
+
+// ─── 数据库存储统计与清理 ─────────────────────────────────────────────────────
+
+/** 获取各表的行数和数据库大小 */
+export async function getStorageStats() {
+  const db = await getDb();
+  if (!db) return null;
+
+  // 获取各表行数
+  const [chunkCount] = await db.select({ count: count() }).from(materialChunks);
+  const [queryCount] = await db.select({ count: count() }).from(queries);
+  const [sessionCount] = await db.select({ count: count() }).from(uploadSessions);
+  const [feedbackCount] = await db.select({ count: count() }).from(queryFeedback);
+  const [materialCount] = await db.select({ count: count() }).from(materials);
+
+  // 获取数据库总大小（MB）
+  const sizeResult = await db.execute(sql`
+    SELECT ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) AS totalMB,
+           TABLE_NAME as tableName,
+           ROUND((data_length + index_length) / 1024 / 1024, 2) AS tableMB
+    FROM information_schema.TABLES
+    WHERE TABLE_SCHEMA = DATABASE()
+    GROUP BY TABLE_NAME
+    ORDER BY (data_length + index_length) DESC
+  `);
+
+  return {
+    tables: {
+      materialChunks: chunkCount.count,
+      queries: queryCount.count,
+      uploadSessions: sessionCount.count,
+      queryFeedback: feedbackCount.count,
+      materials: materialCount.count,
+    },
+    tableSizes: (sizeResult as unknown as [{ tableName: string; tableMB: string }[]]).at(0) ?? [],
+  };
+}
+
+/** 清理旧查询记录（保留最近 N 天） */
+export async function purgeOldQueries(retainDays: number) {
+  const db = await getDb();
+  if (!db) return 0;
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - retainDays);
+  const result = await db.delete(queries).where(lte(queries.createdAt, cutoff));
+  return (result as unknown as [{ affectedRows?: number }])[0]?.affectedRows ?? 0;
+}
+
+/** 清理已完成的上传会话 */
+export async function purgeCompletedUploadSessions() {
+  const db = await getDb();
+  if (!db) return 0;
+  const result = await db.delete(uploadSessions).where(
+    eq(uploadSessions.status, "completed")
+  );
+  return (result as unknown as [{ affectedRows?: number }])[0]?.affectedRows ?? 0;
+}
+
+/** 清空所有 embedding 数据（释放大量空间）*/
+export async function clearAllEmbeddings() {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(materialChunks).set({ embedding: null });
+}

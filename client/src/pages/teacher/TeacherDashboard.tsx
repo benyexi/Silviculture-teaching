@@ -13,7 +13,10 @@ import {
   Line,
   CartesianGrid,
 } from "recharts";
-import { MessageSquare, Users, BookOpen, TrendingUp, MapPin } from "lucide-react";
+import { MessageSquare, Users, BookOpen, TrendingUp, MapPin, HardDrive, Trash2, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useState } from "react";
+import { toast } from "sonner";
 
 export default function TeacherDashboard() {
   const { data, isLoading } = trpc.stats.overview.useQuery();
@@ -225,7 +228,99 @@ export default function TeacherDashboard() {
           )}
         </CardContent>
       </Card>
+
+      {/* 数据库存储管理 */}
+      <StorageCard />
     </div>
+  );
+}
+
+function StorageCard() {
+  const utils = trpc.useUtils();
+  const { data: storage, isLoading } = trpc.stats.storage.useQuery();
+  const [cleaning, setCleaning] = useState(false);
+
+  const cleanupMutation = trpc.stats.cleanup.useMutation({
+    onSuccess: (result) => {
+      utils.stats.storage.invalidate();
+      const msgs: string[] = [];
+      if (result.queriesPurged) msgs.push(`清理了 ${result.queriesPurged} 条旧查询`);
+      if (result.sessionsPurged) msgs.push(`清理了 ${result.sessionsPurged} 个上传会话`);
+      if (result.embeddingsCleared) msgs.push("已清空 Embedding 数据");
+      toast.success(msgs.length > 0 ? msgs.join("；") : "无需清理");
+      setCleaning(false);
+    },
+    onError: (e) => { toast.error(`清理失败: ${e.message}`); setCleaning(false); },
+  });
+
+  const handleCleanup = () => {
+    setCleaning(true);
+    cleanupMutation.mutate({
+      purgeQueriesOlderThanDays: 90,
+      purgeUploadSessions: true,
+    });
+  };
+
+  const handleClearEmbeddings = () => {
+    if (!confirm("确定要清空所有 Embedding 数据吗？这会释放大量空间，但向量搜索将回退为关键词搜索，直到重新处理教材。")) return;
+    setCleaning(true);
+    cleanupMutation.mutate({ clearEmbeddings: true });
+  };
+
+  const tableSizes = (storage?.tableSizes || []) as { tableName: string; tableMB: string }[];
+  const totalMB = tableSizes.reduce((sum, t) => sum + parseFloat(t.tableMB || "0"), 0);
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base flex items-center gap-2">
+            <HardDrive className="h-4 w-4" />
+            数据库存储
+          </CardTitle>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" onClick={handleCleanup} disabled={cleaning || isLoading}>
+              {cleaning ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Trash2 className="h-3.5 w-3.5 mr-1" />}
+              清理旧数据
+            </Button>
+            <Button size="sm" variant="outline" onClick={handleClearEmbeddings} disabled={cleaning || isLoading} className="text-destructive hover:text-destructive">
+              清空 Embedding
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <p className="text-muted-foreground text-sm text-center py-4">加载中...</p>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              数据库总占用约 <span className="font-semibold text-foreground">{totalMB.toFixed(1)} MB</span>
+              {storage?.tables && (
+                <span> | 文档块 {storage.tables.materialChunks} 条 | 查询记录 {storage.tables.queries} 条</span>
+              )}
+            </p>
+            <div className="space-y-1">
+              {tableSizes.slice(0, 5).map((t) => {
+                const pct = totalMB > 0 ? (parseFloat(t.tableMB) / totalMB) * 100 : 0;
+                return (
+                  <div key={t.tableName} className="flex items-center gap-2 text-xs">
+                    <span className="w-32 truncate text-muted-foreground font-mono">{t.tableName}</span>
+                    <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                      <div className="h-full bg-primary/60 rounded-full" style={{ width: `${Math.max(pct, 1)}%` }} />
+                    </div>
+                    <span className="w-16 text-right text-muted-foreground">{t.tableMB} MB</span>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              「清理旧数据」将删除 90 天前的查询记录和已完成的上传会话。「清空 Embedding」可释放大量空间但搜索精度会降低。
+            </p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
