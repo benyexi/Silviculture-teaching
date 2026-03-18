@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,6 +23,16 @@ type AnswerResult = {
   enSources?: QuerySource[];
 };
 
+type StreamMeta = {
+  sources: QuerySource[];
+  modelUsed: string;
+  foundInMaterials: boolean;
+  confidence: number;
+  questionLanguage: "zh" | "en";
+  queryId?: number;
+  responseTimeMs?: number;
+};
+
 export default function Home() {
   const { user } = useAuth();
   const [question, setQuestion] = useState("");
@@ -34,25 +44,117 @@ export default function Home() {
   const resultRef = useRef<HTMLDivElement>(null);
   const submitFeedback = trpc.qa.submitFeedback.useMutation();
 
-  const askMutation = trpc.qa.ask.useMutation({
-    onSuccess: (data) => {
-      setResult(data as AnswerResult);
-      setShowSources(true);
-      setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
-    },
-  });
+  // 流式状态
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const [streamAnswer, setStreamAnswer] = useState("");
+  const [streamMeta, setStreamMeta] = useState<StreamMeta | null>(null);
+  const [streamError, setStreamError] = useState<string | null>(null);
+  const [streamStartTime, setStreamStartTime] = useState(0);
+  const [streamElapsed, setStreamElapsed] = useState(0);
+  const abortRef = useRef<AbortController | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
-    if (!question.trim() || askMutation.isPending) return;
-    setAskedQuestion(question.trim());
+    const q = question.trim();
+    if (!q || isStreaming) return;
+
+    // 中断之前的请求
+    if (abortRef.current) abortRef.current.abort();
+
+    setAskedQuestion(q);
     setResult(null);
-    askMutation.mutate({ question: question.trim() });
-  };
+    setStreamAnswer("");
+    setStreamMeta(null);
+    setStreamError(null);
+    setIsSearching(true);
+    setIsStreaming(true);
+    setStreamStartTime(Date.now());
+    setStreamElapsed(0);
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    fetch("/api/stream/ask", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question: q }),
+      signal: controller.signal,
+    })
+      .then(async (resp) => {
+        if (!resp.ok) {
+          const errBody = await resp.text();
+          throw new Error(errBody || `HTTP ${resp.status}`);
+        }
+
+        const reader = resp.body?.getReader();
+        if (!reader) throw new Error("No readable stream");
+
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let accumulatedAnswer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+
+          let currentEvent = "";
+          for (const line of lines) {
+            if (line.startsWith("event: ")) {
+              currentEvent = line.slice(7);
+            } else if (line.startsWith("data: ")) {
+              const data = line.slice(6);
+              try {
+                const parsed = JSON.parse(data);
+                if (currentEvent === "meta") {
+                  setStreamMeta(parsed as StreamMeta);
+                  setIsSearching(false);
+                  setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+                } else if (currentEvent === "token") {
+                  accumulatedAnswer += parsed.t;
+                  setStreamAnswer(accumulatedAnswer);
+                } else if (currentEvent === "done") {
+                  // 完成
+                  setStreamElapsed(Date.now() - Date.now()); // will be recalculated
+                } else if (currentEvent === "error") {
+                  setStreamError(parsed.message);
+                }
+              } catch {
+                // ignore parse errors
+              }
+              currentEvent = "";
+            }
+          }
+        }
+
+        setIsStreaming(false);
+      })
+      .catch((err) => {
+        if (err.name !== "AbortError") {
+          setStreamError(err.message || "请求失败");
+        }
+        setIsStreaming(false);
+        setIsSearching(false);
+      });
+  }, [question, isStreaming]);
+
+  // 计时器：显示已用时间
+  useEffect(() => {
+    if (!isStreaming || !streamStartTime) return;
+    const timer = setInterval(() => {
+      setStreamElapsed(Date.now() - streamStartTime);
+    }, 100);
+    return () => clearInterval(timer);
+  }, [isStreaming, streamStartTime]);
 
   const handleFeedback = (helpful: boolean) => {
-    if (!result?.queryId || feedbackSubmitted) return;
-    submitFeedback.mutate({ queryId: result.queryId, helpful });
+    const qid = result?.queryId || streamMeta?.queryId;
+    if (!qid || feedbackSubmitted) return;
+    submitFeedback.mutate({ queryId: qid, helpful });
     setFeedbackValue(helpful);
     setFeedbackSubmitted(true);
   };
@@ -60,13 +162,22 @@ export default function Home() {
   useEffect(() => {
     setFeedbackSubmitted(false);
     setFeedbackValue(null);
-  }, [result?.queryId]);
+  }, [result?.queryId, streamMeta?.queryId]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
       handleSubmit(e as any);
     }
   };
+
+  // 统一的结果显示状态
+  const isPending = isStreaming && isSearching;
+  const hasAnswer = streamAnswer.length > 0 || result?.answer;
+  const displayAnswer = streamAnswer || result?.answer || "";
+  const displaySources = streamMeta?.sources || result?.sources || [];
+  const displayTime = streamMeta?.responseTimeMs || (streamElapsed > 0 ? streamElapsed : result?.responseTimeMs || 0);
+  const displayFoundInMaterials = streamMeta?.foundInMaterials ?? result?.foundInMaterials ?? true;
+  const showResult = hasAnswer || isPending || isStreaming;
 
   // Forest background — place forest-bg.jpg in client/public/ or use a remote URL
   const FOREST_BG = "https://images.unsplash.com/photo-1448375240586-882707db888b?w=1920&q=80";
@@ -142,7 +253,7 @@ export default function Home() {
                 onKeyDown={handleKeyDown}
                 placeholder="Ask a question about silviculture — 例如：什么是立地质量？如何进行树种选择？造林密度如何确定？"
                 className="min-h-[160px] md:min-h-[200px] text-base resize-none border-0 focus-visible:ring-0 p-5 bg-transparent text-foreground placeholder:text-muted-foreground/70 rounded-none"
-                disabled={askMutation.isPending}
+                disabled={isStreaming}
               />
               <div className="flex items-center justify-between px-5 py-4 border-t border-border/30 bg-white/60">
                 <span className="text-xs text-muted-foreground">
@@ -151,10 +262,10 @@ export default function Home() {
                 <Button
                   type="submit"
                   size="lg"
-                  disabled={!question.trim() || askMutation.isPending}
+                  disabled={!question.trim() || isStreaming}
                   className="gap-2 px-8 text-base"
                 >
-                  {askMutation.isPending ? (
+                  {isStreaming ? (
                     <>
                       <Loader2 className="h-5 w-5 animate-spin" />
                       Searching...
@@ -171,15 +282,15 @@ export default function Home() {
           </form>
 
           {/* 错误提示 */}
-          {askMutation.isError && (
+          {streamError && (
             <div className="mt-4 p-3 rounded-lg bg-red-900/60 text-red-200 text-sm backdrop-blur-sm">
-              查询失败：{askMutation.error?.message || "请稍后重试"}
+              查询失败：{streamError}
             </div>
           )}
         </div>
 
         {/* 三个特性卡片 */}
-        {!result && !askMutation.isPending && (
+        {!showResult && (
           <div className="relative z-10 w-full max-w-4xl mx-auto mt-10">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {[
@@ -199,18 +310,18 @@ export default function Home() {
       </section>
 
       {/* 答案展示区（白色背景，在森林图下方） */}
-      {(result || askMutation.isPending) && (
+      {showResult && (
         <main className="flex-1 bg-[oklch(0.97_0.008_145)] py-8">
           <div className="container">
             <div ref={resultRef} className="max-w-4xl mx-auto space-y-4">
-              {askMutation.isPending && (
+              {isPending && (
                 <div className="text-center py-12 text-muted-foreground">
                   <Loader2 className="h-8 w-8 animate-spin mx-auto mb-3 text-primary" />
                   <p>正在检索教材并生成答案，请稍候...</p>
                 </div>
               )}
 
-              {result && (
+              {(hasAnswer || (isStreaming && !isSearching)) && (
                 <>
                   {/* 主答案 */}
                   <Card className="shadow-sm">
@@ -219,18 +330,21 @@ export default function Home() {
                         <CardTitle className="text-lg flex items-center gap-2">
                           <BookOpen className="h-5 w-5 text-primary" />
                           Answer &nbsp;<span className="text-muted-foreground font-normal text-base">教材答案</span>
+                          {isStreaming && (
+                            <Loader2 className="h-4 w-4 animate-spin text-primary ml-1" />
+                          )}
                         </CardTitle>
                         <Badge variant="outline" className="text-xs text-muted-foreground">
-                          {(result.responseTimeMs / 1000).toFixed(1)}s
+                          {(displayTime / 1000).toFixed(1)}s
                         </Badge>
                       </div>
                     </CardHeader>
                     <CardContent>
                       <div className="prose prose-sm max-w-none text-foreground leading-relaxed">
-                        <Streamdown>{result.answer}</Streamdown>
+                        <Streamdown>{displayAnswer}</Streamdown>
                       </div>
 
-                      {result && result.foundInMaterials && (
+                      {!isStreaming && displayFoundInMaterials && (
                         <div className="mt-4 pt-3 border-t border-border flex items-center gap-3 flex-wrap">
                           <span className="text-sm text-muted-foreground">这个答案对你有帮助吗？</span>
                           <Button
@@ -256,42 +370,17 @@ export default function Home() {
                           )}
                         </div>
                       )}
-
-                      {result.questionLanguage === "zh" && result.enAnswer && (
-                        <div className="mt-4 pt-4 border-t border-border">
-                          <div className="flex items-center gap-2 mb-2">
-                            <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
-                              英文教材补充
-                            </span>
-                          </div>
-                          <div className="prose prose-sm max-w-none text-foreground leading-relaxed">
-                            <Streamdown>{result.enAnswer}</Streamdown>
-                          </div>
-                          {result.enSources && result.enSources.length > 0 && (
-                            <div className="mt-3 space-y-2">
-                              {result.enSources.map((source, idx) => (
-                                <SourceCard
-                                  key={`en-${idx}`}
-                                  source={source}
-                                  index={idx + 1}
-                                  keywords={extractHighlightKeywords(askedQuestion)}
-                                />
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )}
                     </CardContent>
                   </Card>
 
                   {/* 引用来源 */}
-                  {result.sources && result.sources.length > 0 && (
+                  {displaySources.length > 0 && (
                     <Card className="shadow-sm">
                       <CardHeader className="pb-2 cursor-pointer" onClick={() => setShowSources(!showSources)}>
                         <div className="flex items-center justify-between">
                           <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                             <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary/10 text-primary text-xs font-bold">
-                              {result.sources.length}
+                              {displaySources.length}
                             </span>
                             Sources &nbsp;&middot;&nbsp; 引用教材来源
                           </CardTitle>
@@ -304,7 +393,7 @@ export default function Home() {
                       </CardHeader>
                       {showSources && (
                         <CardContent className="pt-0 space-y-3">
-                          {result.sources.map((source, idx) => (
+                          {displaySources.map((source, idx) => (
                             <SourceCard
                               key={idx}
                               source={source}
@@ -318,7 +407,7 @@ export default function Home() {
                   )}
 
                   {/* 无来源提示 */}
-                  {(!result.sources || result.sources.length === 0) && (
+                  {!isStreaming && displaySources.length === 0 && (
                     <div className="text-center py-4 text-sm text-muted-foreground">
                       本次回答未能匹配到具体教材片段，建议换一种问法或咨询教师。
                     </div>
@@ -331,7 +420,7 @@ export default function Home() {
       )}
 
       {/* 无结果时撑开空间 */}
-      {!result && !askMutation.isPending && <div className="flex-1" />}
+      {!showResult && <div className="flex-1" />}
 
       {/* 底部版权 */}
       <footer className="border-t border-border/40 py-5 bg-white/90">

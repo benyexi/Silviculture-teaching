@@ -106,6 +106,47 @@ export async function invokeLLMWithConfig(
   };
 }
 
+// ─── 流式推理接口 ─────────────────────────────────────────────────────────────
+export async function invokeLLMStreamWithConfig(
+  messages: LLMMessage[],
+  systemPrompt?: string
+): Promise<{ stream: AsyncIterable<string>; model: string }> {
+  const config = await getActiveLlmConfig();
+
+  if (!config) {
+    throw new Error(
+      "未配置 LLM 模型。请在教师端「模型配置」页面添加并激活一个 LLM 配置。"
+    );
+  }
+
+  const allMessages: LLMMessage[] = [];
+  if (systemPrompt) {
+    allMessages.push({ role: "system", content: systemPrompt });
+  }
+  allMessages.push(...messages);
+
+  const baseURL = getProviderBaseUrl(config.provider, config.apiBaseUrl);
+  const apiKey = config.apiKey || "ollama";
+  const client = buildOpenAIClient(apiKey, baseURL);
+
+  const response = await client.chat.completions.create({
+    model: config.modelName,
+    messages: allMessages,
+    temperature: config.temperature ?? 0.1,
+    max_tokens: config.maxTokens ?? 4096,
+    stream: true,
+  });
+
+  async function* textStream() {
+    for await (const chunk of response) {
+      const delta = chunk.choices[0]?.delta?.content;
+      if (delta) yield delta;
+    }
+  }
+
+  return { stream: textStream(), model: config.modelName };
+}
+
 // ─── Embedding 接口 ───────────────────────────────────────────────────────────
 export async function getEmbedding(text: string): Promise<number[]> {
   const config = await getActiveLlmConfig();
