@@ -67,7 +67,8 @@ Rules:
 2. If not covered, set found_in_materials=false and answer clearly that the content is not covered in the provided textbook.
 3. If multiple viewpoints exist, list all of them.
 4. Keep wording aligned with textbook terminology.
-5. Return JSON only:
+5. Use **bold** (Markdown) to highlight key terms, definitions, and important concepts in your answer.
+6. Return JSON only:
 { "answer": "...", "found_in_materials": true/false, "confidence": 0-1, "citation_indices": [] }`;
   }
 
@@ -81,6 +82,7 @@ Rules:
 - 只能基于提供的教材内容回答，不能使用教材以外的知识
 - 如果教材中没有相关内容，设 found_in_materials=false
 - confidence 表示答案与教材内容的匹配程度（0-1）
+- 使用 **加粗**（Markdown格式）标记关键术语和重要概念
 
 返回 JSON：{ "answer": "...", "found_in_materials": true/false, "confidence": 0-1, "citation_indices": [] }`;
   }
@@ -95,9 +97,10 @@ ${titleList}
 规则：
 1. 只能基于提供的教材片段回答。
 2. 不得使用教材外知识。
-3. 若教材未涉及，found_in_materials=false，且明确说明“教材中未涉及此内容”。
+3. 若教材未涉及，found_in_materials=false，且明确说明”教材中未涉及此内容”。
 4. 如果有多个观点，必须完整列出。
-5. 返回 JSON：{ "answer": "...", "found_in_materials": true/false, "confidence": 0-1, "citation_indices": [] }`;
+5. 使用 **加粗**（Markdown格式）标记答案中的关键术语、定义和重要概念，便于学生快速抓住重点。
+6. 返回 JSON：{ “answer”: “...”, “found_in_materials”: true/false, “confidence”: 0-1, “citation_indices”: [] }`;
 }
 
 export function buildUserPrompt(
