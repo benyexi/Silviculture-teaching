@@ -14,6 +14,8 @@ export function registerOAuthRoutes(app: Express) {
   app.post("/api/auth/login", async (req: Request, res: Response) => {
     const { username, password } = req.body ?? {};
 
+    console.log("[Auth] Login attempt:", { username, bodyKeys: Object.keys(req.body ?? {}), envUser: ENV.adminUsername, envPassSet: !!ENV.adminPassword });
+
     if (!username || !password) {
       res.status(400).json({ error: "用户名和密码不能为空" });
       return;
@@ -24,7 +26,19 @@ export function registerOAuthRoutes(app: Express) {
       return;
     }
 
-    if (username !== ENV.adminUsername || password !== ENV.adminPassword) {
+    // Trim whitespace to handle copy-paste issues in environment variables
+    const envUsername = ENV.adminUsername.trim();
+    const envPassword = ENV.adminPassword.trim();
+
+    if (username !== envUsername || password !== envPassword) {
+      console.log("[Auth] Login failed - mismatch:", {
+        usernameMatch: username === envUsername,
+        passwordMatch: password === envPassword,
+        inputUserLen: username.length,
+        envUserLen: envUsername.length,
+        inputPassLen: password.length,
+        envPassLen: envPassword.length,
+      });
       res.status(401).json({ error: "用户名或密码错误" });
       return;
     }
