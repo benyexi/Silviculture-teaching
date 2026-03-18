@@ -111,14 +111,11 @@ ${titleList}
 
 Rules:
 1. Use only the provided excerpts. Do not add outside knowledge.
-2. Synthesize and organize information from the excerpts into a clear, comprehensive answer. You may restructure and summarize the content for clarity.
-3. If not covered, set found_in_materials=false and state that the content is not covered.
+2. Synthesize and organize information from the excerpts into a clear, comprehensive answer with headings and bullet points.
+3. If the content is not covered in the excerpts, reply: "The provided textbook excerpts do not cover this topic."
 4. If multiple viewpoints exist, list all of them.
 5. Use **bold** (Markdown) to highlight key terms and definitions.
-6. Do NOT include any citation markers or reference numbers in the answer text. Keep the answer clean.
-7. Put the excerpt numbers you referenced in the citation_indices array (e.g. [1, 3, 5]).
-8. Return pure JSON (no markdown code blocks):
-{ "answer": "...", "found_in_materials": true/false, "confidence": 0-1, "citation_indices": [] }`;
+6. Output your answer directly in Markdown format. Do NOT wrap it in JSON or code blocks.`;
   }
 
   if (materialLang === "en") {
@@ -129,11 +126,9 @@ Rules:
 
 规则：
 - 只能基于提供的教材内容回答，不能使用教材以外的知识
-- 如果教材中没有相关内容，设 found_in_materials=false
-- answer 中不要包含引用标记，在 citation_indices 数组中填写引用的片段编号
+- 如果教材中没有相关内容，回复"教材中未涉及此内容"
 - 使用 **加粗**（Markdown格式）标记关键术语和重要概念
-
-返回纯 JSON（不要 markdown 代码块）：{ "answer": "...", "found_in_materials": true/false, "confidence": 0-1, "citation_indices": [] }`;
+- 直接输出 Markdown 格式的回答，不要包裹在 JSON 或代码块中`;
   }
 
   const titleList = materialTitles.length
@@ -145,13 +140,11 @@ ${titleList}
 
 规则：
 1. 只能基于提供的教材片段回答，不得使用教材外知识。
-2. 综合整理教材片段中的信息，给出结构清晰、内容完整的回答。可以适当组织和概括内容，但核心信息必须来自教材。
-3. 若教材未涉及该内容，设 found_in_materials=false，明确说明"教材中未涉及此内容"。
+2. 综合整理教材片段中的信息，给出结构清晰、内容完整的回答。使用标题（如 一、二、三）和列表组织内容，条理分明。
+3. 若教材未涉及该内容，明确回复"教材中未涉及此内容"。
 4. 如果教材中有多个观点或说法，应完整列出。
 5. 使用 **加粗**（Markdown格式）标记关键术语和重要概念。
-6. answer 字段中不要包含任何引用标记或编号，直接输出干净的回答文本。
-7. 在 citation_indices 数组中填写你引用了哪些片段的编号（如 [1, 3, 5]）。
-8. 返回纯 JSON（不要 markdown 代码块）：{ "answer": "...", "found_in_materials": true/false, "confidence": 0-1, "citation_indices": [] }`;
+6. 直接输出 Markdown 格式的回答，不要包裹在 JSON 或代码块中。`;
 }
 
 export function buildUserPrompt(
@@ -176,10 +169,10 @@ export function buildUserPrompt(
     .join("\n\n---\n\n");
 
   if (questionLang === "en") {
-    return `Question:\n${question}\n\nTextbook excerpts (${chunks.length}):\n${chunkTexts}\n\nPlease answer in JSON.`;
+    return `Question:\n${question}\n\nTextbook excerpts (${chunks.length}):\n${chunkTexts}\n\nPlease answer based on the excerpts above.`;
   }
 
-  return `【学生问题】\n${question}\n\n【教材内容片段（共 ${chunks.length} 条）】\n${chunkTexts}\n\n请根据以上教材内容，以 JSON 格式回答。`;
+  return `【学生问题】\n${question}\n\n【教材内容片段（共 ${chunks.length} 条）】\n${chunkTexts}\n\n请根据以上教材内容回答。`;
 }
 
 export async function generateAnswer(req: QARequest): Promise<QAResponse> {
@@ -291,35 +284,21 @@ async function callLLM(
     systemPrompt
   );
 
+  let answer = stripCitationMarkers(llmResponse.content);
+
+  // 如果 LLM 仍然返回了 JSON，提取 answer 字段
   const parsed = parseLLMOutput(llmResponse.content);
-
-  let answer = llmResponse.content;
-  let foundInMaterials = true;
-  let confidence = 0.6;
-  let usedSources = searchResults;
-
   if (parsed) {
     answer = stripCitationMarkers(parsed.answer);
-    foundInMaterials = parsed.found_in_materials;
-    confidence = parsed.confidence;
-
-    if (parsed.citation_indices && parsed.citation_indices.length > 0) {
-      usedSources = parsed.citation_indices
-        .filter((idx) => idx >= 1 && idx <= searchResults.length)
-        .map((idx) => searchResults[idx - 1]);
-      usedSources = usedSources.filter(
-        (s, i, arr) => arr.findIndex((x) => x.chunkId === s.chunkId) === i
-      );
-    }
-
-    if (!foundInMaterials) {
-      usedSources = [];
-    }
   }
+
+  // 判断是否在教材中找到了内容
+  const notFoundPhrases = ["未涉及", "not cover", "没有相关", "未找到", "not found"];
+  const foundInMaterials = !notFoundPhrases.some((p) => answer.toLowerCase().includes(p));
 
   const keywords = questionLang === "en" ? extractKeywordsEn(question) : extractKeywords(question);
 
-  const sources: QuerySource[] = usedSources.map((r) => ({
+  const sources: QuerySource[] = (foundInMaterials ? searchResults : []).map((r) => ({
     materialId: r.materialId,
     materialTitle: r.materialTitle,
     chapter: r.chapter,
@@ -334,7 +313,7 @@ async function callLLM(
     sources,
     modelUsed: llmResponse.model,
     foundInMaterials,
-    confidence,
+    confidence: foundInMaterials ? 0.8 : 0.1,
   };
 }
 
