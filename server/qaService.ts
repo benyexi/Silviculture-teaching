@@ -604,7 +604,13 @@ function isNoisySearchResult(row: SearchResult): boolean {
   const chapter = (row.chapter || "").trim();
   const content = row.content.trim();
   if (!content) return true;
-  if (chapter && isNumericLikeChapter(chapter)) return true;
+  if (chapter && isNumericLikeChapter(chapter)) {
+    const informativeNumericChapter =
+      content.length >= 160 &&
+      /(是指|指的是|定义为|定义是|概念|可分为|包括|是.*?过程|是.*?学科|单位面积|林分密度)/.test(content) &&
+      !looksLikeCatalogBlock(content);
+    if (!informativeNumericChapter) return true;
+  }
   if (/^(复习思考题|思考题|习题|练习题|参考文献|目录)/.test(content)) return true;
   if (looksLikeCatalogBlock(content)) return true;
   return false;
@@ -1696,6 +1702,9 @@ function buildExtractiveAnswer(
     targetHit: boolean;
     cueHit: boolean;
     definitionalHit: boolean;
+    startsWithTarget: boolean;
+    directSubjectDefinition: boolean;
+    targetPos: number;
   }> = [];
   const sanitizeSentence = (sentence: string): string =>
     sentence
@@ -1776,6 +1785,13 @@ function buildExtractiveAnswer(
         const definitionalHit = questionLang === "en"
           ? /\b(is|means|refers to|defined as)\b/i.test(sentence)
           : /(?:^|，|。)\s*(?:[^。！？\n]{0,14})(?:是指|指的是|定义为|定义是|是研究|是一种|是一类|是将|是对|是按|是从)/.test(sentence);
+        const definesDifferentSubject =
+          cueHit &&
+          targetHit &&
+          !startsWithTarget &&
+          !directSubjectDefinition &&
+          Number.isFinite(firstTargetPos) &&
+          firstTargetPos > (questionLang === "en" ? 20 : 10);
         const contextualSentence = questionLang === "en"
           ? !cueHit && !definitionalHit && /(should|need to|management|operation|practice|during|under)/i.test(sentence)
           : !cueHit && !definitionalHit && /(一般|通常|应|需|需要|可|可以|采用|实施|管理|措施|技术|作业|过程|在.*时|对.+?时)/.test(sentence);
@@ -1792,6 +1808,7 @@ function buildExtractiveAnswer(
         if (contextualSentence) score -= 4.5;
         if (targetAppearsLate) score -= 5.2;
         if (subjectSuffixMismatch) score -= 4.8;
+        if (definesDifferentSubject) score -= 12;
         if (questionLang === "zh" && sentence.length > 120) score -= 2.2;
         if (questionLang === "zh" && sentence.length > 170) score -= 2.8;
         if (questionLang === "en" && sentence.length > 260) score -= 2.2;
@@ -1799,7 +1816,17 @@ function buildExtractiveAnswer(
         if (hasHistoricalCue(sentence, questionLang)) score -= 4;
         if (!targetHit && !cueHit) score -= 2;
         if (score > 0) {
-          scored.push({ sentence, score, chunkId: chunk.chunkId, targetHit, cueHit, definitionalHit });
+          scored.push({
+            sentence,
+            score,
+            chunkId: chunk.chunkId,
+            targetHit,
+            cueHit,
+            definitionalHit,
+            startsWithTarget,
+            directSubjectDefinition,
+            targetPos: Number.isFinite(firstTargetPos) ? firstTargetPos : Number.POSITIVE_INFINITY,
+          });
         }
         continue;
       }
@@ -1811,6 +1838,9 @@ function buildExtractiveAnswer(
           targetHit: false,
           cueHit: false,
           definitionalHit: false,
+          startsWithTarget: false,
+          directSubjectDefinition: false,
+          targetPos: Number.POSITIVE_INFINITY,
         });
       }
     }
@@ -1819,7 +1849,12 @@ function buildExtractiveAnswer(
   if (scored.length === 0) return null;
 
   if (analysis.conciseDefinition) {
-    const hasStrongDefinitionSentence = scored.some((item) => item.targetHit && (item.cueHit || item.definitionalHit));
+    const hasStrongDefinitionSentence = scored.some(
+      (item) =>
+        item.targetHit &&
+        (item.cueHit || item.definitionalHit) &&
+        (item.startsWithTarget || item.directSubjectDefinition || item.targetPos <= 8)
+    );
     if (!hasStrongDefinitionSentence) {
       const hasApproxDefinitionSignal = scored.some((item) => item.targetHit || item.cueHit || item.definitionalHit);
       if (!hasApproxDefinitionSignal) return null;
@@ -1834,6 +1869,9 @@ function buildExtractiveAnswer(
     targetHit: boolean;
     cueHit: boolean;
     definitionalHit: boolean;
+    startsWithTarget: boolean;
+    directSubjectDefinition: boolean;
+    targetPos: number;
   }> = [];
   const seen = new Set<string>();
   const maxItems = analysis.conciseDefinition ? 2 : analysis.conciseEntity ? 2 : analysis.conciseAnswer ? 3 : 5;
@@ -1848,6 +1886,9 @@ function buildExtractiveAnswer(
       targetHit: item.targetHit,
       cueHit: item.cueHit,
       definitionalHit: item.definitionalHit,
+      startsWithTarget: item.startsWithTarget,
+      directSubjectDefinition: item.directSubjectDefinition,
+      targetPos: item.targetPos,
     });
     used.add(item.chunkId);
     if (picked.length >= maxItems) break;
@@ -1858,8 +1899,20 @@ function buildExtractiveAnswer(
   let pickedSentences = picked;
   if (analysis.conciseDefinition) {
     const anchor = picked.find(
-      (item) => item.targetHit && (item.cueHit || item.definitionalHit) && !hasHistoricalCue(item.sentence, questionLang)
-    ) || picked.find((item) => item.targetHit && (item.cueHit || item.definitionalHit)) || picked[0];
+      (item) =>
+        item.targetHit &&
+        (item.cueHit || item.definitionalHit) &&
+        (item.startsWithTarget || item.directSubjectDefinition || item.targetPos <= 8) &&
+        !hasHistoricalCue(item.sentence, questionLang)
+    ) ||
+      picked.find(
+        (item) =>
+          item.targetHit &&
+          (item.cueHit || item.definitionalHit) &&
+          (item.startsWithTarget || item.directSubjectDefinition || item.targetPos <= 8)
+      ) ||
+      picked.find((item) => item.targetHit && !hasHistoricalCue(item.sentence, questionLang)) ||
+      picked[0];
 
     const support = picked.find(
       (item) =>
@@ -1889,11 +1942,25 @@ function buildExtractiveAnswer(
     const hasStrongDefinitionSentence = pickedSentences.some((item) => {
       const sentenceLower = item.sentence.toLowerCase();
       const targetHit = definitionTargets.some((term) => sentenceLower.includes(term));
+      const startsWithTarget = definitionTargets.some((term) =>
+        questionLang === "zh" && !term.endsWith("学")
+          ? sentenceLower.startsWith(term) && !sentenceLower.startsWith(`${term}学`)
+          : sentenceLower.startsWith(term)
+      );
       const cueHit = hasDefinitionCue(item.sentence, questionLang);
       const definitionalHit = questionLang === "en"
         ? /\b(is|means|refers to|defined as)\b/i.test(item.sentence)
-        : /(?:^|，|。)\s*(?:[^。！？\n]{0,14})(?:是指|指的是|定义为|定义是|是研究|是一种|是一类|是将|是对|是按|是从)/.test(item.sentence);
-      return targetHit && (cueHit || definitionalHit);
+          : /(?:^|，|。)\s*(?:[^。！？\n]{0,14})(?:是指|指的是|定义为|定义是|是研究|是一种|是一类|是将|是对|是按|是从)/.test(item.sentence);
+      const targetPos = definitionTargets.reduce((minPos, term) => {
+        const idx = sentenceLower.indexOf(term);
+        if (idx < 0) return minPos;
+        return Math.min(minPos, idx);
+      }, Number.POSITIVE_INFINITY);
+      return (
+        targetHit &&
+        (cueHit || definitionalHit) &&
+        (startsWithTarget || item.directSubjectDefinition || (Number.isFinite(targetPos) && targetPos <= 8))
+      );
     });
 
     if (!hasStrongDefinitionSentence) {

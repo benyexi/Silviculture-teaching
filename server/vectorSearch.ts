@@ -805,10 +805,21 @@ function isReviewSectionNoise(content: string): boolean {
 export function assessNoiseCandidate(content: string, chapter: string | null | undefined): NoiseAssessment {
   const reasons: string[] = [];
   let penalty = 1;
+  const compactContent = normalizeForComparison(content);
+  const hasDefinitionValue = /(是指|指的是|定义为|定义是|概念|可分为|包括|是.*?过程|是.*?学科)/.test(content);
 
   if (isNumericChapterNoise(chapter)) {
-    reasons.push("numeric-chapter");
-    return { drop: true, penalty: 0, reasons };
+    const directoryProbe = detectDirectoryStyleNoise(content);
+    const informativeNumericChapter =
+      compactContent.length >= 160 && (hasDefinitionValue || directoryProbe.score < 0.5);
+
+    if (informativeNumericChapter) {
+      reasons.push("numeric-chapter-soft");
+      penalty *= 0.62;
+    } else {
+      reasons.push("numeric-chapter");
+      return { drop: true, penalty: 0, reasons };
+    }
   }
 
   if (isReviewSectionNoise(content)) {
