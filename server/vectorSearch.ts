@@ -55,6 +55,7 @@ type SearchProfile = {
   coreTerms: string[];
   broadTerms: string[];
   scoringTerms: string[];
+  queryMode: "definition" | "classification" | "method" | "general";
 };
 
 type TermStats = {
@@ -476,6 +477,7 @@ async function emergencyLikeFallbackSearch(
       const contentScore = scoreChunk(row.content, scoringTerms, question, row.chapter ?? undefined, {
         stats,
         intentTerms: profile.intentTerms,
+        queryMode: profile.queryMode,
       });
       const definitionBoost = hasDefinitionSignal(row.content) ? 1.8 : 0;
       const chapterBoost = row.chapter && !isNumericLikeChapter(row.chapter) ? 0.4 : 0;
@@ -677,6 +679,14 @@ const QUESTION_INTENT_WORDS = [
   "定义",
   "含义",
   "概念",
+  "内涵",
+  "界定",
+  "指标",
+  "表现",
+  "形式",
+  "特征",
+  "要素",
+  "构成",
   "是指",
   "分类",
   "类型",
@@ -877,9 +887,19 @@ function extractIntentTerms(text: string): string[] {
   return QUESTION_INTENT_WORDS.filter((term) => normalized.includes(normalizeForComparison(term)));
 }
 
+function detectQuestionMode(question: string): SearchProfile["queryMode"] {
+  const normalized = normalizeForComparison(normalizeForLookup(question));
+
+  if (/(什么是|是什么|何谓|何为|何谓|定义|概念|含义|内涵|界定)/.test(normalized)) return "definition";
+  if (/(指标|表现|形式|特征|要素|构成|有哪些|哪些|分类|类型|分为|包括)/.test(normalized)) return "classification";
+  if (/(如何|怎么|怎样|步骤|方法|措施|原则|过程|程序|实施)/.test(normalized)) return "method";
+  return "general";
+}
+
 function buildSearchProfile(question: string, questionLang: "zh" | "en"): SearchProfile {
   const normalizedQuestion = normalizeForLookup(question);
   const strippedQuestion = stripQuestionWords(normalizedQuestion).trim();
+  const queryMode = detectQuestionMode(question);
   const baseKeywords = questionLang === "en" ? extractKeywordsEn(question) : extractKeywords(question);
   const exactPhrases = questionLang === "en" ? [] : extractDomainPhrases(strippedQuestion);
   const derivedDefinitionTerms =
@@ -902,17 +922,19 @@ function buildSearchProfile(question: string, questionLang: "zh" | "en"): Search
     return normalized.length >= 3 || DOMAIN_VOCAB_KEYS.has(normalized) || QUESTION_INTENT_KEYS.has(normalized);
   }).slice(0, 8);
 
+  const broadLimit = queryMode === "definition" ? 14 : queryMode === "classification" ? 16 : 18;
+  const scoringLimit = queryMode === "definition" ? 14 : queryMode === "classification" ? 15 : 16;
   const broadTerms = uniqueSortedTerms([
     ...candidateTerms,
     ...expandWithSynonyms(candidateTerms).slice(0, 12),
-  ]).slice(0, 18);
+  ]).slice(0, broadLimit);
 
   const scoringTerms = uniqueSortedTerms([
     ...coreTerms,
     ...exactPhrases,
     ...intentTerms,
     ...broadTerms,
-  ]).slice(0, 16);
+  ]).slice(0, scoringLimit);
 
   return {
     cleanedQuestion: strippedQuestion,
@@ -921,6 +943,7 @@ function buildSearchProfile(question: string, questionLang: "zh" | "en"): Search
     coreTerms,
     broadTerms,
     scoringTerms,
+    queryMode,
   };
 }
 
@@ -1074,6 +1097,7 @@ function scoreChunk(
   options?: {
     stats?: TermStats;
     intentTerms?: string[];
+    queryMode?: SearchProfile["queryMode"];
   }
 ): number {
   if (keywords.length === 0) return 0;
@@ -1083,6 +1107,7 @@ function scoreChunk(
   const cleanedQuestion = normalizeForComparison(stripQuestionWords(originalQuestion));
   const stats = options?.stats;
   const intentTerms = options?.intentTerms ?? [];
+  const queryMode = options?.queryMode ?? "general";
   const coreKeywords = keywords.filter((kw) => {
     const normalized = normalizeForComparison(kw);
     return normalized.length >= 3 || DOMAIN_VOCAB_KEYS.has(normalized) || QUESTION_INTENT_KEYS.has(normalized);
@@ -1124,14 +1149,18 @@ function scoreChunk(
   const coverage = coreKeywords.length > 0 ? matchedCore / coreKeywords.length : 0;
 
   let phraseBonus = 0;
+  let leadBonus = 0;
   if (cleanedQuestion.length >= 3 && compactContent.includes(cleanedQuestion)) {
-    phraseBonus += cleanedQuestion.length * 0.9;
+    phraseBonus += cleanedQuestion.length * (queryMode === "definition" ? 1.15 : 0.9);
+    if (compactContent.slice(0, 140).includes(cleanedQuestion)) {
+      leadBonus += queryMode === "definition" || queryMode === "classification" ? 2.2 : 1.2;
+    }
   }
 
   for (const phrase of coreKeywords) {
     const phraseKey = normalizeForComparison(phrase);
     if (phraseKey.length >= 3 && compactContent.includes(phraseKey)) {
-      phraseBonus += Math.min(8, phraseKey.length * 0.55);
+      phraseBonus += Math.min(queryMode === "definition" ? 10 : 8, phraseKey.length * (queryMode === "definition" ? 0.72 : 0.55));
     }
   }
 
@@ -1140,28 +1169,42 @@ function scoreChunk(
     for (const keyword of coreKeywords) {
       const termKey = normalizeForComparison(keyword);
       if (termKey.length >= 2 && compactChapter.includes(termKey)) {
-        chapterBonus += Math.min(6, termKey.length * 0.65);
+        chapterBonus += Math.min(queryMode === "definition" ? 4.5 : 6, termKey.length * (queryMode === "definition" ? 0.5 : 0.65));
       }
     }
 
     for (const intent of intentTerms) {
       const intentKey = normalizeForComparison(intent);
       if (intentKey && compactChapter.includes(intentKey)) {
-        chapterBonus += 1.4;
+        chapterBonus += queryMode === "definition" ? 1.0 : 1.4;
       }
     }
   }
 
   let structureBonus = 0;
-  if (containsEnumerationMarkers(content) && intentTerms.some((term) => QUESTION_INTENT_KEYS.has(normalizeForComparison(term)))) {
-    structureBonus += 2.2;
+  const hasStructuredClue =
+    containsEnumerationMarkers(content) &&
+    intentTerms.some((term) => QUESTION_INTENT_KEYS.has(normalizeForComparison(term)));
+  if (hasStructuredClue) {
+    structureBonus += queryMode === "classification" ? 2.8 : 2.2;
+  }
+  if (queryMode === "definition" && hasDefinitionSignal(content)) {
+    structureBonus += 1.3;
+  }
+
+  if ((queryMode === "definition" || queryMode === "classification") && !hasDefinitionSignal(content) && !containsEnumerationMarkers(content)) {
+    chapterBonus *= 0.78;
+  }
+
+  if (queryMode === "classification" && compactContent.includes(cleanedQuestion) && containsEnumerationMarkers(content)) {
+    leadBonus += 0.8;
   }
 
   const repetitionPenalty = computeRepetitionPenalty(content);
   const tfPenalty = maxTf > 5 ? Math.max(0.82, 1 - (maxTf - 5) * 0.03) : 1;
   const baseScore = bm25Score * (0.6 + 0.4 * coverage);
 
-  return (baseScore + phraseBonus + chapterBonus + structureBonus) * repetitionPenalty * tfPenalty;
+  return (baseScore + phraseBonus + chapterBonus + structureBonus + leadBonus) * repetitionPenalty * tfPenalty;
 }
 
 function computeRepetitionPenalty(content: string): number {
@@ -1462,7 +1505,12 @@ export async function semanticSearch(
   const emergencyTerms = buildEmergencyTerms(question, questionLang);
   const strictTerms = uniqueSortedTerms(profile.coreTerms.slice(0, 5));
   const phraseTerms = uniqueSortedTerms([...profile.exactPhrases, ...profile.intentTerms]).slice(0, 8);
-  const broadTerms = profile.broadTerms.slice(0, 18);
+  const broadTerms =
+    profile.queryMode === "definition"
+      ? profile.broadTerms.slice(0, 12)
+      : profile.queryMode === "classification"
+        ? profile.broadTerms.slice(0, 15)
+        : profile.broadTerms.slice(0, 18);
   console.log(`[HybridSearch] question="${question}", lang=${questionLang}, langFilter=${languageFilter}, useEmb=${useEmbedding}`);
   console.log(`[HybridSearch] strictTerms=[${strictTerms.join(',')}], phraseTerms=[${phraseTerms.join(',')}], broadTerms=[${broadTerms.join(',')}], emergencyTerms=[${emergencyTerms.join(',')}]`);
   const routePlan: Array<{
@@ -1543,6 +1591,7 @@ export async function semanticSearch(
         score:
           scoreChunk(row.content, route.terms, question, row.chapter ?? undefined, {
             intentTerms: profile.intentTerms,
+            queryMode: profile.queryMode,
           }) * (isNoisyChunk(row) ? 0.35 : 1),
       }))
       .filter((item) => item.score > 0)
@@ -1604,6 +1653,7 @@ export async function semanticSearch(
     candidate.keywordScore = scoreChunk(candidate.content, profile.scoringTerms, question, candidate.chapter ?? undefined, {
       stats,
       intentTerms: profile.intentTerms,
+      queryMode: profile.queryMode,
     });
   }
 
@@ -1637,6 +1687,7 @@ export async function semanticSearch(
     candidate.keywordScore = scoreChunk(candidate.content, profile.scoringTerms, question, candidate.chapter ?? undefined, {
       stats,
       intentTerms: profile.intentTerms,
+      queryMode: profile.queryMode,
     });
   }
 

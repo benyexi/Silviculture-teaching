@@ -34,7 +34,7 @@ type StreamMeta = {
 };
 
 function normalizeAnswerMarkdown(text: string): string {
-  return text
+  const normalized = text
     .replace(/\r\n/g, "\n")
     .replace(/\r/g, "\n")
     // 清除非标准引用格式，但保留 [1] [2] 等正规引用标记
@@ -45,8 +45,18 @@ function normalizeAnswerMarkdown(text: string): string {
     // 标准化引用格式
     .replace(/\[\s*(\d+)\s*\]/g, "[$1]")
     .replace(/([^\n])\s+(#{1,6}\s+)/g, "$1\n\n$2")
+    .replace(/([^\n])\s+((?:[-*+]\s+|\d+\.\s+))/g, "$1\n\n$2")
     .replace(/\n[ \t]*([#>-])/g, "\n$1")
+    .replace(/\n{1,2}([*-+]\s+)/g, "\n$1")
+    .replace(/\n{1,2}(\d+\.\s+)/g, "\n$1")
     .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+  return normalized
+    .split("\n")
+    .map((line) => line.replace(/[ \t]{2,}/g, " ").trimEnd())
+    .join("\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
@@ -362,8 +372,8 @@ export default function Home() {
                         </Badge>
                       </div>
                     </CardHeader>
-                    <CardContent>
-                      <div className="prose prose-sm max-w-none text-foreground leading-relaxed">
+                    <CardContent className="pt-0 sm:pt-1">
+                      <div className="notebook-answer">
                         <CitedAnswer answer={displayAnswer} sourceCount={displaySources.length} />
                       </div>
 
@@ -488,7 +498,7 @@ function CitedAnswer({ answer, sourceCount }: { answer: string; sourceCount: num
           const idx = ref.getAttribute("data-idx");
           if (!idx) return;
           const badge = document.createElement("sup");
-          badge.className = "inline-flex items-center justify-center min-w-[1.1rem] h-[1.1rem] rounded-full bg-primary/15 text-primary text-[0.65rem] font-bold cursor-pointer hover:bg-primary/30 transition-colors mx-0.5 px-0.5 align-super";
+          badge.className = "cite-badge";
           badge.textContent = idx;
           badge.title = `查看来源 ${idx}`;
           badge.onclick = () => {

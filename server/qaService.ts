@@ -239,15 +239,15 @@ function buildAnswerBlueprint(analysis: QuestionAnalysis, questionLang: "zh" | "
   if (questionLang === "en") {
     switch (analysis.intent) {
       case "classification":
-        return `1. One-sentence direct answer (optional)\n2. Complete list of types/classes from excerpts\n3. Item-by-item explanation in short lines`;
+        return `1. Directly list all types/classes mentioned in the excerpts\n2. Item-by-item explanation in short lines`;
       case "method":
-        return `1. One-sentence direct answer (optional)\n2. Complete list of methods/steps from excerpts\n3. Key points for each item`;
+        return `1. Directly list all methods/steps mentioned in the excerpts\n2. Key points for each item`;
       case "comparison":
         return `1. Objects being compared\n2. Side-by-side comparison table\n3. Key differences and conclusion`;
       case "condition":
-        return `1. One-sentence direct answer (optional)\n2. Complete list of conditions/requirements from excerpts\n3. Brief explanation of each item`;
+        return `1. Directly list all conditions/requirements mentioned in the excerpts\n2. Brief explanation of each item`;
       case "advantage":
-        return `1. Direct answer sentence (optional)\n2. Advantages from excerpts\n3. Disadvantages from excerpts`;
+        return `1. Directly list all advantages/disadvantages mentioned in the excerpts\n2. Brief explanation of each item`;
       case "definition":
         return analysis.conciseDefinition
           ? `1. One direct definition sentence\n2. 1-2 supporting sentences from excerpts\n3. Stop; no background expansion`
@@ -262,18 +262,18 @@ function buildAnswerBlueprint(analysis: QuestionAnalysis, questionLang: "zh" | "
 
   switch (analysis.intent) {
     case "classification":
-      return `1. 可选一句结论\n2. 完整列出教材中的类型/分类/条目\n3. 每项用1-2句说明`;
+      return `1. 直接列出教材中的类型/分类/条目\n2. 每项用1-2句说明`;
     case "method":
-      return `1. 可选一句结论\n2. 完整列出教材中的方法/步骤\n3. 逐项说明条件、要点或作用`;
+      return `1. 直接列出教材中的方法/步骤\n2. 逐项说明条件、要点或作用`;
     case "comparison":
       return `1. 说明比较对象\n2. 用对比表或分点对比列出差异\n3. 给出结论`;
     case "condition":
-      return `1. 可选一句结论\n2. 完整列出教材中的条件/要求\n3. 逐项简要说明`;
+      return `1. 直接列出教材中的条件/要求\n2. 逐项简要说明`;
     case "advantage":
-      return `1. 可选一句结论\n2. 列出教材中的优点/优势\n3. 列出教材中的缺点/劣势`;
+      return `1. 直接列出教材中的优点/优势/缺点\n2. 逐项简要说明`;
     case "definition":
       return analysis.conciseDefinition
-        ? `1. 先给出一句最直接定义\n2. 再补1-2句教材内关键说明\n3. 到此结束，不延伸历史、分类、目的等`
+        ? `1. 直接给出一句最直接定义\n2. 再补1-2句教材内关键说明\n3. 到此结束，不延伸历史、分类、目的等`
         : `1. 先给出定义或核心含义\n2. 补充关键特征、边界或作用\n3. 结合教材语境做简短解释`;
     default:
       if (analysis.conciseEntity) {
@@ -286,12 +286,11 @@ function buildAnswerBlueprint(analysis: QuestionAnalysis, questionLang: "zh" | "
 function buildFewShot(questionLang: "zh" | "en", analysis: QuestionAnalysis): string {
   if (analysis.intent === "definition" && analysis.conciseDefinition) {
     if (questionLang === "en") {
-      return `Example (concise definition):
+    return `Example (concise definition):
 Q: What is silviculture?
 A:
 Silviculture is the discipline that studies forest cultivation theory and practice.
-It covers the cultivation process from seeds/seedlings to stand establishment and maturity.
-Only information explicitly stated in the excerpts is included.`;
+It covers the cultivation process from seeds/seedlings to stand establishment and maturity.`;
     }
 
     return `示例（简洁定义题）：
@@ -378,8 +377,8 @@ ${materialNote}
 6. 直接输出 Markdown，不要包裹在 JSON 或代码块中。
 7. 引用标注：每个事实性陈述后必须添加引用标记 [1]、[2]，对应片段编号。例如："森林培育涵盖从种子到成林的全过程[1]，包括间伐经营[3]。"
 8. 严禁扩展教材外知识，不要凭常识或通用知识补充。
-9. 禁止写过程性废话或自我说明，如"教材明确将…""完整性说明""本回答完全限定于…"。直接给答案内容。
-10. 禁止输出大段"未涉及项排除说明"（例如逐条解释哪些概念不在教材里），除非用户明确问"哪些没有提到"。`;
+9. 禁止写过程性废话或自我说明，如"教材明确将…""完整性说明""本回答完全限定于…"。答案第一句必须直接进入结论或清单。
+10. 证据不足时只用一句短提示，不要展开排除说明；除非用户明确问"哪些没有提到"，才可以说明缺失项。`;
 }
 
 export function buildSystemPrompt(
@@ -399,9 +398,9 @@ Textbooks:
 ${titleList}
 
 Requirements:
-1. Source only: use only the provided excerpts. Do not add outside knowledge. If not covered, reply with: "The provided textbook excerpts do not cover this topic."
-2. ${analysis.conciseDefinition ? "Concise definition mode: answer only the core definition from excerpts in 2-4 sentences." : "Completeness: synthesize ALL provided excerpts thoroughly. For classification/method/step/comparison questions, list every item that appears in the excerpts."}
-3. Structure: follow this blueprint: ${buildAnswerBlueprint(analysis, questionLang)}.
+1. Source only: use only the provided excerpts. Do not add outside knowledge. If not covered, reply with a single short sentence and stop.
+2. ${analysis.conciseDefinition ? "Concise definition mode: answer only the core definition from excerpts in 2-4 sentences, with the first sentence being the direct answer." : "Completeness: synthesize ALL provided excerpts thoroughly. For classification/method/step/comparison questions, list every item that appears in the excerpts."}
+3. Structure: follow this blueprint: ${buildAnswerBlueprint(analysis, questionLang)}. Do not add a preface like 'the textbook says' or 'excerpt-grounded'.
 4. Key terms: use **bold** for key terms, important concepts, and critical conclusions. Precisely preserve numeric data, formulas, and ratios from the textbook.
 5. Textbook language: preserve original terminology. If multiple viewpoints exist, list them all.
 6. ${analysis.conciseDefinition ? "Format: output plain concise Markdown in 2-4 sentences; do not use long sectioned expansion." : "Format: output directly in Markdown. Start with a 1-2 sentence overview, then expand with full details."}
@@ -420,6 +419,7 @@ ${buildFewShot(questionLang, analysis)}`;
 1. 先给出英文教材的关键原文或关键术语（1-2句）
 2. 再给出中文翻译和解释
 3. 若问题属于分类/方法/步骤/比较题，必须完整列出教材中明确出现的项目，不能只给概述
+4. 直接进入答案，不要先写“教材中关于…”或“根据片段…”之类的引导语；如果证据不足，只用一句短提示。
 
 规则：
 - 只能基于提供的教材内容回答，不能使用教材以外的知识
@@ -443,7 +443,7 @@ ${titleList}
 3. 结构清晰：${analysis.conciseDefinition ? `直接按"定义句 + 1-2句补充说明"输出。` : `优先"直接回答 + 清单/要点"。`} ${buildAnswerBlueprint(analysis, questionLang)}
 4. 突出重点：使用 **加粗** 标记关键术语、重要概念和核心结论。对于教材中的数据、公式、比例等要精确引用。
 5. 保留教材表述：尽量使用教材中的原始术语和表述，可以适当组织和概括，但核心信息必须来自教材。如果教材中有多个观点或说法，应完整列出。
-6. 格式规范：${analysis.conciseDefinition ? "直接输出 Markdown，2-4句即可，不要使用长篇多级标题。" : "直接输出 Markdown 格式，不要包裹在 JSON 或代码块中。不要求固定写'一、概述/三、完整性说明'。"}
+6. 格式规范：${analysis.conciseDefinition ? "直接输出 Markdown，2-4句即可，不要使用长篇多级标题，也不要写导语。" : "直接输出 Markdown 格式，不要包裹在 JSON 或代码块中。不要求固定写'一、概述/三、完整性说明'。"}
 7. 内联引用标注：每个事实性陈述后必须添加 [1]、[2]、[3] 等标记，对应其来自的片段编号。每个关键陈述至少有一个引用标记。例如：造林密度取决于立地条件[2]和树种特性[4]。
 ${analysis.conciseDefinition ? `\n8. 当前是简洁定义题，仅回答定义本身（2-4句），不得扩展到历史、分类、目的、发展、问题等延伸内容。` : ""}
 
@@ -483,11 +483,11 @@ ${buildAnswerBlueprint(analysis, questionLang)}
 
 Completion constraints (Strict Grounding Mode):
 - You may ONLY use the excerpts below. Never use pre-trained knowledge to fabricate content.
-- If the excerpts don't contain the answer, say "The provided textbook excerpts do not cover this topic."
+- If the excerpts don't contain the answer, reply with one short sentence and stop.
 - Add citation markers [1], [2] etc. after every factual claim, referencing the excerpt number.
 - If the question asks for types, methods, steps, or comparisons, list every item explicitly mentioned in the excerpts.
 - Do not stop at a summary sentence.
-- If the excerpts only cover part of the topic, say so clearly.
+- If the excerpts only cover part of the topic, say so briefly and directly.
 ${analysis.conciseDefinition ? "- This is a concise definition question. Use 2-4 sentences only and stop after the core definition." : ""}
 
 Textbook excerpts (${chunks.length}):
@@ -506,10 +506,10 @@ ${buildAnswerBlueprint(analysis, questionLang)}
 
 【完整性约束（严格 Grounding 模式）】
 - 你只能基于下方教材片段回答，绝对不能根据预训练知识编造内容。
-- 如果片段中没有答案，直接告知"教材中未涉及此内容"。
+- 如果片段中没有答案，直接用一句短提示，不要解释原因，也不要列出排除项。
 - 每个事实性陈述后必须标注来源片段编号，如 [1]、[2]。
 - 如果是分类/方法/步骤/比较题，必须把教材中明确出现的项目全部列出。
-- 直接列与问题最相关的条目，可选1句总述，不要求概述段。
+- 直接列与问题最相关的条目，第一句必须直接进入答案，不要写导语。
 - 仅在确实缺失且用户明确追问缺失内容时，用1句短注说明，不要扩展解释过程。
 ${analysis.conciseDefinition ? "- 这是简洁定义题：只用2-4句话回答定义本身，禁止历史背景/分类/目的等延伸。" : ""}
 
@@ -799,7 +799,7 @@ async function callLLM(
     const answer =
       questionLang === "en"
         ? "The provided textbook excerpts do not cover this topic."
-        : "教材中未涉及此内容。建议查阅其他章节或咨询教师。";
+        : "教材中未涉及此内容。";
 
     return {
       answer,
@@ -1062,7 +1062,10 @@ function assessAnswerLocally(
   }
 
   if (searchResults.length > 0 && hasNotFoundPhrase && !/教材只明确提到|部分内容|partial/i.test(answer)) {
-    issues.push("存在召回片段，但回答仍表现为未涉及");
+    const isShortFallbackNote = compactAnswer.length <= 40 && /未涉及|没有相关|未找到|not cover|not found/i.test(answer);
+    if (!(analysis.conciseDefinition || analysis.conciseAnswer) || !isShortFallbackNote) {
+      issues.push("存在召回片段，但回答仍表现为未涉及");
+    }
   }
 
   const complete = issues.length === 0;
@@ -1324,9 +1327,11 @@ function removeAnswerBoilerplate(
     /^#+\s*[一二三四五六七八九十]+[、.．]?\s*完整性说明\s*$/i,
     /^(?:[一二三四五六七八九十]+[、.．])\s*概述\s*$/,
     /^(?:[一二三四五六七八九十]+[、.．])\s*完整性说明\s*$/,
+    /^教材中关于.+?(直接信息|直接定义性信息|最接近的定义性表述|直接相关的要点)[:：]?\s*$/,
     /^教材中明确提到/,
     /^教材中明确提及/,
     /^教材明确将/,
+    /^教材中与.+?(直接相关|最接近的定义性表述|直接信息)[:：]?\s*$/,
     /^教材未设专节/,
     /^全部直接源自/,
     /^未作任何扩展或推断/,
@@ -1335,15 +1340,29 @@ function removeAnswerBoilerplate(
     /^教材未涉及“/,
     /^未使用“/,
     /^未将“/,
+    /^可参考教材中的相关表述[:：]?\s*$/,
+    /^以下是教材中的相关表述[:：]?\s*$/,
     /^该内容在.*始终与/,
     /^属同一.*维度/,
     /^并非单独列项/,
+    /^本回答[:：]?\s*$/,
     /^因此，本回答/,
     /^以上仅列出教材明确出现/,
     /^无任何召回遗漏/,
     /^无任何外部补充/,
     /^仅整理已明确出现的内容/,
     /^仅列出教材明确提及的项目/,
+  ];
+  const zhDropContains = [
+    "教材片段只覆盖了该问题的部分要点",
+    "以下仅整理已明确出现的内容",
+    "本回答完全限定于教材原文",
+    "无任何召回遗漏",
+    "无任何外部补充",
+    "未作任何扩展或推断",
+    "具备可确证性",
+    "全部源自教材片段",
+    "仅列出教材明确提及的项目",
   ];
   const enDropPatterns = [
     /^#+\s*overview\s*$/i,
@@ -1352,6 +1371,16 @@ function removeAnswerBoilerplate(
     /^the excerpts clearly/i,
     /^this answer is strictly limited to/i,
     /^only items explicitly mentioned/i,
+    /^excerpt-grounded (definition|information|statement|list).*$/i,
+    /^closest excerpt-grounded statement.*$/i,
+    /^direct excerpt-grounded (definition|information).*$/i,
+  ];
+  const enDropContains = [
+    "only partially cover this topic",
+    "only the clearly stated content is listed",
+    "strictly limited to the textbook excerpts",
+    "no external supplementation",
+    "no inferred content",
   ];
 
   for (const raw of lines) {
@@ -1360,10 +1389,12 @@ function removeAnswerBoilerplate(
       if (filtered.length > 0 && filtered[filtered.length - 1] !== "") filtered.push("");
       continue;
     }
+    if (line === "-" || line === "*" || line === "•") continue;
+    if (/^\[(\d+)\]$/.test(line)) continue;
 
     const shouldDrop = questionLang === "en"
-      ? enDropPatterns.some((re) => re.test(line))
-      : zhDropPatterns.some((re) => re.test(line));
+      ? enDropPatterns.some((re) => re.test(line)) || enDropContains.some((s) => line.toLowerCase().includes(s))
+      : zhDropPatterns.some((re) => re.test(line)) || zhDropContains.some((s) => line.includes(s));
     if (shouldDrop) continue;
 
     if (filtered.length > 0 && normalizeForFocus(filtered[filtered.length - 1]) === normalizeForFocus(line)) {
@@ -1374,6 +1405,12 @@ function removeAnswerBoilerplate(
 
   let cleaned = filtered.join("\n").replace(/\n{3,}/g, "\n\n").trim();
   if (!cleaned) return answer.trim();
+
+  cleaned = cleaned
+    .replace(/(?:^|\n)(?:一、|二、|三、|四、|五、)\s*概述\s*(?=\n|$)/g, "")
+    .replace(/(?:^|\n)概述[:：]?\s*(?=\n|$)/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 
   if (analysis.expectsEnumeration) {
     cleaned = cleaned
@@ -1482,7 +1519,7 @@ Question: ${question}
 Rules:
 1. No external knowledge.
 2. Paraphrase conservatively; do not add new facts.
-3. ${analysis.conciseDefinition ? "Answer in 2-4 sentences only." : "Keep a clear structure based on the question intent."}
+3. ${analysis.conciseDefinition ? "Answer in 2-4 sentences only, starting with the direct answer." : "Keep a clear structure based on the question intent, and start directly with the answer."}
 
 Excerpts:
 ${sourceTexts}`;
@@ -1493,7 +1530,7 @@ ${sourceTexts}`;
 1. 只能使用片段中出现的信息，不得发挥。
 2. 可适度改写表述，但不能新增事实。
 3. 每个事实性陈述后添加引用标记 [1]、[2] 对应片段编号。
-4. ${analysis.conciseDefinition ? "这是简洁定义题，仅用2-4句。禁止历史背景和延伸。" : "按问题类型组织结构，但不要超出片段。"}
+4. ${analysis.conciseDefinition ? "这是简洁定义题，仅用2-4句，第一句直接给出定义；禁止历史背景和延伸。" : "按问题类型组织结构，第一句直接进入答案，但不要超出片段。"}
 
 教材片段：
 ${sourceTexts}`;
@@ -2118,21 +2155,12 @@ function buildExtractiveAnswer(
     if (questionLang === "en") return `- ${trimmed}${/[.!?…]$/.test(trimmed) ? "" : "."}`;
     return `- ${trimmed}${/[。！？…]$/.test(trimmed) ? "" : "。"}`;
   });
-
-  const prefix = questionLang === "en"
-    ? (analysis.conciseDefinition
-      ? (strictScored.length > 0
-        ? `Direct excerpt-grounded definition about "${question.trim()}":`
-        : `Closest excerpt-grounded statement about "${question.trim()}":`)
-      : `Direct excerpt-grounded information about "${question.trim()}":`)
-    : (analysis.conciseDefinition
-      ? (strictScored.length > 0
-        ? `教材中关于"${question.trim()}"的直接定义性信息：`
-        : `教材片段中与"${question.trim()}"最接近的定义性表述：`)
-      : `教材中关于"${question.trim()}"的直接信息：`);
+  const answerBody = analysis.conciseDefinition
+    ? lines.map((line) => line.replace(/^-\s*/, "")).join(questionLang === "en" ? " " : "\n").trim()
+    : lines.join("\n").trim();
 
   return {
-    answer: `${prefix}\n${lines.join("\n")}`.replace(/[ \t]+\n/g, "\n").trim(),
+    answer: answerBody,
     usedChunkIds: Array.from(used),
   };
 }
@@ -2212,12 +2240,8 @@ function buildEnumerativeExtractiveAnswer(
     return `- ${t}${/[。！？…]$/.test(t) ? "" : "。"}`;
   });
 
-  const prefix = questionLang === "en"
-    ? `Excerpt-grounded list for "${question.trim()}":`
-    : `教材中与“${question.trim()}”直接相关的要点：`;
-
   return {
-    answer: `${prefix}\n${lines.join("\n")}`,
+    answer: lines.join("\n"),
     usedChunkIds: Array.from(used),
   };
 }
@@ -2320,7 +2344,7 @@ export async function generateAnswerStream(
     if (effectiveResults.length === 0) {
       const answer = questionLanguage === "en"
         ? "The provided textbook excerpts do not cover this topic."
-        : "教材中未涉及此内容。建议查阅其他章节或咨询教师。";
+        : "教材中未涉及此内容。";
       onMeta({
         sources: [],
         modelUsed: "built-in",
