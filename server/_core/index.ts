@@ -10,6 +10,7 @@ import { serveStatic, setupVite } from "./vite";
 import { runMigrations, getDb, getActiveLlmConfig } from "../db";
 import { ENV } from "./env";
 import { generateAnswerStream } from "../qaService";
+import { semanticSearch } from "../vectorSearch";
 import { getGeoInfo, extractIp } from "../geoip";
 import { materials, materialChunks } from "../../drizzle/schema";
 import { eq, like, and, count as drizzleCount } from "drizzle-orm";
@@ -155,6 +156,26 @@ async function startServer() {
           embeddingModel: config.embeddingModel || "(not set)",
           provider: config.provider,
         } : null,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message, stack: err.stack });
+    }
+  });
+
+  // ─── 直接调用 semanticSearch 测试 ─────────────────────────────────
+  app.get("/api/debug/search-test", async (req, res) => {
+    const q = (req.query.q as string) || "什么是森林培育";
+    try {
+      const results = await semanticSearch(q, undefined, 5, "zh", true);
+      res.json({
+        question: q,
+        resultCount: results.length,
+        results: results.map(r => ({
+          chunkId: r.chunkId,
+          similarity: r.similarity,
+          chapter: r.chapter,
+          contentPreview: r.content.slice(0, 150),
+        })),
       });
     } catch (err: any) {
       res.status(500).json({ error: err.message, stack: err.stack });
