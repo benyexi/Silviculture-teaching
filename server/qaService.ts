@@ -4,7 +4,7 @@ import {
   extractKeywordsEn,
   type SearchResult,
 } from "./vectorSearch";
-import { invokeLLMWithConfig, invokeLLMStreamWithConfig } from "./llmDriver";
+import { invokeLLMWithConfig } from "./llmDriver";
 import { createQuery, upsertVisitorStat, getActiveLlmConfig } from "./db";
 import { detectLanguage } from "./languageDetect";
 import type { QuerySource } from "../drizzle/schema";
@@ -2315,10 +2315,8 @@ export type StreamMeta = {
 };
 
 /**
- * 流式生成答案：先检索教材，然后通过 SSE 逐步输出 LLM 回答。
- * onToken: 每生成一个 token 就调用
- * onMeta: 在开始流式输出前发送元数据（sources 等）
- * onDone: 完成时调用
+ * 质量优先的流式接口：
+ * 复用与非流式一致的答案生成与审校管线，待最终答案确定后再输出。
  */
 export async function generateAnswerStream(
   req: QARequest,
@@ -2333,156 +2331,61 @@ export async function generateAnswerStream(
   const activeConfig = await getActiveLlmConfig();
   const useRAG = activeConfig?.useRAG ?? false;
 
-  // 检查缓存
-  const cached = getCachedAnswer(req.question);
-  if (cached) {
-    const responseTimeMs = Date.now() - startTime;
-    const queryId = await createQuery({
-      question: req.question,
-      answer: cached.mainResult.answer,
-      sources: cached.mainResult.sources,
-      modelUsed: `${cached.mainResult.modelUsed}(cached)`,
-      responseTimeMs,
-      visitorIp: req.visitorIp,
-      visitorCity: req.visitorCity,
-      visitorRegion: req.visitorRegion,
-      visitorCountry: req.visitorCountry,
-      visitorLat: req.visitorLat,
-      visitorLng: req.visitorLng,
-    });
-    onMeta({
-      sources: cached.mainResult.sources,
-      modelUsed: `${cached.mainResult.modelUsed}(cached)`,
-      foundInMaterials: cached.mainResult.foundInMaterials,
-      confidence: cached.mainResult.confidence,
-      questionLanguage,
-      queryId,
-      responseTimeMs,
-    });
-    // 对于缓存的答案，快速逐段输出以模拟流式效果
-    onToken(cached.mainResult.answer);
-    onDone(cached.mainResult.answer);
-    return;
-  }
-
   try {
-    // 1) 检索教材
+    const cached = getCachedAnswer(req.question);
+    if (cached) {
+      const responseTimeMs = Date.now() - startTime;
+      const queryId = await createQuery({
+        question: req.question,
+        answer: cached.mainResult.answer,
+        sources: cached.mainResult.sources,
+        modelUsed: `${cached.mainResult.modelUsed}(cached)`,
+        responseTimeMs,
+        visitorIp: req.visitorIp,
+        visitorCity: req.visitorCity,
+        visitorRegion: req.visitorRegion,
+        visitorCountry: req.visitorCountry,
+        visitorLat: req.visitorLat,
+        visitorLng: req.visitorLng,
+      });
+
+      onMeta({
+        sources: cached.mainResult.sources,
+        modelUsed: `${cached.mainResult.modelUsed}(cached)`,
+        foundInMaterials: cached.mainResult.foundInMaterials,
+        confidence: cached.mainResult.confidence,
+        questionLanguage,
+        queryId,
+        responseTimeMs,
+      });
+      onToken(cached.mainResult.answer);
+      onDone(cached.mainResult.answer);
+      return;
+    }
+
     const langFilter = questionLanguage === "en" ? "en" : "zh";
     const topK = questionLanguage === "en" ? pickTopK("en", questionAnalysis) : pickTopK("zh", questionAnalysis);
     let searchResults: SearchResult[] = await semanticSearch(req.question, undefined, topK, langFilter, useRAG);
 
-    // Fallback: 如果关键词检索未命中，自动尝试 embedding 检索
+    // useRAG=false 且首次未命中时，允许尝试 embedding 检索兜底
     if (searchResults.length === 0 && !useRAG && activeConfig?.embeddingModel) {
       searchResults = await semanticSearch(req.question, undefined, topK, langFilter, true);
     }
 
-    let effectiveResults = questionAnalysis.conciseDefinition
-      ? [...searchResults]
-      : focusResultsByChapter(req.question, searchResults, questionLanguage, questionAnalysis);
-    if (questionAnalysis.conciseDefinition) {
-      effectiveResults = await enrichDefinitionResults(
-        req.question,
-        effectiveResults,
-        questionLanguage,
-        questionAnalysis
-      );
-    }
-    const sourceLimit = pickSourceLimit(questionLanguage, questionAnalysis);
-
-    if (effectiveResults.length === 0) {
-      const answer = questionLanguage === "en"
-        ? "The provided textbook excerpts do not cover this topic."
-        : "教材中未涉及此内容。";
-      onMeta({
-        sources: [],
-        modelUsed: "built-in",
-        foundInMaterials: false,
-        confidence: 0,
-        questionLanguage,
-      });
-      onToken(answer);
-      onDone(answer);
-      return;
-    }
-
-    // 2) 构建提示词与来源
-    const keywords = questionLanguage === "en" ? extractKeywordsEn(req.question) : extractKeywords(req.question);
-    const sources = buildSources(effectiveResults, true, keywords, sourceLimit);
-    const materialTitles = Array.from(new Set(effectiveResults.map((r) => r.materialTitle)));
-    const systemPrompt = buildSystemPrompt(materialTitles, questionLanguage, questionLanguage, questionAnalysis);
-    const userMessage = buildUserPrompt(req.question, effectiveResults, questionLanguage, questionAnalysis);
-
-    // 3) 真流式输出（优先），失败回退非流式
-    let rawAnswer = "";
-    let model = "built-in";
-    let streamedChars = 0;
-    try {
-      const streamed = await invokeLLMStreamWithConfig(
-        [{ role: "user", content: userMessage }],
-        systemPrompt,
-        {
-          temperature: questionAnalysis.conciseAnswer ? 0 : undefined,
-          maxTokens: questionAnalysis.conciseAnswer ? 420 : undefined,
-        }
-      );
-      model = streamed.model;
-
-      onMeta({
-        sources,
-        modelUsed: model,
-        foundInMaterials: true,
-        confidence: 0.72,
-        questionLanguage,
-      });
-
-      for await (const delta of streamed.stream) {
-        if (!delta) continue;
-        rawAnswer += delta;
-        streamedChars += delta.length;
-        onToken(delta);
-      }
-    } catch {
-      const fallback = await invokeLLMWithConfig(
-        [{ role: "user", content: userMessage }],
-        systemPrompt,
-        {
-          temperature: questionAnalysis.conciseAnswer ? 0 : undefined,
-          maxTokens: questionAnalysis.conciseAnswer ? 420 : undefined,
-        }
-      );
-      model = fallback.model;
-      rawAnswer = fallback.content;
-    }
-
-    let fullAnswer = stripCitationMarkers(rawAnswer);
-    const parsed = parseLLMOutput(rawAnswer);
-    if (parsed) {
-      fullAnswer = stripCitationMarkers(parsed.answer);
-    }
-    if (questionAnalysis.conciseAnswer) {
-      fullAnswer = enforceConciseDefinition(fullAnswer, questionLanguage);
-    }
-    fullAnswer = removeAnswerBoilerplate(fullAnswer, questionLanguage, questionAnalysis);
-    fullAnswer = enforceReadableStructure(fullAnswer, questionAnalysis, questionLanguage);
-
-    // 判断是否找到内容
-    const notFoundPhrases = ["未涉及", "not cover", "没有相关", "未找到", "not found"];
-    const foundInMaterials = !notFoundPhrases.some((p) => fullAnswer.toLowerCase().includes(p));
-    const finalReview = assessAnswerLocally(fullAnswer, effectiveResults, questionAnalysis, questionLanguage);
-    if (!finalReview.complete && shouldAppendDowngradeNote(fullAnswer, questionAnalysis)) {
-      fullAnswer = appendDegradationNote(fullAnswer, finalReview.downgradeNote);
-    }
-    fullAnswer = removeAnswerBoilerplate(fullAnswer, questionLanguage, questionAnalysis);
-    fullAnswer = enforceReadableStructure(fullAnswer, questionAnalysis, questionLanguage);
+    const mainResult = await callLLM(
+      req.question,
+      searchResults,
+      questionLanguage,
+      questionLanguage,
+      questionAnalysis
+    );
 
     const responseTimeMs = Date.now() - startTime;
-
-    // 保存到数据库
     const queryId = await createQuery({
       question: req.question,
-      answer: fullAnswer,
-      sources: foundInMaterials ? sources : [],
-      modelUsed: model,
+      answer: mainResult.answer,
+      sources: mainResult.sources,
+      modelUsed: mainResult.modelUsed,
       responseTimeMs,
       visitorIp: req.visitorIp,
       visitorCity: req.visitorCity,
@@ -2492,42 +2395,27 @@ export async function generateAnswerStream(
       visitorLng: req.visitorLng,
     });
 
-    // 发送元数据（含 queryId 和 responseTimeMs）
     onMeta({
-      sources: foundInMaterials ? sources : [],
-      modelUsed: model,
-      foundInMaterials,
-      confidence: foundInMaterials ? (finalReview.complete ? 0.82 : 0.66) : 0.1,
+      sources: mainResult.sources,
+      modelUsed: mainResult.modelUsed,
+      foundInMaterials: mainResult.foundInMaterials,
+      confidence: mainResult.confidence,
       questionLanguage,
       queryId,
       responseTimeMs,
     });
 
-    // 缓存
-    if (foundInMaterials) {
-      setCachedAnswer(req.question, {
-        mainResult: {
-          answer: fullAnswer,
-          sources,
-          modelUsed: model,
-          foundInMaterials,
-          confidence: foundInMaterials ? (finalReview.complete ? 0.82 : 0.68) : 0.1,
-        },
-        questionLanguage,
-      });
+    if (mainResult.foundInMaterials) {
+      setCachedAnswer(req.question, { mainResult, questionLanguage });
     }
 
-    // 更新访客统计
     const today = new Date().toISOString().split("T")[0];
     const cityDist = req.visitorCity ? { [req.visitorCity]: 1 } : {};
     const countryDist = req.visitorCountry ? { [req.visitorCountry]: 1 } : {};
     upsertVisitorStat(today, cityDist, countryDist).catch(console.error);
 
-    // 非流式回退时补发正文
-    if (streamedChars === 0) {
-      onToken(fullAnswer);
-    }
-    onDone(fullAnswer);
+    onToken(mainResult.answer);
+    onDone(mainResult.answer);
   } catch (err: any) {
     onError(err?.message || String(err));
   }
