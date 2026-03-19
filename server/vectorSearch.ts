@@ -371,6 +371,97 @@ function buildEmergencyTerms(question: string, questionLang: "zh" | "en"): strin
     .slice(0, 10);
 }
 
+async function keywordFallbackSearch(
+  db: DbConnection,
+  question: string,
+  materialIds: number[] | undefined,
+  topK: number,
+  languageFilter: "zh" | "en" | "all",
+  profile: SearchProfile,
+  questionLang: "zh" | "en"
+): Promise<SearchResult[]> {
+  const terms = uniqueSortedTerms([
+    ...profile.coreTerms,
+    ...profile.exactPhrases,
+    ...profile.broadTerms,
+    ...buildEmergencyTerms(question, questionLang),
+  ]).slice(0, 10);
+  if (terms.length === 0) return [];
+
+  const runLikeQuery = async (lang: "zh" | "en" | "all") => {
+    const filters = buildBaseFilters(materialIds, lang);
+    const termClauses = terms.map((term) => buildTermCondition(term));
+    const matchClause = termClauses.length === 1 ? termClauses[0] : or(...termClauses);
+
+    const rows = await db
+      .select({
+        id: materialChunks.id,
+        materialId: materialChunks.materialId,
+        chunkIndex: materialChunks.chunkIndex,
+        content: materialChunks.content,
+        chapter: materialChunks.chapter,
+        pageStart: materialChunks.pageStart,
+        pageEnd: materialChunks.pageEnd,
+        materialTitle: materials.title,
+      })
+      .from(materialChunks)
+      .innerJoin(materials, eq(materialChunks.materialId, materials.id))
+      .where(and(...filters, matchClause))
+      .limit(Math.max(100, topK * 24));
+
+    return rows.map((row) => ({
+      id: row.id,
+      materialId: row.materialId,
+      chunkIndex: row.chunkIndex,
+      content: row.content,
+      chapter: row.chapter,
+      pageStart: row.pageStart,
+      pageEnd: row.pageEnd,
+      materialTitle: row.materialTitle,
+    }));
+  };
+
+  let rows = await runLikeQuery(languageFilter);
+  if (rows.length === 0 && languageFilter !== "all") {
+    rows = await runLikeQuery("all");
+  }
+  if (rows.length === 0) return [];
+
+  const dedup = new Map<number, typeof rows[number]>();
+  for (const row of rows) {
+    if (!dedup.has(row.id)) dedup.set(row.id, row);
+  }
+  const candidates = Array.from(dedup.values());
+  const stats = countTermStats(candidates, terms);
+
+  const scored = candidates
+    .map((row) => ({
+      row,
+      score: scoreChunk(row.content, terms, question, row.chapter ?? undefined, {
+        stats,
+        intentTerms: profile.intentTerms,
+        anchorTerms: profile.anchorTerms,
+        queryMode: profile.queryMode,
+      }),
+    }))
+    .filter((item) => Number.isFinite(item.score))
+    .sort((a, b) => b.score - a.score);
+
+  if (scored.length === 0) return [];
+
+  return scored.slice(0, Math.max(1, topK)).map(({ row, score }) => ({
+    chunkId: row.id,
+    chunkIndex: row.chunkIndex,
+    materialId: row.materialId,
+    materialTitle: row.materialTitle,
+    chapter: row.chapter,
+    pageStart: row.pageStart,
+    pageEnd: row.pageEnd,
+    content: row.content,
+    similarity: score,
+  }));
+}
+
 // ─── 林业领域同义词扩展表 ───────────────────────────────────────────────────
 // 用于评分阶段（不用于SQL检索），帮助识别相关但措辞不同的chunk
 const SYNONYM_MAP: Record<string, string[]> = {
@@ -1554,10 +1645,7 @@ export async function semanticSearch(
   }
 
   if (candidateMap.size === 0) {
-    if (languageFilter !== "all" && allowLanguageFallback) {
-      return semanticSearch(question, materialIds, topK, "all", useEmbedding, false);
-    }
-    return [];
+    return keywordFallbackSearch(db, question, materialIds, topK, languageFilter, profile, questionLang);
   }
 
   let candidates = Array.from(candidateMap.values());
@@ -1640,10 +1728,7 @@ export async function semanticSearch(
   const topResults = applyDiversitySelection(candidates, topK).filter((candidate) => candidate.finalScore > 0);
 
   if (topResults.length === 0) {
-    if (languageFilter !== "all" && allowLanguageFallback) {
-      return semanticSearch(question, materialIds, topK, "all", useEmbedding, false);
-    }
-    return [];
+    return keywordFallbackSearch(db, question, materialIds, topK, languageFilter, profile, questionLang);
   }
 
   const matIds = Array.from(new Set(topResults.map((c) => c.materialId)));
