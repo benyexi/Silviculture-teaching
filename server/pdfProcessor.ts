@@ -20,7 +20,7 @@ type TextChunk = {
 };
 
 const HEADING_PATTERN =
-  /^(第[一二三四五六七八九十百零\d]+[章节篇部编]|[\d]+\.[\d]+[\s\S]{0,30}|[一二三四五六七八九十]+[、．.]\s*\S|Chapter\s+\d+|CHAPTER\s+\d+|Part\s+[IVX\d]+)/i;
+  /^(第[一二三四五六七八九十百零\d]+[章节篇部编]|(?:\d+(?:\.\d+){1,5})\s*[^\d\s%][^\n]{0,60}|[一二三四五六七八九十]+[、．.]\s*\S|Chapter\s+\d+|CHAPTER\s+\d+|Part\s+[IVX\d]+)/i;
 
 const LIST_ITEM_PATTERN =
   /^(?:[（(]?(?:[一二三四五六七八九十百千零\d]+|[a-zA-Z]+)[)）.、．]|(?:\d+|[ivxlcdmIVXLCDM]+)[)）.、．]|[-*•·●○])\s*\S/;
@@ -57,9 +57,23 @@ function isListItemLine(line: string): boolean {
   return LIST_ITEM_PATTERN.test(line.trim());
 }
 
+function normalizeChapterTitle(line: string): string | null {
+  const trimmed = line.trim();
+  if (!trimmed) return null;
+  if (!HEADING_PATTERN.test(trimmed)) return null;
+  if (/^\d+(?:\.\d+){1,6}\s*$/.test(trimmed)) return null;
+  if (/^\d+(?:\.\d+)?%\s*$/.test(trimmed)) return null;
+  if (/^[\d.%\-]+$/.test(trimmed) && !/[\u4e00-\u9fa5a-z]/i.test(trimmed)) return null;
+  return trimmed.substring(0, 100);
+}
+
+function isHeadingLine(line: string): boolean {
+  return normalizeChapterTitle(line) !== null;
+}
+
 function isStructuralBoundaryLine(line: string): boolean {
   const trimmed = line.trim();
-  return HEADING_PATTERN.test(trimmed) || isListItemLine(trimmed);
+  return isHeadingLine(trimmed) || isListItemLine(trimmed);
 }
 
 function mergeSectionText(a: string, b: string): string {
@@ -135,7 +149,7 @@ function splitIntoSemanticBlocks(text: string): string[] {
       continue;
     }
 
-    if (line.length <= 36 && (HEADING_PATTERN.test(line) || /[:：]$/.test(line))) {
+    if (line.length <= 36 && (isHeadingLine(line) || /[:：]$/.test(line))) {
       flushBuffer();
       blocks.push(line);
       continue;
@@ -370,7 +384,7 @@ async function extractDocxText(
     if (!trimmed) continue;
 
     // 遇到章节标题时，开始新的 section
-    if (HEADING_PATTERN.test(trimmed) && currentSection.trim().length > 100) {
+    if (isHeadingLine(trimmed) && currentSection.trim().length > 100) {
       sections.push(currentSection.trim());
       currentSection = trimmed + "\n";
     } else {
@@ -406,7 +420,7 @@ async function extractDocText(
     const trimmed = line.trim();
     if (!trimmed) continue;
 
-    if (HEADING_PATTERN.test(trimmed) && currentSection.trim().length > 100) {
+    if (isHeadingLine(trimmed) && currentSection.trim().length > 100) {
       sections.push(currentSection.trim());
       currentSection = trimmed + "\n";
     } else {
@@ -591,7 +605,8 @@ function splitIntoChunks(text: string, pageTexts: string[], language: "zh" | "en
         const line = rawLine.trim();
         if (!line) continue;
 
-        if (HEADING_PATTERN.test(line)) {
+        const chapterTitle = normalizeChapterTitle(line);
+        if (chapterTitle) {
           // 遇到新标题，保存当前 section
           if (currentText.trim().length >= sectionThreshold) {
             sections.push({
@@ -601,7 +616,7 @@ function splitIntoChunks(text: string, pageTexts: string[], language: "zh" | "en
               pageEnd: sectionPageEnd,
             });
           }
-          currentChapter = line.substring(0, 100);
+          currentChapter = chapterTitle;
           currentText = line + "\n";
           sectionPageStart = pageNum;
           sectionPageEnd = pageNum;
@@ -630,11 +645,12 @@ function splitIntoChunks(text: string, pageTexts: string[], language: "zh" | "en
       const line = rawLine.trim();
       if (!line) continue;
 
-      if (HEADING_PATTERN.test(line)) {
+      const chapterTitle = normalizeChapterTitle(line);
+      if (chapterTitle) {
         if (currentText.trim().length >= sectionThreshold) {
           sections.push({ chapter: currentChapter, text: currentText.trim(), pageStart: null, pageEnd: null });
         }
-        currentChapter = line.substring(0, 100);
+        currentChapter = chapterTitle;
         currentText = line + "\n";
       } else {
         currentText += line + "\n";

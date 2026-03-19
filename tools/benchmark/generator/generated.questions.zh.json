@@ -1,0 +1,6002 @@
+[
+  {
+    "id": 1,
+    "category": "definition",
+    "question": "什么是立地质量？"
+  },
+  {
+    "id": 2,
+    "category": "classification",
+    "question": "立地质量可以按哪些标准进行分类？"
+  },
+  {
+    "id": 3,
+    "category": "method",
+    "question": "如何开展立地质量？"
+  },
+  {
+    "id": 4,
+    "category": "comparison",
+    "question": "立地质量与排水条件有什么区别？"
+  },
+  {
+    "id": 5,
+    "category": "entity",
+    "question": "与立地质量研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 6,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到立地质量？"
+  },
+  {
+    "id": 7,
+    "category": "other",
+    "question": "请简述立地质量的主要要点。"
+  },
+  {
+    "id": 8,
+    "category": "other",
+    "question": "在实际经营中，立地质量通常要优先关注哪些问题？"
+  },
+  {
+    "id": 9,
+    "category": "definition",
+    "question": "请解释立地条件的含义。"
+  },
+  {
+    "id": 10,
+    "category": "classification",
+    "question": "立地条件通常可以分成哪些类别？"
+  },
+  {
+    "id": 11,
+    "category": "method",
+    "question": "在实际工作中，立地条件一般怎么实施？"
+  },
+  {
+    "id": 12,
+    "category": "comparison",
+    "question": "在立地条件和催芽之间，核心差异是什么？"
+  },
+  {
+    "id": 13,
+    "category": "entity",
+    "question": "与立地条件研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 14,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到立地条件？"
+  },
+  {
+    "id": 15,
+    "category": "other",
+    "question": "在实际经营中，立地条件通常要优先关注哪些问题？"
+  },
+  {
+    "id": 16,
+    "category": "other",
+    "question": "如果要快速掌握立地条件，最重要的内容是什么？"
+  },
+  {
+    "id": 17,
+    "category": "definition",
+    "question": "地位指数具体指什么？"
+  },
+  {
+    "id": 18,
+    "category": "classification",
+    "question": "地位指数有哪些常见类型？"
+  },
+  {
+    "id": 19,
+    "category": "method",
+    "question": "进行地位指数时通常要遵循哪些步骤？"
+  },
+  {
+    "id": 20,
+    "category": "comparison",
+    "question": "地位指数和扦插育苗分别适用于什么情形？"
+  },
+  {
+    "id": 21,
+    "category": "entity",
+    "question": "与地位指数研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 22,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到地位指数？"
+  },
+  {
+    "id": 23,
+    "category": "other",
+    "question": "如果要快速掌握地位指数，最重要的内容是什么？"
+  },
+  {
+    "id": 24,
+    "category": "other",
+    "question": "围绕地位指数，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 25,
+    "category": "definition",
+    "question": "如何理解土层厚度？"
+  },
+  {
+    "id": 26,
+    "category": "classification",
+    "question": "土层厚度一般怎样划分层次或类型？"
+  },
+  {
+    "id": 27,
+    "category": "method",
+    "question": "有哪些可操作的方法可以完成土层厚度？"
+  },
+  {
+    "id": 28,
+    "category": "comparison",
+    "question": "如果把土层厚度与造林方法对照，主要分歧在哪里？"
+  },
+  {
+    "id": 29,
+    "category": "entity",
+    "question": "与土层厚度研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 30,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到土层厚度？"
+  },
+  {
+    "id": 31,
+    "category": "other",
+    "question": "围绕土层厚度，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 32,
+    "category": "other",
+    "question": "请简述土层厚度的主要要点。"
+  },
+  {
+    "id": 33,
+    "category": "definition",
+    "question": "什么是土壤质地？"
+  },
+  {
+    "id": 34,
+    "category": "classification",
+    "question": "土壤质地可以按哪些标准进行分类？"
+  },
+  {
+    "id": 35,
+    "category": "method",
+    "question": "如何开展土壤质地？"
+  },
+  {
+    "id": 36,
+    "category": "comparison",
+    "question": "土壤质地与人工林有什么区别？"
+  },
+  {
+    "id": 37,
+    "category": "entity",
+    "question": "与土壤质地研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 38,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到土壤质地？"
+  },
+  {
+    "id": 39,
+    "category": "other",
+    "question": "请简述土壤质地的主要要点。"
+  },
+  {
+    "id": 40,
+    "category": "other",
+    "question": "在实际经营中，土壤质地通常要优先关注哪些问题？"
+  },
+  {
+    "id": 41,
+    "category": "definition",
+    "question": "请解释土壤肥力的含义。"
+  },
+  {
+    "id": 42,
+    "category": "classification",
+    "question": "土壤肥力通常可以分成哪些类别？"
+  },
+  {
+    "id": 43,
+    "category": "method",
+    "question": "在实际工作中，土壤肥力一般怎么实施？"
+  },
+  {
+    "id": 44,
+    "category": "comparison",
+    "question": "在土壤肥力和林层结构之间，核心差异是什么？"
+  },
+  {
+    "id": 45,
+    "category": "entity",
+    "question": "与土壤肥力研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 46,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到土壤肥力？"
+  },
+  {
+    "id": 47,
+    "category": "other",
+    "question": "在实际经营中，土壤肥力通常要优先关注哪些问题？"
+  },
+  {
+    "id": 48,
+    "category": "other",
+    "question": "如果要快速掌握土壤肥力，最重要的内容是什么？"
+  },
+  {
+    "id": 49,
+    "category": "definition",
+    "question": "土壤水分具体指什么？"
+  },
+  {
+    "id": 50,
+    "category": "classification",
+    "question": "土壤水分有哪些常见类型？"
+  },
+  {
+    "id": 51,
+    "category": "method",
+    "question": "进行土壤水分时通常要遵循哪些步骤？"
+  },
+  {
+    "id": 52,
+    "category": "comparison",
+    "question": "土壤水分和胸径分别适用于什么情形？"
+  },
+  {
+    "id": 53,
+    "category": "entity",
+    "question": "与土壤水分研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 54,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到土壤水分？"
+  },
+  {
+    "id": 55,
+    "category": "other",
+    "question": "如果要快速掌握土壤水分，最重要的内容是什么？"
+  },
+  {
+    "id": 56,
+    "category": "other",
+    "question": "围绕土壤水分，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 57,
+    "category": "definition",
+    "question": "如何理解坡位？"
+  },
+  {
+    "id": 58,
+    "category": "classification",
+    "question": "坡位一般怎样划分层次或类型？"
+  },
+  {
+    "id": 59,
+    "category": "method",
+    "question": "有哪些可操作的方法可以完成坡位？"
+  },
+  {
+    "id": 60,
+    "category": "comparison",
+    "question": "如果把坡位与抚育间伐对照，主要分歧在哪里？"
+  },
+  {
+    "id": 61,
+    "category": "entity",
+    "question": "与坡位研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 62,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到坡位？"
+  },
+  {
+    "id": 63,
+    "category": "other",
+    "question": "围绕坡位，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 64,
+    "category": "other",
+    "question": "请简述坡位的主要要点。"
+  },
+  {
+    "id": 65,
+    "category": "definition",
+    "question": "什么是坡向？"
+  },
+  {
+    "id": 66,
+    "category": "classification",
+    "question": "坡向可以按哪些标准进行分类？"
+  },
+  {
+    "id": 67,
+    "category": "method",
+    "question": "如何开展坡向？"
+  },
+  {
+    "id": 68,
+    "category": "comparison",
+    "question": "坡向与间伐时期有什么区别？"
+  },
+  {
+    "id": 69,
+    "category": "entity",
+    "question": "与坡向研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 70,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到坡向？"
+  },
+  {
+    "id": 71,
+    "category": "other",
+    "question": "请简述坡向的主要要点。"
+  },
+  {
+    "id": 72,
+    "category": "other",
+    "question": "在实际经营中，坡向通常要优先关注哪些问题？"
+  },
+  {
+    "id": 73,
+    "category": "definition",
+    "question": "请解释坡度的含义。"
+  },
+  {
+    "id": 74,
+    "category": "classification",
+    "question": "坡度通常可以分成哪些类别？"
+  },
+  {
+    "id": 75,
+    "category": "method",
+    "question": "在实际工作中，坡度一般怎么实施？"
+  },
+  {
+    "id": 76,
+    "category": "comparison",
+    "question": "在坡度和目标树经营之间，核心差异是什么？"
+  },
+  {
+    "id": 77,
+    "category": "entity",
+    "question": "与坡度研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 78,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到坡度？"
+  },
+  {
+    "id": 79,
+    "category": "other",
+    "question": "在实际经营中，坡度通常要优先关注哪些问题？"
+  },
+  {
+    "id": 80,
+    "category": "other",
+    "question": "如果要快速掌握坡度，最重要的内容是什么？"
+  },
+  {
+    "id": 81,
+    "category": "definition",
+    "question": "海拔具体指什么？"
+  },
+  {
+    "id": 82,
+    "category": "classification",
+    "question": "海拔有哪些常见类型？"
+  },
+  {
+    "id": 83,
+    "category": "method",
+    "question": "进行海拔时通常要遵循哪些步骤？"
+  },
+  {
+    "id": 84,
+    "category": "comparison",
+    "question": "海拔和萌芽更新分别适用于什么情形？"
+  },
+  {
+    "id": 85,
+    "category": "entity",
+    "question": "与海拔研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 86,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到海拔？"
+  },
+  {
+    "id": 87,
+    "category": "other",
+    "question": "如果要快速掌握海拔，最重要的内容是什么？"
+  },
+  {
+    "id": 88,
+    "category": "other",
+    "question": "围绕海拔，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 89,
+    "category": "definition",
+    "question": "如何理解排水条件？"
+  },
+  {
+    "id": 90,
+    "category": "classification",
+    "question": "排水条件一般怎样划分层次或类型？"
+  },
+  {
+    "id": 91,
+    "category": "method",
+    "question": "有哪些可操作的方法可以完成排水条件？"
+  },
+  {
+    "id": 92,
+    "category": "comparison",
+    "question": "如果把排水条件与轮伐期对照，主要分歧在哪里？"
+  },
+  {
+    "id": 93,
+    "category": "entity",
+    "question": "与排水条件研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 94,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到排水条件？"
+  },
+  {
+    "id": 95,
+    "category": "other",
+    "question": "围绕排水条件，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 96,
+    "category": "other",
+    "question": "请简述排水条件的主要要点。"
+  },
+  {
+    "id": 97,
+    "category": "definition",
+    "question": "什么是光照条件？"
+  },
+  {
+    "id": 98,
+    "category": "classification",
+    "question": "光照条件可以按哪些标准进行分类？"
+  },
+  {
+    "id": 99,
+    "category": "method",
+    "question": "如何开展光照条件？"
+  },
+  {
+    "id": 100,
+    "category": "comparison",
+    "question": "光照条件与滴灌有什么区别？"
+  },
+  {
+    "id": 101,
+    "category": "entity",
+    "question": "与光照条件研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 102,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到光照条件？"
+  },
+  {
+    "id": 103,
+    "category": "other",
+    "question": "请简述光照条件的主要要点。"
+  },
+  {
+    "id": 104,
+    "category": "other",
+    "question": "在实际经营中，光照条件通常要优先关注哪些问题？"
+  },
+  {
+    "id": 105,
+    "category": "definition",
+    "question": "请解释风害风险的含义。"
+  },
+  {
+    "id": 106,
+    "category": "classification",
+    "question": "风害风险通常可以分成哪些类别？"
+  },
+  {
+    "id": 107,
+    "category": "method",
+    "question": "在实际工作中，风害风险一般怎么实施？"
+  },
+  {
+    "id": 108,
+    "category": "comparison",
+    "question": "在风害风险和肥力提升之间，核心差异是什么？"
+  },
+  {
+    "id": 109,
+    "category": "entity",
+    "question": "与风害风险研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 110,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到风害风险？"
+  },
+  {
+    "id": 111,
+    "category": "other",
+    "question": "在实际经营中，风害风险通常要优先关注哪些问题？"
+  },
+  {
+    "id": 112,
+    "category": "other",
+    "question": "如果要快速掌握风害风险，最重要的内容是什么？"
+  },
+  {
+    "id": 113,
+    "category": "definition",
+    "question": "冻害风险具体指什么？"
+  },
+  {
+    "id": 114,
+    "category": "classification",
+    "question": "冻害风险有哪些常见类型？"
+  },
+  {
+    "id": 115,
+    "category": "method",
+    "question": "进行冻害风险时通常要遵循哪些步骤？"
+  },
+  {
+    "id": 116,
+    "category": "comparison",
+    "question": "冻害风险和干旱胁迫分别适用于什么情形？"
+  },
+  {
+    "id": 117,
+    "category": "entity",
+    "question": "与冻害风险研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 118,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到冻害风险？"
+  },
+  {
+    "id": 119,
+    "category": "other",
+    "question": "如果要快速掌握冻害风险，最重要的内容是什么？"
+  },
+  {
+    "id": 120,
+    "category": "other",
+    "question": "围绕冻害风险，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 121,
+    "category": "definition",
+    "question": "如何理解种源？"
+  },
+  {
+    "id": 122,
+    "category": "classification",
+    "question": "种源一般怎样划分层次或类型？"
+  },
+  {
+    "id": 123,
+    "category": "method",
+    "question": "有哪些可操作的方法可以完成种源？"
+  },
+  {
+    "id": 124,
+    "category": "comparison",
+    "question": "如果把种源与生物入侵对照，主要分歧在哪里？"
+  },
+  {
+    "id": 125,
+    "category": "entity",
+    "question": "与种源研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 126,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到种源？"
+  },
+  {
+    "id": 127,
+    "category": "other",
+    "question": "围绕种源，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 128,
+    "category": "other",
+    "question": "请简述种源的主要要点。"
+  },
+  {
+    "id": 129,
+    "category": "definition",
+    "question": "什么是采种？"
+  },
+  {
+    "id": 130,
+    "category": "classification",
+    "question": "采种可以按哪些标准进行分类？"
+  },
+  {
+    "id": 131,
+    "category": "method",
+    "question": "如何开展采种？"
+  },
+  {
+    "id": 132,
+    "category": "comparison",
+    "question": "采种与经营周期有什么区别？"
+  },
+  {
+    "id": 133,
+    "category": "entity",
+    "question": "与采种研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 134,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到采种？"
+  },
+  {
+    "id": 135,
+    "category": "other",
+    "question": "请简述采种的主要要点。"
+  },
+  {
+    "id": 136,
+    "category": "other",
+    "question": "在实际经营中，采种通常要优先关注哪些问题？"
+  },
+  {
+    "id": 137,
+    "category": "definition",
+    "question": "请解释种子处理的含义。"
+  },
+  {
+    "id": 138,
+    "category": "classification",
+    "question": "种子处理通常可以分成哪些类别？"
+  },
+  {
+    "id": 139,
+    "category": "method",
+    "question": "在实际工作中，种子处理一般怎么实施？"
+  },
+  {
+    "id": 140,
+    "category": "comparison",
+    "question": "在种子处理和用材林经营之间，核心差异是什么？"
+  },
+  {
+    "id": 141,
+    "category": "entity",
+    "question": "与种子处理研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 142,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到种子处理？"
+  },
+  {
+    "id": 143,
+    "category": "other",
+    "question": "在实际经营中，种子处理通常要优先关注哪些问题？"
+  },
+  {
+    "id": 144,
+    "category": "other",
+    "question": "如果要快速掌握种子处理，最重要的内容是什么？"
+  },
+  {
+    "id": 145,
+    "category": "definition",
+    "question": "催芽具体指什么？"
+  },
+  {
+    "id": 146,
+    "category": "classification",
+    "question": "催芽有哪些常见类型？"
+  },
+  {
+    "id": 147,
+    "category": "method",
+    "question": "进行催芽时通常要遵循哪些步骤？"
+  },
+  {
+    "id": 148,
+    "category": "comparison",
+    "question": "催芽和遥感监测分别适用于什么情形？"
+  },
+  {
+    "id": 149,
+    "category": "entity",
+    "question": "与催芽研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 150,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到催芽？"
+  },
+  {
+    "id": 151,
+    "category": "other",
+    "question": "如果要快速掌握催芽，最重要的内容是什么？"
+  },
+  {
+    "id": 152,
+    "category": "other",
+    "question": "围绕催芽，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 153,
+    "category": "definition",
+    "question": "如何理解播种？"
+  },
+  {
+    "id": 154,
+    "category": "classification",
+    "question": "播种一般怎样划分层次或类型？"
+  },
+  {
+    "id": 155,
+    "category": "method",
+    "question": "有哪些可操作的方法可以完成播种？"
+  },
+  {
+    "id": 156,
+    "category": "comparison",
+    "question": "如果把播种与生物多样性对照，主要分歧在哪里？"
+  },
+  {
+    "id": 157,
+    "category": "entity",
+    "question": "与播种研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 158,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到播种？"
+  },
+  {
+    "id": 159,
+    "category": "other",
+    "question": "围绕播种，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 160,
+    "category": "other",
+    "question": "请简述播种的主要要点。"
+  },
+  {
+    "id": 161,
+    "category": "definition",
+    "question": "什么是发芽率？"
+  },
+  {
+    "id": 162,
+    "category": "classification",
+    "question": "发芽率可以按哪些标准进行分类？"
+  },
+  {
+    "id": 163,
+    "category": "method",
+    "question": "如何开展发芽率？"
+  },
+  {
+    "id": 164,
+    "category": "comparison",
+    "question": "发芽率与立地条件有什么区别？"
+  },
+  {
+    "id": 165,
+    "category": "entity",
+    "question": "与发芽率研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 166,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到发芽率？"
+  },
+  {
+    "id": 167,
+    "category": "other",
+    "question": "请简述发芽率的主要要点。"
+  },
+  {
+    "id": 168,
+    "category": "other",
+    "question": "在实际经营中，发芽率通常要优先关注哪些问题？"
+  },
+  {
+    "id": 169,
+    "category": "definition",
+    "question": "请解释苗木质量的含义。"
+  },
+  {
+    "id": 170,
+    "category": "classification",
+    "question": "苗木质量通常可以分成哪些类别？"
+  },
+  {
+    "id": 171,
+    "category": "method",
+    "question": "在实际工作中，苗木质量一般怎么实施？"
+  },
+  {
+    "id": 172,
+    "category": "comparison",
+    "question": "在苗木质量和坡向之间，核心差异是什么？"
+  },
+  {
+    "id": 173,
+    "category": "entity",
+    "question": "与苗木质量研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 174,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到苗木质量？"
+  },
+  {
+    "id": 175,
+    "category": "other",
+    "question": "在实际经营中，苗木质量通常要优先关注哪些问题？"
+  },
+  {
+    "id": 176,
+    "category": "other",
+    "question": "如果要快速掌握苗木质量，最重要的内容是什么？"
+  },
+  {
+    "id": 177,
+    "category": "definition",
+    "question": "苗木分级具体指什么？"
+  },
+  {
+    "id": 178,
+    "category": "classification",
+    "question": "苗木分级有哪些常见类型？"
+  },
+  {
+    "id": 179,
+    "category": "method",
+    "question": "进行苗木分级时通常要遵循哪些步骤？"
+  },
+  {
+    "id": 180,
+    "category": "comparison",
+    "question": "苗木分级和种源分别适用于什么情形？"
+  },
+  {
+    "id": 181,
+    "category": "entity",
+    "question": "与苗木分级研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 182,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到苗木分级？"
+  },
+  {
+    "id": 183,
+    "category": "other",
+    "question": "如果要快速掌握苗木分级，最重要的内容是什么？"
+  },
+  {
+    "id": 184,
+    "category": "other",
+    "question": "围绕苗木分级，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 185,
+    "category": "definition",
+    "question": "如何理解容器育苗？"
+  },
+  {
+    "id": 186,
+    "category": "classification",
+    "question": "容器育苗一般怎样划分层次或类型？"
+  },
+  {
+    "id": 187,
+    "category": "method",
+    "question": "有哪些可操作的方法可以完成容器育苗？"
+  },
+  {
+    "id": 188,
+    "category": "comparison",
+    "question": "如果把容器育苗与苗木分级对照，主要分歧在哪里？"
+  },
+  {
+    "id": 189,
+    "category": "entity",
+    "question": "与容器育苗研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 190,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到容器育苗？"
+  },
+  {
+    "id": 191,
+    "category": "other",
+    "question": "围绕容器育苗，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 192,
+    "category": "other",
+    "question": "请简述容器育苗的主要要点。"
+  },
+  {
+    "id": 193,
+    "category": "definition",
+    "question": "什么是裸根育苗？"
+  },
+  {
+    "id": 194,
+    "category": "classification",
+    "question": "裸根育苗可以按哪些标准进行分类？"
+  },
+  {
+    "id": 195,
+    "category": "method",
+    "question": "如何开展裸根育苗？"
+  },
+  {
+    "id": 196,
+    "category": "comparison",
+    "question": "裸根育苗与移栽有什么区别？"
+  },
+  {
+    "id": 197,
+    "category": "entity",
+    "question": "与裸根育苗研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 198,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到裸根育苗？"
+  },
+  {
+    "id": 199,
+    "category": "other",
+    "question": "请简述裸根育苗的主要要点。"
+  },
+  {
+    "id": 200,
+    "category": "other",
+    "question": "在实际经营中，裸根育苗通常要优先关注哪些问题？"
+  },
+  {
+    "id": 201,
+    "category": "definition",
+    "question": "请解释扦插育苗的含义。"
+  },
+  {
+    "id": 202,
+    "category": "classification",
+    "question": "扦插育苗通常可以分成哪些类别？"
+  },
+  {
+    "id": 203,
+    "category": "method",
+    "question": "在实际工作中，扦插育苗一般怎么实施？"
+  },
+  {
+    "id": 204,
+    "category": "comparison",
+    "question": "在扦插育苗和防护林之间，核心差异是什么？"
+  },
+  {
+    "id": 205,
+    "category": "entity",
+    "question": "与扦插育苗研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 206,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到扦插育苗？"
+  },
+  {
+    "id": 207,
+    "category": "other",
+    "question": "在实际经营中，扦插育苗通常要优先关注哪些问题？"
+  },
+  {
+    "id": 208,
+    "category": "other",
+    "question": "如果要快速掌握扦插育苗，最重要的内容是什么？"
+  },
+  {
+    "id": 209,
+    "category": "definition",
+    "question": "嫁接育苗具体指什么？"
+  },
+  {
+    "id": 210,
+    "category": "classification",
+    "question": "嫁接育苗有哪些常见类型？"
+  },
+  {
+    "id": 211,
+    "category": "method",
+    "question": "进行嫁接育苗时通常要遵循哪些步骤？"
+  },
+  {
+    "id": 212,
+    "category": "comparison",
+    "question": "嫁接育苗和目标树种分别适用于什么情形？"
+  },
+  {
+    "id": 213,
+    "category": "entity",
+    "question": "与嫁接育苗研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 214,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到嫁接育苗？"
+  },
+  {
+    "id": 215,
+    "category": "other",
+    "question": "如果要快速掌握嫁接育苗，最重要的内容是什么？"
+  },
+  {
+    "id": 216,
+    "category": "other",
+    "question": "围绕嫁接育苗，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 217,
+    "category": "definition",
+    "question": "如何理解苗期管理？"
+  },
+  {
+    "id": 218,
+    "category": "classification",
+    "question": "苗期管理一般怎样划分层次或类型？"
+  },
+  {
+    "id": 219,
+    "category": "method",
+    "question": "有哪些可操作的方法可以完成苗期管理？"
+  },
+  {
+    "id": 220,
+    "category": "comparison",
+    "question": "如果把苗期管理与郁闭度对照，主要分歧在哪里？"
+  },
+  {
+    "id": 221,
+    "category": "entity",
+    "question": "与苗期管理研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 222,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到苗期管理？"
+  },
+  {
+    "id": 223,
+    "category": "other",
+    "question": "围绕苗期管理，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 224,
+    "category": "other",
+    "question": "请简述苗期管理的主要要点。"
+  },
+  {
+    "id": 225,
+    "category": "definition",
+    "question": "什么是苗圃管理？"
+  },
+  {
+    "id": 226,
+    "category": "classification",
+    "question": "苗圃管理可以按哪些标准进行分类？"
+  },
+  {
+    "id": 227,
+    "category": "method",
+    "question": "如何开展苗圃管理？"
+  },
+  {
+    "id": 228,
+    "category": "comparison",
+    "question": "苗圃管理与目标树有什么区别？"
+  },
+  {
+    "id": 229,
+    "category": "entity",
+    "question": "与苗圃管理研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 230,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到苗圃管理？"
+  },
+  {
+    "id": 231,
+    "category": "other",
+    "question": "请简述苗圃管理的主要要点。"
+  },
+  {
+    "id": 232,
+    "category": "other",
+    "question": "在实际经营中，苗圃管理通常要优先关注哪些问题？"
+  },
+  {
+    "id": 233,
+    "category": "definition",
+    "question": "请解释移栽的含义。"
+  },
+  {
+    "id": 234,
+    "category": "classification",
+    "question": "移栽通常可以分成哪些类别？"
+  },
+  {
+    "id": 235,
+    "category": "method",
+    "question": "在实际工作中，移栽一般怎么实施？"
+  },
+  {
+    "id": 236,
+    "category": "comparison",
+    "question": "在移栽和生长伐之间，核心差异是什么？"
+  },
+  {
+    "id": 237,
+    "category": "entity",
+    "question": "与移栽研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 238,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到移栽？"
+  },
+  {
+    "id": 239,
+    "category": "other",
+    "question": "在实际经营中，移栽通常要优先关注哪些问题？"
+  },
+  {
+    "id": 240,
+    "category": "other",
+    "question": "如果要快速掌握移栽，最重要的内容是什么？"
+  },
+  {
+    "id": 241,
+    "category": "definition",
+    "question": "树种选择具体指什么？"
+  },
+  {
+    "id": 242,
+    "category": "classification",
+    "question": "树种选择有哪些常见类型？"
+  },
+  {
+    "id": 243,
+    "category": "method",
+    "question": "进行树种选择时通常要遵循哪些步骤？"
+  },
+  {
+    "id": 244,
+    "category": "comparison",
+    "question": "树种选择和竞争调控分别适用于什么情形？"
+  },
+  {
+    "id": 245,
+    "category": "entity",
+    "question": "与树种选择研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 246,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到树种选择？"
+  },
+  {
+    "id": 247,
+    "category": "other",
+    "question": "如果要快速掌握树种选择，最重要的内容是什么？"
+  },
+  {
+    "id": 248,
+    "category": "other",
+    "question": "围绕树种选择，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 249,
+    "category": "definition",
+    "question": "如何理解造林密度？"
+  },
+  {
+    "id": 250,
+    "category": "classification",
+    "question": "造林密度一般怎样划分层次或类型？"
+  },
+  {
+    "id": 251,
+    "category": "method",
+    "question": "有哪些可操作的方法可以完成造林密度？"
+  },
+  {
+    "id": 252,
+    "category": "comparison",
+    "question": "如果把造林密度与皆伐更新对照，主要分歧在哪里？"
+  },
+  {
+    "id": 253,
+    "category": "entity",
+    "question": "与造林密度研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 254,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到造林密度？"
+  },
+  {
+    "id": 255,
+    "category": "other",
+    "question": "围绕造林密度，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 256,
+    "category": "other",
+    "question": "请简述造林密度的主要要点。"
+  },
+  {
+    "id": 257,
+    "category": "definition",
+    "question": "什么是造林方法？"
+  },
+  {
+    "id": 258,
+    "category": "classification",
+    "question": "造林方法可以按哪些标准进行分类？"
+  },
+  {
+    "id": 259,
+    "category": "method",
+    "question": "如何开展造林方法？"
+  },
+  {
+    "id": 260,
+    "category": "comparison",
+    "question": "造林方法与更新潜力有什么区别？"
+  },
+  {
+    "id": 261,
+    "category": "entity",
+    "question": "与造林方法研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 262,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到造林方法？"
+  },
+  {
+    "id": 263,
+    "category": "other",
+    "question": "请简述造林方法的主要要点。"
+  },
+  {
+    "id": 264,
+    "category": "other",
+    "question": "在实际经营中，造林方法通常要优先关注哪些问题？"
+  },
+  {
+    "id": 265,
+    "category": "definition",
+    "question": "请解释整地的含义。"
+  },
+  {
+    "id": 266,
+    "category": "classification",
+    "question": "整地通常可以分成哪些类别？"
+  },
+  {
+    "id": 267,
+    "category": "method",
+    "question": "在实际工作中，整地一般怎么实施？"
+  },
+  {
+    "id": 268,
+    "category": "comparison",
+    "question": "在整地和追肥之间，核心差异是什么？"
+  },
+  {
+    "id": 269,
+    "category": "entity",
+    "question": "与整地研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 270,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到整地？"
+  },
+  {
+    "id": 271,
+    "category": "other",
+    "question": "在实际经营中，整地通常要优先关注哪些问题？"
+  },
+  {
+    "id": 272,
+    "category": "other",
+    "question": "如果要快速掌握整地，最重要的内容是什么？"
+  },
+  {
+    "id": 273,
+    "category": "definition",
+    "question": "混交林具体指什么？"
+  },
+  {
+    "id": 274,
+    "category": "classification",
+    "question": "混交林有哪些常见类型？"
+  },
+  {
+    "id": 275,
+    "category": "method",
+    "question": "进行混交林时通常要遵循哪些步骤？"
+  },
+  {
+    "id": 276,
+    "category": "comparison",
+    "question": "混交林和覆盖分别适用于什么情形？"
+  },
+  {
+    "id": 277,
+    "category": "entity",
+    "question": "与混交林研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 278,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到混交林？"
+  },
+  {
+    "id": 279,
+    "category": "other",
+    "question": "如果要快速掌握混交林，最重要的内容是什么？"
+  },
+  {
+    "id": 280,
+    "category": "other",
+    "question": "围绕混交林，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 281,
+    "category": "definition",
+    "question": "如何理解纯林？"
+  },
+  {
+    "id": 282,
+    "category": "classification",
+    "question": "纯林一般怎样划分层次或类型？"
+  },
+  {
+    "id": 283,
+    "category": "method",
+    "question": "有哪些可操作的方法可以完成纯林？"
+  },
+  {
+    "id": 284,
+    "category": "comparison",
+    "question": "如果把纯林与森林防火对照，主要分歧在哪里？"
+  },
+  {
+    "id": 285,
+    "category": "entity",
+    "question": "与纯林研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 286,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到纯林？"
+  },
+  {
+    "id": 287,
+    "category": "other",
+    "question": "围绕纯林，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 288,
+    "category": "other",
+    "question": "请简述纯林的主要要点。"
+  },
+  {
+    "id": 289,
+    "category": "definition",
+    "question": "什么是防护林？"
+  },
+  {
+    "id": 290,
+    "category": "classification",
+    "question": "防护林可以按哪些标准进行分类？"
+  },
+  {
+    "id": 291,
+    "category": "method",
+    "question": "如何开展防护林？"
+  },
+  {
+    "id": 292,
+    "category": "comparison",
+    "question": "防护林与叶部病害有什么区别？"
+  },
+  {
+    "id": 293,
+    "category": "entity",
+    "question": "与防护林研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 294,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到防护林？"
+  },
+  {
+    "id": 295,
+    "category": "other",
+    "question": "请简述防护林的主要要点。"
+  },
+  {
+    "id": 296,
+    "category": "other",
+    "question": "在实际经营中，防护林通常要优先关注哪些问题？"
+  },
+  {
+    "id": 297,
+    "category": "definition",
+    "question": "请解释用材林的含义。"
+  },
+  {
+    "id": 298,
+    "category": "classification",
+    "question": "用材林通常可以分成哪些类别？"
+  },
+  {
+    "id": 299,
+    "category": "method",
+    "question": "在实际工作中，用材林一般怎么实施？"
+  },
+  {
+    "id": 300,
+    "category": "comparison",
+    "question": "在用材林和森林经营之间，核心差异是什么？"
+  },
+  {
+    "id": 301,
+    "category": "entity",
+    "question": "与用材林研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 302,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到用材林？"
+  },
+  {
+    "id": 303,
+    "category": "other",
+    "question": "在实际经营中，用材林通常要优先关注哪些问题？"
+  },
+  {
+    "id": 304,
+    "category": "other",
+    "question": "如果要快速掌握用材林，最重要的内容是什么？"
+  },
+  {
+    "id": 305,
+    "category": "definition",
+    "question": "经济林具体指什么？"
+  },
+  {
+    "id": 306,
+    "category": "classification",
+    "question": "经济林有哪些常见类型？"
+  },
+  {
+    "id": 307,
+    "category": "method",
+    "question": "进行经济林时通常要遵循哪些步骤？"
+  },
+  {
+    "id": 308,
+    "category": "comparison",
+    "question": "经济林和生态修复分别适用于什么情形？"
+  },
+  {
+    "id": 309,
+    "category": "entity",
+    "question": "与经济林研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 310,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到经济林？"
+  },
+  {
+    "id": 311,
+    "category": "other",
+    "question": "如果要快速掌握经济林，最重要的内容是什么？"
+  },
+  {
+    "id": 312,
+    "category": "other",
+    "question": "围绕经济林，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 313,
+    "category": "definition",
+    "question": "如何理解人工林？"
+  },
+  {
+    "id": 314,
+    "category": "classification",
+    "question": "人工林一般怎样划分层次或类型？"
+  },
+  {
+    "id": 315,
+    "category": "method",
+    "question": "有哪些可操作的方法可以完成人工林？"
+  },
+  {
+    "id": 316,
+    "category": "comparison",
+    "question": "如果把人工林与森林认证对照，主要分歧在哪里？"
+  },
+  {
+    "id": 317,
+    "category": "entity",
+    "question": "与人工林研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 318,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到人工林？"
+  },
+  {
+    "id": 319,
+    "category": "other",
+    "question": "围绕人工林，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 320,
+    "category": "other",
+    "question": "请简述人工林的主要要点。"
+  },
+  {
+    "id": 321,
+    "category": "definition",
+    "question": "什么是天然林？"
+  },
+  {
+    "id": 322,
+    "category": "classification",
+    "question": "天然林可以按哪些标准进行分类？"
+  },
+  {
+    "id": 323,
+    "category": "method",
+    "question": "如何开展天然林？"
+  },
+  {
+    "id": 324,
+    "category": "comparison",
+    "question": "天然林与树高曲线有什么区别？"
+  },
+  {
+    "id": 325,
+    "category": "entity",
+    "question": "与天然林研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 326,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到天然林？"
+  },
+  {
+    "id": 327,
+    "category": "other",
+    "question": "请简述天然林的主要要点。"
+  },
+  {
+    "id": 328,
+    "category": "other",
+    "question": "在实际经营中，天然林通常要优先关注哪些问题？"
+  },
+  {
+    "id": 329,
+    "category": "definition",
+    "question": "请解释速生林的含义。"
+  },
+  {
+    "id": 330,
+    "category": "classification",
+    "question": "速生林通常可以分成哪些类别？"
+  },
+  {
+    "id": 331,
+    "category": "method",
+    "question": "在实际工作中，速生林一般怎么实施？"
+  },
+  {
+    "id": 332,
+    "category": "comparison",
+    "question": "在速生林和近自然经营之间，核心差异是什么？"
+  },
+  {
+    "id": 333,
+    "category": "entity",
+    "question": "与速生林研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 334,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到速生林？"
+  },
+  {
+    "id": 335,
+    "category": "other",
+    "question": "在实际经营中，速生林通常要优先关注哪些问题？"
+  },
+  {
+    "id": 336,
+    "category": "other",
+    "question": "如果要快速掌握速生林，最重要的内容是什么？"
+  },
+  {
+    "id": 337,
+    "category": "definition",
+    "question": "乡土树种具体指什么？"
+  },
+  {
+    "id": 338,
+    "category": "classification",
+    "question": "乡土树种有哪些常见类型？"
+  },
+  {
+    "id": 339,
+    "category": "method",
+    "question": "进行乡土树种时通常要遵循哪些步骤？"
+  },
+  {
+    "id": 340,
+    "category": "comparison",
+    "question": "乡土树种和土壤肥力分别适用于什么情形？"
+  },
+  {
+    "id": 341,
+    "category": "entity",
+    "question": "与乡土树种研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 342,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到乡土树种？"
+  },
+  {
+    "id": 343,
+    "category": "other",
+    "question": "如果要快速掌握乡土树种，最重要的内容是什么？"
+  },
+  {
+    "id": 344,
+    "category": "other",
+    "question": "围绕乡土树种，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 345,
+    "category": "definition",
+    "question": "如何理解目标树种？"
+  },
+  {
+    "id": 346,
+    "category": "classification",
+    "question": "目标树种一般怎样划分层次或类型？"
+  },
+  {
+    "id": 347,
+    "category": "method",
+    "question": "有哪些可操作的方法可以完成目标树种？"
+  },
+  {
+    "id": 348,
+    "category": "comparison",
+    "question": "如果把目标树种与光照条件对照，主要分歧在哪里？"
+  },
+  {
+    "id": 349,
+    "category": "entity",
+    "question": "与目标树种研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 350,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到目标树种？"
+  },
+  {
+    "id": 351,
+    "category": "other",
+    "question": "围绕目标树种，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 352,
+    "category": "other",
+    "question": "请简述目标树种的主要要点。"
+  },
+  {
+    "id": 353,
+    "category": "definition",
+    "question": "什么是适地适树？"
+  },
+  {
+    "id": 354,
+    "category": "classification",
+    "question": "适地适树可以按哪些标准进行分类？"
+  },
+  {
+    "id": 355,
+    "category": "method",
+    "question": "如何开展适地适树？"
+  },
+  {
+    "id": 356,
+    "category": "comparison",
+    "question": "适地适树与播种有什么区别？"
+  },
+  {
+    "id": 357,
+    "category": "entity",
+    "question": "与适地适树研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 358,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到适地适树？"
+  },
+  {
+    "id": 359,
+    "category": "other",
+    "question": "请简述适地适树的主要要点。"
+  },
+  {
+    "id": 360,
+    "category": "other",
+    "question": "在实际经营中，适地适树通常要优先关注哪些问题？"
+  },
+  {
+    "id": 361,
+    "category": "definition",
+    "question": "请解释林分结构的含义。"
+  },
+  {
+    "id": 362,
+    "category": "classification",
+    "question": "林分结构通常可以分成哪些类别？"
+  },
+  {
+    "id": 363,
+    "category": "method",
+    "question": "在实际工作中，林分结构一般怎么实施？"
+  },
+  {
+    "id": 364,
+    "category": "comparison",
+    "question": "在林分结构和嫁接育苗之间，核心差异是什么？"
+  },
+  {
+    "id": 365,
+    "category": "entity",
+    "question": "与林分结构研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 366,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到林分结构？"
+  },
+  {
+    "id": 367,
+    "category": "other",
+    "question": "在实际经营中，林分结构通常要优先关注哪些问题？"
+  },
+  {
+    "id": 368,
+    "category": "other",
+    "question": "如果要快速掌握林分结构，最重要的内容是什么？"
+  },
+  {
+    "id": 369,
+    "category": "definition",
+    "question": "林层结构具体指什么？"
+  },
+  {
+    "id": 370,
+    "category": "classification",
+    "question": "林层结构有哪些常见类型？"
+  },
+  {
+    "id": 371,
+    "category": "method",
+    "question": "进行林层结构时通常要遵循哪些步骤？"
+  },
+  {
+    "id": 372,
+    "category": "comparison",
+    "question": "林层结构和整地分别适用于什么情形？"
+  },
+  {
+    "id": 373,
+    "category": "entity",
+    "question": "与林层结构研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 374,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到林层结构？"
+  },
+  {
+    "id": 375,
+    "category": "other",
+    "question": "如果要快速掌握林层结构，最重要的内容是什么？"
+  },
+  {
+    "id": 376,
+    "category": "other",
+    "question": "围绕林层结构，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 377,
+    "category": "definition",
+    "question": "如何理解复层林？"
+  },
+  {
+    "id": 378,
+    "category": "classification",
+    "question": "复层林一般怎样划分层次或类型？"
+  },
+  {
+    "id": 379,
+    "category": "method",
+    "question": "有哪些可操作的方法可以完成复层林？"
+  },
+  {
+    "id": 380,
+    "category": "comparison",
+    "question": "如果把复层林与天然林对照，主要分歧在哪里？"
+  },
+  {
+    "id": 381,
+    "category": "entity",
+    "question": "与复层林研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 382,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到复层林？"
+  },
+  {
+    "id": 383,
+    "category": "other",
+    "question": "围绕复层林，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 384,
+    "category": "other",
+    "question": "请简述复层林的主要要点。"
+  },
+  {
+    "id": 385,
+    "category": "definition",
+    "question": "什么是同龄林？"
+  },
+  {
+    "id": 386,
+    "category": "classification",
+    "question": "同龄林可以按哪些标准进行分类？"
+  },
+  {
+    "id": 387,
+    "category": "method",
+    "question": "如何开展同龄林？"
+  },
+  {
+    "id": 388,
+    "category": "comparison",
+    "question": "同龄林与复层林有什么区别？"
+  },
+  {
+    "id": 389,
+    "category": "entity",
+    "question": "与同龄林研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 390,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到同龄林？"
+  },
+  {
+    "id": 391,
+    "category": "other",
+    "question": "请简述同龄林的主要要点。"
+  },
+  {
+    "id": 392,
+    "category": "other",
+    "question": "在实际经营中，同龄林通常要优先关注哪些问题？"
+  },
+  {
+    "id": 393,
+    "category": "definition",
+    "question": "请解释异龄林的含义。"
+  },
+  {
+    "id": 394,
+    "category": "classification",
+    "question": "异龄林通常可以分成哪些类别？"
+  },
+  {
+    "id": 395,
+    "category": "method",
+    "question": "在实际工作中，异龄林一般怎么实施？"
+  },
+  {
+    "id": 396,
+    "category": "comparison",
+    "question": "在异龄林和蓄积量之间，核心差异是什么？"
+  },
+  {
+    "id": 397,
+    "category": "entity",
+    "question": "与异龄林研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 398,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到异龄林？"
+  },
+  {
+    "id": 399,
+    "category": "other",
+    "question": "在实际经营中，异龄林通常要优先关注哪些问题？"
+  },
+  {
+    "id": 400,
+    "category": "other",
+    "question": "如果要快速掌握异龄林，最重要的内容是什么？"
+  },
+  {
+    "id": 401,
+    "category": "definition",
+    "question": "郁闭度具体指什么？"
+  },
+  {
+    "id": 402,
+    "category": "classification",
+    "question": "郁闭度有哪些常见类型？"
+  },
+  {
+    "id": 403,
+    "category": "method",
+    "question": "进行郁闭度时通常要遵循哪些步骤？"
+  },
+  {
+    "id": 404,
+    "category": "comparison",
+    "question": "郁闭度和修枝分别适用于什么情形？"
+  },
+  {
+    "id": 405,
+    "category": "entity",
+    "question": "与郁闭度研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 406,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到郁闭度？"
+  },
+  {
+    "id": 407,
+    "category": "other",
+    "question": "如果要快速掌握郁闭度，最重要的内容是什么？"
+  },
+  {
+    "id": 408,
+    "category": "other",
+    "question": "围绕郁闭度，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 409,
+    "category": "definition",
+    "question": "如何理解冠幅？"
+  },
+  {
+    "id": 410,
+    "category": "classification",
+    "question": "冠幅一般怎样划分层次或类型？"
+  },
+  {
+    "id": 411,
+    "category": "method",
+    "question": "有哪些可操作的方法可以完成冠幅？"
+  },
+  {
+    "id": 412,
+    "category": "comparison",
+    "question": "如果把冠幅与间伐方式对照，主要分歧在哪里？"
+  },
+  {
+    "id": 413,
+    "category": "entity",
+    "question": "与冠幅研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 414,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到冠幅？"
+  },
+  {
+    "id": 415,
+    "category": "other",
+    "question": "围绕冠幅，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 416,
+    "category": "other",
+    "question": "请简述冠幅的主要要点。"
+  },
+  {
+    "id": 417,
+    "category": "definition",
+    "question": "什么是树高？"
+  },
+  {
+    "id": 418,
+    "category": "classification",
+    "question": "树高可以按哪些标准进行分类？"
+  },
+  {
+    "id": 419,
+    "category": "method",
+    "question": "如何开展树高？"
+  },
+  {
+    "id": 420,
+    "category": "comparison",
+    "question": "树高与采伐更新有什么区别？"
+  },
+  {
+    "id": 421,
+    "category": "entity",
+    "question": "与树高研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 422,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到树高？"
+  },
+  {
+    "id": 423,
+    "category": "other",
+    "question": "请简述树高的主要要点。"
+  },
+  {
+    "id": 424,
+    "category": "other",
+    "question": "在实际经营中，树高通常要优先关注哪些问题？"
+  },
+  {
+    "id": 425,
+    "category": "definition",
+    "question": "请解释胸径的含义。"
+  },
+  {
+    "id": 426,
+    "category": "classification",
+    "question": "胸径通常可以分成哪些类别？"
+  },
+  {
+    "id": 427,
+    "category": "method",
+    "question": "在实际工作中，胸径一般怎么实施？"
+  },
+  {
+    "id": 428,
+    "category": "comparison",
+    "question": "在胸径和补植之间，核心差异是什么？"
+  },
+  {
+    "id": 429,
+    "category": "entity",
+    "question": "与胸径研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 430,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到胸径？"
+  },
+  {
+    "id": 431,
+    "category": "other",
+    "question": "在实际经营中，胸径通常要优先关注哪些问题？"
+  },
+  {
+    "id": 432,
+    "category": "other",
+    "question": "如果要快速掌握胸径，最重要的内容是什么？"
+  },
+  {
+    "id": 433,
+    "category": "definition",
+    "question": "蓄积量具体指什么？"
+  },
+  {
+    "id": 434,
+    "category": "classification",
+    "question": "蓄积量有哪些常见类型？"
+  },
+  {
+    "id": 435,
+    "category": "method",
+    "question": "进行蓄积量时通常要遵循哪些步骤？"
+  },
+  {
+    "id": 436,
+    "category": "comparison",
+    "question": "蓄积量和采伐制度分别适用于什么情形？"
+  },
+  {
+    "id": 437,
+    "category": "entity",
+    "question": "与蓄积量研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 438,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到蓄积量？"
+  },
+  {
+    "id": 439,
+    "category": "other",
+    "question": "如果要快速掌握蓄积量，最重要的内容是什么？"
+  },
+  {
+    "id": 440,
+    "category": "other",
+    "question": "围绕蓄积量，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 441,
+    "category": "definition",
+    "question": "如何理解生长量？"
+  },
+  {
+    "id": 442,
+    "category": "classification",
+    "question": "生长量一般怎样划分层次或类型？"
+  },
+  {
+    "id": 443,
+    "category": "method",
+    "question": "有哪些可操作的方法可以完成生长量？"
+  },
+  {
+    "id": 444,
+    "category": "comparison",
+    "question": "如果把生长量与沟灌对照，主要分歧在哪里？"
+  },
+  {
+    "id": 445,
+    "category": "entity",
+    "question": "与生长量研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 446,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到生长量？"
+  },
+  {
+    "id": 447,
+    "category": "other",
+    "question": "围绕生长量，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 448,
+    "category": "other",
+    "question": "请简述生长量的主要要点。"
+  },
+  {
+    "id": 449,
+    "category": "definition",
+    "question": "什么是生产力？"
+  },
+  {
+    "id": 450,
+    "category": "classification",
+    "question": "生产力可以按哪些标准进行分类？"
+  },
+  {
+    "id": 451,
+    "category": "method",
+    "question": "如何开展生产力？"
+  },
+  {
+    "id": 452,
+    "category": "comparison",
+    "question": "生产力与养分循环有什么区别？"
+  },
+  {
+    "id": 453,
+    "category": "entity",
+    "question": "与生产力研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 454,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到生产力？"
+  },
+  {
+    "id": 455,
+    "category": "other",
+    "question": "请简述生产力的主要要点。"
+  },
+  {
+    "id": 456,
+    "category": "other",
+    "question": "在实际经营中，生产力通常要优先关注哪些问题？"
+  },
+  {
+    "id": 457,
+    "category": "definition",
+    "question": "请解释目标树的含义。"
+  },
+  {
+    "id": 458,
+    "category": "classification",
+    "question": "目标树通常可以分成哪些类别？"
+  },
+  {
+    "id": 459,
+    "category": "method",
+    "question": "在实际工作中，目标树一般怎么实施？"
+  },
+  {
+    "id": 460,
+    "category": "comparison",
+    "question": "在目标树和鼠害之间，核心差异是什么？"
+  },
+  {
+    "id": 461,
+    "category": "entity",
+    "question": "与目标树研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 462,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到目标树？"
+  },
+  {
+    "id": 463,
+    "category": "other",
+    "question": "在实际经营中，目标树通常要优先关注哪些问题？"
+  },
+  {
+    "id": 464,
+    "category": "other",
+    "question": "如果要快速掌握目标树，最重要的内容是什么？"
+  },
+  {
+    "id": 465,
+    "category": "definition",
+    "question": "林窗具体指什么？"
+  },
+  {
+    "id": 466,
+    "category": "classification",
+    "question": "林窗有哪些常见类型？"
+  },
+  {
+    "id": 467,
+    "category": "method",
+    "question": "进行林窗时通常要遵循哪些步骤？"
+  },
+  {
+    "id": 468,
+    "category": "comparison",
+    "question": "林窗和生态风险分别适用于什么情形？"
+  },
+  {
+    "id": 469,
+    "category": "entity",
+    "question": "与林窗研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 470,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到林窗？"
+  },
+  {
+    "id": 471,
+    "category": "other",
+    "question": "如果要快速掌握林窗，最重要的内容是什么？"
+  },
+  {
+    "id": 472,
+    "category": "other",
+    "question": "围绕林窗，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 473,
+    "category": "definition",
+    "question": "如何理解林下植被？"
+  },
+  {
+    "id": 474,
+    "category": "classification",
+    "question": "林下植被一般怎样划分层次或类型？"
+  },
+  {
+    "id": 475,
+    "category": "method",
+    "question": "有哪些可操作的方法可以完成林下植被？"
+  },
+  {
+    "id": 476,
+    "category": "comparison",
+    "question": "如果把林下植被与经营强度对照，主要分歧在哪里？"
+  },
+  {
+    "id": 477,
+    "category": "entity",
+    "question": "与林下植被研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 478,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到林下植被？"
+  },
+  {
+    "id": 479,
+    "category": "other",
+    "question": "围绕林下植被，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 480,
+    "category": "other",
+    "question": "请简述林下植被的主要要点。"
+  },
+  {
+    "id": 481,
+    "category": "definition",
+    "question": "什么是抚育间伐？"
+  },
+  {
+    "id": 482,
+    "category": "classification",
+    "question": "抚育间伐可以按哪些标准进行分类？"
+  },
+  {
+    "id": 483,
+    "category": "method",
+    "question": "如何开展抚育间伐？"
+  },
+  {
+    "id": 484,
+    "category": "comparison",
+    "question": "抚育间伐与经济林经营有什么区别？"
+  },
+  {
+    "id": 485,
+    "category": "entity",
+    "question": "与抚育间伐研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 486,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到抚育间伐？"
+  },
+  {
+    "id": 487,
+    "category": "other",
+    "question": "请简述抚育间伐的主要要点。"
+  },
+  {
+    "id": 488,
+    "category": "other",
+    "question": "在实际经营中，抚育间伐通常要优先关注哪些问题？"
+  },
+  {
+    "id": 489,
+    "category": "definition",
+    "question": "请解释修枝的含义。"
+  },
+  {
+    "id": 490,
+    "category": "classification",
+    "question": "修枝通常可以分成哪些类别？"
+  },
+  {
+    "id": 491,
+    "category": "method",
+    "question": "在实际工作中，修枝一般怎么实施？"
+  },
+  {
+    "id": 492,
+    "category": "comparison",
+    "question": "在修枝和生长模型之间，核心差异是什么？"
+  },
+  {
+    "id": 493,
+    "category": "entity",
+    "question": "与修枝研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 494,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到修枝？"
+  },
+  {
+    "id": 495,
+    "category": "other",
+    "question": "在实际经营中，修枝通常要优先关注哪些问题？"
+  },
+  {
+    "id": 496,
+    "category": "other",
+    "question": "如果要快速掌握修枝，最重要的内容是什么？"
+  },
+  {
+    "id": 497,
+    "category": "definition",
+    "question": "割灌除草具体指什么？"
+  },
+  {
+    "id": 498,
+    "category": "classification",
+    "question": "割灌除草有哪些常见类型？"
+  },
+  {
+    "id": 499,
+    "category": "method",
+    "question": "进行割灌除草时通常要遵循哪些步骤？"
+  },
+  {
+    "id": 500,
+    "category": "comparison",
+    "question": "割灌除草和水源涵养分别适用于什么情形？"
+  },
+  {
+    "id": 501,
+    "category": "entity",
+    "question": "与割灌除草研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 502,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到割灌除草？"
+  },
+  {
+    "id": 503,
+    "category": "other",
+    "question": "如果要快速掌握割灌除草，最重要的内容是什么？"
+  },
+  {
+    "id": 504,
+    "category": "other",
+    "question": "围绕割灌除草，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 505,
+    "category": "definition",
+    "question": "如何理解透光伐？"
+  },
+  {
+    "id": 506,
+    "category": "classification",
+    "question": "透光伐一般怎样划分层次或类型？"
+  },
+  {
+    "id": 507,
+    "category": "method",
+    "question": "有哪些可操作的方法可以完成透光伐？"
+  },
+  {
+    "id": 508,
+    "category": "comparison",
+    "question": "如果把透光伐与地位指数对照，主要分歧在哪里？"
+  },
+  {
+    "id": 509,
+    "category": "entity",
+    "question": "与透光伐研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 510,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到透光伐？"
+  },
+  {
+    "id": 511,
+    "category": "other",
+    "question": "围绕透光伐，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 512,
+    "category": "other",
+    "question": "请简述透光伐的主要要点。"
+  },
+  {
+    "id": 513,
+    "category": "definition",
+    "question": "什么是生长伐？"
+  },
+  {
+    "id": 514,
+    "category": "classification",
+    "question": "生长伐可以按哪些标准进行分类？"
+  },
+  {
+    "id": 515,
+    "category": "method",
+    "question": "如何开展生长伐？"
+  },
+  {
+    "id": 516,
+    "category": "comparison",
+    "question": "生长伐与坡度有什么区别？"
+  },
+  {
+    "id": 517,
+    "category": "entity",
+    "question": "与生长伐研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 518,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到生长伐？"
+  },
+  {
+    "id": 519,
+    "category": "other",
+    "question": "请简述生长伐的主要要点。"
+  },
+  {
+    "id": 520,
+    "category": "other",
+    "question": "在实际经营中，生长伐通常要优先关注哪些问题？"
+  },
+  {
+    "id": 521,
+    "category": "definition",
+    "question": "请解释卫生伐的含义。"
+  },
+  {
+    "id": 522,
+    "category": "classification",
+    "question": "卫生伐通常可以分成哪些类别？"
+  },
+  {
+    "id": 523,
+    "category": "method",
+    "question": "在实际工作中，卫生伐一般怎么实施？"
+  },
+  {
+    "id": 524,
+    "category": "comparison",
+    "question": "在卫生伐和采种之间，核心差异是什么？"
+  },
+  {
+    "id": 525,
+    "category": "entity",
+    "question": "与卫生伐研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 526,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到卫生伐？"
+  },
+  {
+    "id": 527,
+    "category": "other",
+    "question": "在实际经营中，卫生伐通常要优先关注哪些问题？"
+  },
+  {
+    "id": 528,
+    "category": "other",
+    "question": "如果要快速掌握卫生伐，最重要的内容是什么？"
+  },
+  {
+    "id": 529,
+    "category": "definition",
+    "question": "间伐强度具体指什么？"
+  },
+  {
+    "id": 530,
+    "category": "classification",
+    "question": "间伐强度有哪些常见类型？"
+  },
+  {
+    "id": 531,
+    "category": "method",
+    "question": "进行间伐强度时通常要遵循哪些步骤？"
+  },
+  {
+    "id": 532,
+    "category": "comparison",
+    "question": "间伐强度和容器育苗分别适用于什么情形？"
+  },
+  {
+    "id": 533,
+    "category": "entity",
+    "question": "与间伐强度研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 534,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到间伐强度？"
+  },
+  {
+    "id": 535,
+    "category": "other",
+    "question": "如果要快速掌握间伐强度，最重要的内容是什么？"
+  },
+  {
+    "id": 536,
+    "category": "other",
+    "question": "围绕间伐强度，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 537,
+    "category": "definition",
+    "question": "如何理解间伐时期？"
+  },
+  {
+    "id": 538,
+    "category": "classification",
+    "question": "间伐时期一般怎样划分层次或类型？"
+  },
+  {
+    "id": 539,
+    "category": "method",
+    "question": "有哪些可操作的方法可以完成间伐时期？"
+  },
+  {
+    "id": 540,
+    "category": "comparison",
+    "question": "如果把间伐时期与树种选择对照，主要分歧在哪里？"
+  },
+  {
+    "id": 541,
+    "category": "entity",
+    "question": "与间伐时期研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 542,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到间伐时期？"
+  },
+  {
+    "id": 543,
+    "category": "other",
+    "question": "围绕间伐时期，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 544,
+    "category": "other",
+    "question": "请简述间伐时期的主要要点。"
+  },
+  {
+    "id": 545,
+    "category": "definition",
+    "question": "什么是间伐方式？"
+  },
+  {
+    "id": 546,
+    "category": "classification",
+    "question": "间伐方式可以按哪些标准进行分类？"
+  },
+  {
+    "id": 547,
+    "category": "method",
+    "question": "如何开展间伐方式？"
+  },
+  {
+    "id": 548,
+    "category": "comparison",
+    "question": "间伐方式与用材林有什么区别？"
+  },
+  {
+    "id": 549,
+    "category": "entity",
+    "question": "与间伐方式研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 550,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到间伐方式？"
+  },
+  {
+    "id": 551,
+    "category": "other",
+    "question": "请简述间伐方式的主要要点。"
+  },
+  {
+    "id": 552,
+    "category": "other",
+    "question": "在实际经营中，间伐方式通常要优先关注哪些问题？"
+  },
+  {
+    "id": 553,
+    "category": "definition",
+    "question": "请解释冠层调控的含义。"
+  },
+  {
+    "id": 554,
+    "category": "classification",
+    "question": "冠层调控通常可以分成哪些类别？"
+  },
+  {
+    "id": 555,
+    "category": "method",
+    "question": "在实际工作中，冠层调控一般怎么实施？"
+  },
+  {
+    "id": 556,
+    "category": "comparison",
+    "question": "在冠层调控和适地适树之间，核心差异是什么？"
+  },
+  {
+    "id": 557,
+    "category": "entity",
+    "question": "与冠层调控研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 558,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到冠层调控？"
+  },
+  {
+    "id": 559,
+    "category": "other",
+    "question": "在实际经营中，冠层调控通常要优先关注哪些问题？"
+  },
+  {
+    "id": 560,
+    "category": "other",
+    "question": "如果要快速掌握冠层调控，最重要的内容是什么？"
+  },
+  {
+    "id": 561,
+    "category": "definition",
+    "question": "密度调控具体指什么？"
+  },
+  {
+    "id": 562,
+    "category": "classification",
+    "question": "密度调控有哪些常见类型？"
+  },
+  {
+    "id": 563,
+    "category": "method",
+    "question": "进行密度调控时通常要遵循哪些步骤？"
+  },
+  {
+    "id": 564,
+    "category": "comparison",
+    "question": "密度调控和冠幅分别适用于什么情形？"
+  },
+  {
+    "id": 565,
+    "category": "entity",
+    "question": "与密度调控研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 566,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到密度调控？"
+  },
+  {
+    "id": 567,
+    "category": "other",
+    "question": "如果要快速掌握密度调控，最重要的内容是什么？"
+  },
+  {
+    "id": 568,
+    "category": "other",
+    "question": "围绕密度调控，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 569,
+    "category": "definition",
+    "question": "如何理解竞争调控？"
+  },
+  {
+    "id": 570,
+    "category": "classification",
+    "question": "竞争调控一般怎样划分层次或类型？"
+  },
+  {
+    "id": 571,
+    "category": "method",
+    "question": "有哪些可操作的方法可以完成竞争调控？"
+  },
+  {
+    "id": 572,
+    "category": "comparison",
+    "question": "如果把竞争调控与林窗对照，主要分歧在哪里？"
+  },
+  {
+    "id": 573,
+    "category": "entity",
+    "question": "与竞争调控研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 574,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到竞争调控？"
+  },
+  {
+    "id": 575,
+    "category": "other",
+    "question": "围绕竞争调控，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 576,
+    "category": "other",
+    "question": "请简述竞争调控的主要要点。"
+  },
+  {
+    "id": 577,
+    "category": "definition",
+    "question": "什么是抚育制度？"
+  },
+  {
+    "id": 578,
+    "category": "classification",
+    "question": "抚育制度可以按哪些标准进行分类？"
+  },
+  {
+    "id": 579,
+    "category": "method",
+    "question": "如何开展抚育制度？"
+  },
+  {
+    "id": 580,
+    "category": "comparison",
+    "question": "抚育制度与卫生伐有什么区别？"
+  },
+  {
+    "id": 581,
+    "category": "entity",
+    "question": "与抚育制度研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 582,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到抚育制度？"
+  },
+  {
+    "id": 583,
+    "category": "other",
+    "question": "请简述抚育制度的主要要点。"
+  },
+  {
+    "id": 584,
+    "category": "other",
+    "question": "在实际经营中，抚育制度通常要优先关注哪些问题？"
+  },
+  {
+    "id": 585,
+    "category": "definition",
+    "question": "请解释林下管护的含义。"
+  },
+  {
+    "id": 586,
+    "category": "classification",
+    "question": "林下管护通常可以分成哪些类别？"
+  },
+  {
+    "id": 587,
+    "category": "method",
+    "question": "在实际工作中，林下管护一般怎么实施？"
+  },
+  {
+    "id": 588,
+    "category": "comparison",
+    "question": "在林下管护和抚育制度之间，核心差异是什么？"
+  },
+  {
+    "id": 589,
+    "category": "entity",
+    "question": "与林下管护研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 590,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到林下管护？"
+  },
+  {
+    "id": 591,
+    "category": "other",
+    "question": "在实际经营中，林下管护通常要优先关注哪些问题？"
+  },
+  {
+    "id": 592,
+    "category": "other",
+    "question": "如果要快速掌握林下管护，最重要的内容是什么？"
+  },
+  {
+    "id": 593,
+    "category": "definition",
+    "question": "目标树经营具体指什么？"
+  },
+  {
+    "id": 594,
+    "category": "classification",
+    "question": "目标树经营有哪些常见类型？"
+  },
+  {
+    "id": 595,
+    "category": "method",
+    "question": "进行目标树经营时通常要遵循哪些步骤？"
+  },
+  {
+    "id": 596,
+    "category": "comparison",
+    "question": "目标树经营和择伐更新分别适用于什么情形？"
+  },
+  {
+    "id": 597,
+    "category": "entity",
+    "question": "与目标树经营研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 598,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到目标树经营？"
+  },
+  {
+    "id": 599,
+    "category": "other",
+    "question": "如果要快速掌握目标树经营，最重要的内容是什么？"
+  },
+  {
+    "id": 600,
+    "category": "other",
+    "question": "围绕目标树经营，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 601,
+    "category": "definition",
+    "question": "如何理解采伐更新？"
+  },
+  {
+    "id": 602,
+    "category": "classification",
+    "question": "采伐更新一般怎样划分层次或类型？"
+  },
+  {
+    "id": 603,
+    "category": "method",
+    "question": "有哪些可操作的方法可以完成采伐更新？"
+  },
+  {
+    "id": 604,
+    "category": "comparison",
+    "question": "如果把采伐更新与更新失败对照，主要分歧在哪里？"
+  },
+  {
+    "id": 605,
+    "category": "entity",
+    "question": "与采伐更新研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 606,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到采伐更新？"
+  },
+  {
+    "id": 607,
+    "category": "other",
+    "question": "围绕采伐更新，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 608,
+    "category": "other",
+    "question": "请简述采伐更新的主要要点。"
+  },
+  {
+    "id": 609,
+    "category": "definition",
+    "question": "什么是天然更新？"
+  },
+  {
+    "id": 610,
+    "category": "classification",
+    "question": "天然更新可以按哪些标准进行分类？"
+  },
+  {
+    "id": 611,
+    "category": "method",
+    "question": "如何开展天然更新？"
+  },
+  {
+    "id": 612,
+    "category": "comparison",
+    "question": "天然更新与灌溉有什么区别？"
+  },
+  {
+    "id": 613,
+    "category": "entity",
+    "question": "与天然更新研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 614,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到天然更新？"
+  },
+  {
+    "id": 615,
+    "category": "other",
+    "question": "请简述天然更新的主要要点。"
+  },
+  {
+    "id": 616,
+    "category": "other",
+    "question": "在实际经营中，天然更新通常要优先关注哪些问题？"
+  },
+  {
+    "id": 617,
+    "category": "definition",
+    "question": "请解释人工更新的含义。"
+  },
+  {
+    "id": 618,
+    "category": "classification",
+    "question": "人工更新通常可以分成哪些类别？"
+  },
+  {
+    "id": 619,
+    "category": "method",
+    "question": "在实际工作中，人工更新一般怎么实施？"
+  },
+  {
+    "id": 620,
+    "category": "comparison",
+    "question": "在人工更新和保墒之间，核心差异是什么？"
+  },
+  {
+    "id": 621,
+    "category": "entity",
+    "question": "与人工更新研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 622,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到人工更新？"
+  },
+  {
+    "id": 623,
+    "category": "other",
+    "question": "在实际经营中，人工更新通常要优先关注哪些问题？"
+  },
+  {
+    "id": 624,
+    "category": "other",
+    "question": "如果要快速掌握人工更新，最重要的内容是什么？"
+  },
+  {
+    "id": 625,
+    "category": "definition",
+    "question": "皆伐更新具体指什么？"
+  },
+  {
+    "id": 626,
+    "category": "classification",
+    "question": "皆伐更新有哪些常见类型？"
+  },
+  {
+    "id": 627,
+    "category": "method",
+    "question": "进行皆伐更新时通常要遵循哪些步骤？"
+  },
+  {
+    "id": 628,
+    "category": "comparison",
+    "question": "皆伐更新和风折分别适用于什么情形？"
+  },
+  {
+    "id": 629,
+    "category": "entity",
+    "question": "与皆伐更新研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 630,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到皆伐更新？"
+  },
+  {
+    "id": 631,
+    "category": "other",
+    "question": "如果要快速掌握皆伐更新，最重要的内容是什么？"
+  },
+  {
+    "id": 632,
+    "category": "other",
+    "question": "围绕皆伐更新，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 633,
+    "category": "definition",
+    "question": "如何理解择伐更新？"
+  },
+  {
+    "id": 634,
+    "category": "classification",
+    "question": "择伐更新一般怎样划分层次或类型？"
+  },
+  {
+    "id": 635,
+    "category": "method",
+    "question": "有哪些可操作的方法可以完成择伐更新？"
+  },
+  {
+    "id": 636,
+    "category": "comparison",
+    "question": "如果把择伐更新与根部病害对照，主要分歧在哪里？"
+  },
+  {
+    "id": 637,
+    "category": "entity",
+    "question": "与择伐更新研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 638,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到择伐更新？"
+  },
+  {
+    "id": 639,
+    "category": "other",
+    "question": "围绕择伐更新，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 640,
+    "category": "other",
+    "question": "请简述择伐更新的主要要点。"
+  },
+  {
+    "id": 641,
+    "category": "definition",
+    "question": "什么是带状更新？"
+  },
+  {
+    "id": 642,
+    "category": "classification",
+    "question": "带状更新可以按哪些标准进行分类？"
+  },
+  {
+    "id": 643,
+    "category": "method",
+    "question": "如何开展带状更新？"
+  },
+  {
+    "id": 644,
+    "category": "comparison",
+    "question": "带状更新与经营方案有什么区别？"
+  },
+  {
+    "id": 645,
+    "category": "entity",
+    "question": "与带状更新研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 646,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到带状更新？"
+  },
+  {
+    "id": 647,
+    "category": "other",
+    "question": "请简述带状更新的主要要点。"
+  },
+  {
+    "id": 648,
+    "category": "other",
+    "question": "在实际经营中，带状更新通常要优先关注哪些问题？"
+  },
+  {
+    "id": 649,
+    "category": "definition",
+    "question": "请解释萌芽更新的含义。"
+  },
+  {
+    "id": 650,
+    "category": "classification",
+    "question": "萌芽更新通常可以分成哪些类别？"
+  },
+  {
+    "id": 651,
+    "category": "method",
+    "question": "在实际工作中，萌芽更新一般怎么实施？"
+  },
+  {
+    "id": 652,
+    "category": "comparison",
+    "question": "在萌芽更新和人工林经营之间，核心差异是什么？"
+  },
+  {
+    "id": 653,
+    "category": "entity",
+    "question": "与萌芽更新研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 654,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到萌芽更新？"
+  },
+  {
+    "id": 655,
+    "category": "other",
+    "question": "在实际经营中，萌芽更新通常要优先关注哪些问题？"
+  },
+  {
+    "id": 656,
+    "category": "other",
+    "question": "如果要快速掌握萌芽更新，最重要的内容是什么？"
+  },
+  {
+    "id": 657,
+    "category": "definition",
+    "question": "补植具体指什么？"
+  },
+  {
+    "id": 658,
+    "category": "classification",
+    "question": "补植有哪些常见类型？"
+  },
+  {
+    "id": 659,
+    "category": "method",
+    "question": "进行补植时通常要遵循哪些步骤？"
+  },
+  {
+    "id": 660,
+    "category": "comparison",
+    "question": "补植和样地调查分别适用于什么情形？"
+  },
+  {
+    "id": 661,
+    "category": "entity",
+    "question": "与补植研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 662,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到补植？"
+  },
+  {
+    "id": 663,
+    "category": "other",
+    "question": "如果要快速掌握补植，最重要的内容是什么？"
+  },
+  {
+    "id": 664,
+    "category": "other",
+    "question": "围绕补植，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 665,
+    "category": "definition",
+    "question": "如何理解更新质量？"
+  },
+  {
+    "id": 666,
+    "category": "classification",
+    "question": "更新质量一般怎样划分层次或类型？"
+  },
+  {
+    "id": 667,
+    "category": "method",
+    "question": "有哪些可操作的方法可以完成更新质量？"
+  },
+  {
+    "id": 668,
+    "category": "comparison",
+    "question": "如果把更新质量与胸径分布对照，主要分歧在哪里？"
+  },
+  {
+    "id": 669,
+    "category": "entity",
+    "question": "与更新质量研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 670,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到更新质量？"
+  },
+  {
+    "id": 671,
+    "category": "other",
+    "question": "围绕更新质量，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 672,
+    "category": "other",
+    "question": "请简述更新质量的主要要点。"
+  },
+  {
+    "id": 673,
+    "category": "definition",
+    "question": "什么是更新密度？"
+  },
+  {
+    "id": 674,
+    "category": "classification",
+    "question": "更新密度可以按哪些标准进行分类？"
+  },
+  {
+    "id": 675,
+    "category": "method",
+    "question": "如何开展更新密度？"
+  },
+  {
+    "id": 676,
+    "category": "comparison",
+    "question": "更新密度与永续利用有什么区别？"
+  },
+  {
+    "id": 677,
+    "category": "entity",
+    "question": "与更新密度研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 678,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到更新密度？"
+  },
+  {
+    "id": 679,
+    "category": "other",
+    "question": "请简述更新密度的主要要点。"
+  },
+  {
+    "id": 680,
+    "category": "other",
+    "question": "在实际经营中，更新密度通常要优先关注哪些问题？"
+  },
+  {
+    "id": 681,
+    "category": "definition",
+    "question": "请解释更新潜力的含义。"
+  },
+  {
+    "id": 682,
+    "category": "classification",
+    "question": "更新潜力通常可以分成哪些类别？"
+  },
+  {
+    "id": 683,
+    "category": "method",
+    "question": "在实际工作中，更新潜力一般怎么实施？"
+  },
+  {
+    "id": 684,
+    "category": "comparison",
+    "question": "在更新潜力和土壤水分之间，核心差异是什么？"
+  },
+  {
+    "id": 685,
+    "category": "entity",
+    "question": "与更新潜力研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 686,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到更新潜力？"
+  },
+  {
+    "id": 687,
+    "category": "other",
+    "question": "在实际经营中，更新潜力通常要优先关注哪些问题？"
+  },
+  {
+    "id": 688,
+    "category": "other",
+    "question": "如果要快速掌握更新潜力，最重要的内容是什么？"
+  },
+  {
+    "id": 689,
+    "category": "definition",
+    "question": "更新失败具体指什么？"
+  },
+  {
+    "id": 690,
+    "category": "classification",
+    "question": "更新失败有哪些常见类型？"
+  },
+  {
+    "id": 691,
+    "category": "method",
+    "question": "进行更新失败时通常要遵循哪些步骤？"
+  },
+  {
+    "id": 692,
+    "category": "comparison",
+    "question": "更新失败和风害风险分别适用于什么情形？"
+  },
+  {
+    "id": 693,
+    "category": "entity",
+    "question": "与更新失败研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 694,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到更新失败？"
+  },
+  {
+    "id": 695,
+    "category": "other",
+    "question": "如果要快速掌握更新失败，最重要的内容是什么？"
+  },
+  {
+    "id": 696,
+    "category": "other",
+    "question": "围绕更新失败，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 697,
+    "category": "definition",
+    "question": "如何理解更新成功？"
+  },
+  {
+    "id": 698,
+    "category": "classification",
+    "question": "更新成功一般怎样划分层次或类型？"
+  },
+  {
+    "id": 699,
+    "category": "method",
+    "question": "有哪些可操作的方法可以完成更新成功？"
+  },
+  {
+    "id": 700,
+    "category": "comparison",
+    "question": "如果把更新成功与发芽率对照，主要分歧在哪里？"
+  },
+  {
+    "id": 701,
+    "category": "entity",
+    "question": "与更新成功研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 702,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到更新成功？"
+  },
+  {
+    "id": 703,
+    "category": "other",
+    "question": "围绕更新成功，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 704,
+    "category": "other",
+    "question": "请简述更新成功的主要要点。"
+  },
+  {
+    "id": 705,
+    "category": "definition",
+    "question": "什么是轮伐期？"
+  },
+  {
+    "id": 706,
+    "category": "classification",
+    "question": "轮伐期可以按哪些标准进行分类？"
+  },
+  {
+    "id": 707,
+    "category": "method",
+    "question": "如何开展轮伐期？"
+  },
+  {
+    "id": 708,
+    "category": "comparison",
+    "question": "轮伐期与苗期管理有什么区别？"
+  },
+  {
+    "id": 709,
+    "category": "entity",
+    "question": "与轮伐期研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 710,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到轮伐期？"
+  },
+  {
+    "id": 711,
+    "category": "other",
+    "question": "请简述轮伐期的主要要点。"
+  },
+  {
+    "id": 712,
+    "category": "other",
+    "question": "在实际经营中，轮伐期通常要优先关注哪些问题？"
+  },
+  {
+    "id": 713,
+    "category": "definition",
+    "question": "请解释采伐制度的含义。"
+  },
+  {
+    "id": 714,
+    "category": "classification",
+    "question": "采伐制度通常可以分成哪些类别？"
+  },
+  {
+    "id": 715,
+    "category": "method",
+    "question": "在实际工作中，采伐制度一般怎么实施？"
+  },
+  {
+    "id": 716,
+    "category": "comparison",
+    "question": "在采伐制度和混交林之间，核心差异是什么？"
+  },
+  {
+    "id": 717,
+    "category": "entity",
+    "question": "与采伐制度研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 718,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到采伐制度？"
+  },
+  {
+    "id": 719,
+    "category": "other",
+    "question": "在实际经营中，采伐制度通常要优先关注哪些问题？"
+  },
+  {
+    "id": 720,
+    "category": "other",
+    "question": "如果要快速掌握采伐制度，最重要的内容是什么？"
+  },
+  {
+    "id": 721,
+    "category": "definition",
+    "question": "施肥具体指什么？"
+  },
+  {
+    "id": 722,
+    "category": "classification",
+    "question": "施肥有哪些常见类型？"
+  },
+  {
+    "id": 723,
+    "category": "method",
+    "question": "进行施肥时通常要遵循哪些步骤？"
+  },
+  {
+    "id": 724,
+    "category": "comparison",
+    "question": "施肥和速生林分别适用于什么情形？"
+  },
+  {
+    "id": 725,
+    "category": "entity",
+    "question": "与施肥研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 726,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到施肥？"
+  },
+  {
+    "id": 727,
+    "category": "other",
+    "question": "如果要快速掌握施肥，最重要的内容是什么？"
+  },
+  {
+    "id": 728,
+    "category": "other",
+    "question": "围绕施肥，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 729,
+    "category": "definition",
+    "question": "如何理解基肥？"
+  },
+  {
+    "id": 730,
+    "category": "classification",
+    "question": "基肥一般怎样划分层次或类型？"
+  },
+  {
+    "id": 731,
+    "category": "method",
+    "question": "有哪些可操作的方法可以完成基肥？"
+  },
+  {
+    "id": 732,
+    "category": "comparison",
+    "question": "如果把基肥与同龄林对照，主要分歧在哪里？"
+  },
+  {
+    "id": 733,
+    "category": "entity",
+    "question": "与基肥研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 734,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到基肥？"
+  },
+  {
+    "id": 735,
+    "category": "other",
+    "question": "围绕基肥，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 736,
+    "category": "other",
+    "question": "请简述基肥的主要要点。"
+  },
+  {
+    "id": 737,
+    "category": "definition",
+    "question": "什么是追肥？"
+  },
+  {
+    "id": 738,
+    "category": "classification",
+    "question": "追肥可以按哪些标准进行分类？"
+  },
+  {
+    "id": 739,
+    "category": "method",
+    "question": "如何开展追肥？"
+  },
+  {
+    "id": 740,
+    "category": "comparison",
+    "question": "追肥与生长量有什么区别？"
+  },
+  {
+    "id": 741,
+    "category": "entity",
+    "question": "与追肥研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 742,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到追肥？"
+  },
+  {
+    "id": 743,
+    "category": "other",
+    "question": "请简述追肥的主要要点。"
+  },
+  {
+    "id": 744,
+    "category": "other",
+    "question": "在实际经营中，追肥通常要优先关注哪些问题？"
+  },
+  {
+    "id": 745,
+    "category": "definition",
+    "question": "请解释灌溉的含义。"
+  },
+  {
+    "id": 746,
+    "category": "classification",
+    "question": "灌溉通常可以分成哪些类别？"
+  },
+  {
+    "id": 747,
+    "category": "method",
+    "question": "在实际工作中，灌溉一般怎么实施？"
+  },
+  {
+    "id": 748,
+    "category": "comparison",
+    "question": "在灌溉和割灌除草之间，核心差异是什么？"
+  },
+  {
+    "id": 749,
+    "category": "entity",
+    "question": "与灌溉研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 750,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到灌溉？"
+  },
+  {
+    "id": 751,
+    "category": "other",
+    "question": "在实际经营中，灌溉通常要优先关注哪些问题？"
+  },
+  {
+    "id": 752,
+    "category": "other",
+    "question": "如果要快速掌握灌溉，最重要的内容是什么？"
+  },
+  {
+    "id": 753,
+    "category": "definition",
+    "question": "喷灌具体指什么？"
+  },
+  {
+    "id": 754,
+    "category": "classification",
+    "question": "喷灌有哪些常见类型？"
+  },
+  {
+    "id": 755,
+    "category": "method",
+    "question": "进行喷灌时通常要遵循哪些步骤？"
+  },
+  {
+    "id": 756,
+    "category": "comparison",
+    "question": "喷灌和冠层调控分别适用于什么情形？"
+  },
+  {
+    "id": 757,
+    "category": "entity",
+    "question": "与喷灌研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 758,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到喷灌？"
+  },
+  {
+    "id": 759,
+    "category": "other",
+    "question": "如果要快速掌握喷灌，最重要的内容是什么？"
+  },
+  {
+    "id": 760,
+    "category": "other",
+    "question": "围绕喷灌，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 761,
+    "category": "definition",
+    "question": "如何理解滴灌？"
+  },
+  {
+    "id": 762,
+    "category": "classification",
+    "question": "滴灌一般怎样划分层次或类型？"
+  },
+  {
+    "id": 763,
+    "category": "method",
+    "question": "有哪些可操作的方法可以完成滴灌？"
+  },
+  {
+    "id": 764,
+    "category": "comparison",
+    "question": "如果把滴灌与天然更新对照，主要分歧在哪里？"
+  },
+  {
+    "id": 765,
+    "category": "entity",
+    "question": "与滴灌研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 766,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到滴灌？"
+  },
+  {
+    "id": 767,
+    "category": "other",
+    "question": "围绕滴灌，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 768,
+    "category": "other",
+    "question": "请简述滴灌的主要要点。"
+  },
+  {
+    "id": 769,
+    "category": "definition",
+    "question": "什么是沟灌？"
+  },
+  {
+    "id": 770,
+    "category": "classification",
+    "question": "沟灌可以按哪些标准进行分类？"
+  },
+  {
+    "id": 771,
+    "category": "method",
+    "question": "如何开展沟灌？"
+  },
+  {
+    "id": 772,
+    "category": "comparison",
+    "question": "沟灌与更新质量有什么区别？"
+  },
+  {
+    "id": 773,
+    "category": "entity",
+    "question": "与沟灌研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 774,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到沟灌？"
+  },
+  {
+    "id": 775,
+    "category": "other",
+    "question": "请简述沟灌的主要要点。"
+  },
+  {
+    "id": 776,
+    "category": "other",
+    "question": "在实际经营中，沟灌通常要优先关注哪些问题？"
+  },
+  {
+    "id": 777,
+    "category": "definition",
+    "question": "请解释排水的含义。"
+  },
+  {
+    "id": 778,
+    "category": "classification",
+    "question": "排水通常可以分成哪些类别？"
+  },
+  {
+    "id": 779,
+    "category": "method",
+    "question": "在实际工作中，排水一般怎么实施？"
+  },
+  {
+    "id": 780,
+    "category": "comparison",
+    "question": "在排水和施肥之间，核心差异是什么？"
+  },
+  {
+    "id": 781,
+    "category": "entity",
+    "question": "与排水研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 782,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到排水？"
+  },
+  {
+    "id": 783,
+    "category": "other",
+    "question": "在实际经营中，排水通常要优先关注哪些问题？"
+  },
+  {
+    "id": 784,
+    "category": "other",
+    "question": "如果要快速掌握排水，最重要的内容是什么？"
+  },
+  {
+    "id": 785,
+    "category": "definition",
+    "question": "土壤改良具体指什么？"
+  },
+  {
+    "id": 786,
+    "category": "classification",
+    "question": "土壤改良有哪些常见类型？"
+  },
+  {
+    "id": 787,
+    "category": "method",
+    "question": "进行土壤改良时通常要遵循哪些步骤？"
+  },
+  {
+    "id": 788,
+    "category": "comparison",
+    "question": "土壤改良和排水分别适用于什么情形？"
+  },
+  {
+    "id": 789,
+    "category": "entity",
+    "question": "与土壤改良研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 790,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到土壤改良？"
+  },
+  {
+    "id": 791,
+    "category": "other",
+    "question": "如果要快速掌握土壤改良，最重要的内容是什么？"
+  },
+  {
+    "id": 792,
+    "category": "other",
+    "question": "围绕土壤改良，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 793,
+    "category": "definition",
+    "question": "如何理解覆盖？"
+  },
+  {
+    "id": 794,
+    "category": "classification",
+    "question": "覆盖一般怎样划分层次或类型？"
+  },
+  {
+    "id": 795,
+    "category": "method",
+    "question": "有哪些可操作的方法可以完成覆盖？"
+  },
+  {
+    "id": 796,
+    "category": "comparison",
+    "question": "如果把覆盖与土壤压实对照，主要分歧在哪里？"
+  },
+  {
+    "id": 797,
+    "category": "entity",
+    "question": "与覆盖研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 798,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到覆盖？"
+  },
+  {
+    "id": 799,
+    "category": "other",
+    "question": "围绕覆盖，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 800,
+    "category": "other",
+    "question": "请简述覆盖的主要要点。"
+  },
+  {
+    "id": 801,
+    "category": "definition",
+    "question": "什么是保墒？"
+  },
+  {
+    "id": 802,
+    "category": "classification",
+    "question": "保墒可以按哪些标准进行分类？"
+  },
+  {
+    "id": 803,
+    "category": "method",
+    "question": "如何开展保墒？"
+  },
+  {
+    "id": 804,
+    "category": "comparison",
+    "question": "保墒与蚜虫危害有什么区别？"
+  },
+  {
+    "id": 805,
+    "category": "entity",
+    "question": "与保墒研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 806,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到保墒？"
+  },
+  {
+    "id": 807,
+    "category": "other",
+    "question": "请简述保墒的主要要点。"
+  },
+  {
+    "id": 808,
+    "category": "other",
+    "question": "在实际经营中，保墒通常要优先关注哪些问题？"
+  },
+  {
+    "id": 809,
+    "category": "definition",
+    "question": "请解释水分调控的含义。"
+  },
+  {
+    "id": 810,
+    "category": "classification",
+    "question": "水分调控通常可以分成哪些类别？"
+  },
+  {
+    "id": 811,
+    "category": "method",
+    "question": "在实际工作中，水分调控一般怎么实施？"
+  },
+  {
+    "id": 812,
+    "category": "comparison",
+    "question": "在水分调控和经营风险之间，核心差异是什么？"
+  },
+  {
+    "id": 813,
+    "category": "entity",
+    "question": "与水分调控研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 814,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到水分调控？"
+  },
+  {
+    "id": 815,
+    "category": "other",
+    "question": "在实际经营中，水分调控通常要优先关注哪些问题？"
+  },
+  {
+    "id": 816,
+    "category": "other",
+    "question": "如果要快速掌握水分调控，最重要的内容是什么？"
+  },
+  {
+    "id": 817,
+    "category": "definition",
+    "question": "肥力提升具体指什么？"
+  },
+  {
+    "id": 818,
+    "category": "classification",
+    "question": "肥力提升有哪些常见类型？"
+  },
+  {
+    "id": 819,
+    "category": "method",
+    "question": "进行肥力提升时通常要遵循哪些步骤？"
+  },
+  {
+    "id": 820,
+    "category": "comparison",
+    "question": "肥力提升和林分改造分别适用于什么情形？"
+  },
+  {
+    "id": 821,
+    "category": "entity",
+    "question": "与肥力提升研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 822,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到肥力提升？"
+  },
+  {
+    "id": 823,
+    "category": "other",
+    "question": "如果要快速掌握肥力提升，最重要的内容是什么？"
+  },
+  {
+    "id": 824,
+    "category": "other",
+    "question": "围绕肥力提升，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 825,
+    "category": "definition",
+    "question": "如何理解养分循环？"
+  },
+  {
+    "id": 826,
+    "category": "classification",
+    "question": "养分循环一般怎样划分层次或类型？"
+  },
+  {
+    "id": 827,
+    "category": "method",
+    "question": "有哪些可操作的方法可以完成养分循环？"
+  },
+  {
+    "id": 828,
+    "category": "comparison",
+    "question": "如果把养分循环与防护林经营对照，主要分歧在哪里？"
+  },
+  {
+    "id": 829,
+    "category": "entity",
+    "question": "与养分循环研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 830,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到养分循环？"
+  },
+  {
+    "id": 831,
+    "category": "other",
+    "question": "围绕养分循环，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 832,
+    "category": "other",
+    "question": "请简述养分循环的主要要点。"
+  },
+  {
+    "id": 833,
+    "category": "definition",
+    "question": "什么是土壤压实？"
+  },
+  {
+    "id": 834,
+    "category": "classification",
+    "question": "土壤压实可以按哪些标准进行分类？"
+  },
+  {
+    "id": 835,
+    "category": "method",
+    "question": "如何开展土壤压实？"
+  },
+  {
+    "id": 836,
+    "category": "comparison",
+    "question": "土壤压实与地位指数模型有什么区别？"
+  },
+  {
+    "id": 837,
+    "category": "entity",
+    "question": "与土壤压实研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 838,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到土壤压实？"
+  },
+  {
+    "id": 839,
+    "category": "other",
+    "question": "请简述土壤压实的主要要点。"
+  },
+  {
+    "id": 840,
+    "category": "other",
+    "question": "在实际经营中，土壤压实通常要优先关注哪些问题？"
+  },
+  {
+    "id": 841,
+    "category": "definition",
+    "question": "请解释病虫害防治的含义。"
+  },
+  {
+    "id": 842,
+    "category": "classification",
+    "question": "病虫害防治通常可以分成哪些类别？"
+  },
+  {
+    "id": 843,
+    "category": "method",
+    "question": "在实际工作中，病虫害防治一般怎么实施？"
+  },
+  {
+    "id": 844,
+    "category": "comparison",
+    "question": "在病虫害防治和土壤保持之间，核心差异是什么？"
+  },
+  {
+    "id": 845,
+    "category": "entity",
+    "question": "与病虫害防治研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 846,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到病虫害防治？"
+  },
+  {
+    "id": 847,
+    "category": "other",
+    "question": "在实际经营中，病虫害防治通常要优先关注哪些问题？"
+  },
+  {
+    "id": 848,
+    "category": "other",
+    "question": "如果要快速掌握病虫害防治，最重要的内容是什么？"
+  },
+  {
+    "id": 849,
+    "category": "definition",
+    "question": "森林防火具体指什么？"
+  },
+  {
+    "id": 850,
+    "category": "classification",
+    "question": "森林防火有哪些常见类型？"
+  },
+  {
+    "id": 851,
+    "category": "method",
+    "question": "进行森林防火时通常要遵循哪些步骤？"
+  },
+  {
+    "id": 852,
+    "category": "comparison",
+    "question": "森林防火和土层厚度分别适用于什么情形？"
+  },
+  {
+    "id": 853,
+    "category": "entity",
+    "question": "与森林防火研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 854,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到森林防火？"
+  },
+  {
+    "id": 855,
+    "category": "other",
+    "question": "如果要快速掌握森林防火，最重要的内容是什么？"
+  },
+  {
+    "id": 856,
+    "category": "other",
+    "question": "围绕森林防火，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 857,
+    "category": "definition",
+    "question": "如何理解风折？"
+  },
+  {
+    "id": 858,
+    "category": "classification",
+    "question": "风折一般怎样划分层次或类型？"
+  },
+  {
+    "id": 859,
+    "category": "method",
+    "question": "有哪些可操作的方法可以完成风折？"
+  },
+  {
+    "id": 860,
+    "category": "comparison",
+    "question": "如果把风折与海拔对照，主要分歧在哪里？"
+  },
+  {
+    "id": 861,
+    "category": "entity",
+    "question": "与风折研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 862,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到风折？"
+  },
+  {
+    "id": 863,
+    "category": "other",
+    "question": "围绕风折，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 864,
+    "category": "other",
+    "question": "请简述风折的主要要点。"
+  },
+  {
+    "id": 865,
+    "category": "definition",
+    "question": "什么是雪压？"
+  },
+  {
+    "id": 866,
+    "category": "classification",
+    "question": "雪压可以按哪些标准进行分类？"
+  },
+  {
+    "id": 867,
+    "category": "method",
+    "question": "如何开展雪压？"
+  },
+  {
+    "id": 868,
+    "category": "comparison",
+    "question": "雪压与种子处理有什么区别？"
+  },
+  {
+    "id": 869,
+    "category": "entity",
+    "question": "与雪压研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 870,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到雪压？"
+  },
+  {
+    "id": 871,
+    "category": "other",
+    "question": "请简述雪压的主要要点。"
+  },
+  {
+    "id": 872,
+    "category": "other",
+    "question": "在实际经营中，雪压通常要优先关注哪些问题？"
+  },
+  {
+    "id": 873,
+    "category": "definition",
+    "question": "请解释干旱胁迫的含义。"
+  },
+  {
+    "id": 874,
+    "category": "classification",
+    "question": "干旱胁迫通常可以分成哪些类别？"
+  },
+  {
+    "id": 875,
+    "category": "method",
+    "question": "在实际工作中，干旱胁迫一般怎么实施？"
+  },
+  {
+    "id": 876,
+    "category": "comparison",
+    "question": "在干旱胁迫和裸根育苗之间，核心差异是什么？"
+  },
+  {
+    "id": 877,
+    "category": "entity",
+    "question": "与干旱胁迫研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 878,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到干旱胁迫？"
+  },
+  {
+    "id": 879,
+    "category": "other",
+    "question": "在实际经营中，干旱胁迫通常要优先关注哪些问题？"
+  },
+  {
+    "id": 880,
+    "category": "other",
+    "question": "如果要快速掌握干旱胁迫，最重要的内容是什么？"
+  },
+  {
+    "id": 881,
+    "category": "definition",
+    "question": "鼠害具体指什么？"
+  },
+  {
+    "id": 882,
+    "category": "classification",
+    "question": "鼠害有哪些常见类型？"
+  },
+  {
+    "id": 883,
+    "category": "method",
+    "question": "进行鼠害时通常要遵循哪些步骤？"
+  },
+  {
+    "id": 884,
+    "category": "comparison",
+    "question": "鼠害和造林密度分别适用于什么情形？"
+  },
+  {
+    "id": 885,
+    "category": "entity",
+    "question": "与鼠害研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 886,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到鼠害？"
+  },
+  {
+    "id": 887,
+    "category": "other",
+    "question": "如果要快速掌握鼠害，最重要的内容是什么？"
+  },
+  {
+    "id": 888,
+    "category": "other",
+    "question": "围绕鼠害，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 889,
+    "category": "definition",
+    "question": "如何理解蚜虫危害？"
+  },
+  {
+    "id": 890,
+    "category": "classification",
+    "question": "蚜虫危害一般怎样划分层次或类型？"
+  },
+  {
+    "id": 891,
+    "category": "method",
+    "question": "有哪些可操作的方法可以完成蚜虫危害？"
+  },
+  {
+    "id": 892,
+    "category": "comparison",
+    "question": "如果把蚜虫危害与经济林对照，主要分歧在哪里？"
+  },
+  {
+    "id": 893,
+    "category": "entity",
+    "question": "与蚜虫危害研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 894,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到蚜虫危害？"
+  },
+  {
+    "id": 895,
+    "category": "other",
+    "question": "围绕蚜虫危害，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 896,
+    "category": "other",
+    "question": "请简述蚜虫危害的主要要点。"
+  },
+  {
+    "id": 897,
+    "category": "definition",
+    "question": "什么是蛀干害虫？"
+  },
+  {
+    "id": 898,
+    "category": "classification",
+    "question": "蛀干害虫可以按哪些标准进行分类？"
+  },
+  {
+    "id": 899,
+    "category": "method",
+    "question": "如何开展蛀干害虫？"
+  },
+  {
+    "id": 900,
+    "category": "comparison",
+    "question": "蛀干害虫与林分结构有什么区别？"
+  },
+  {
+    "id": 901,
+    "category": "entity",
+    "question": "与蛀干害虫研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 902,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到蛀干害虫？"
+  },
+  {
+    "id": 903,
+    "category": "other",
+    "question": "请简述蛀干害虫的主要要点。"
+  },
+  {
+    "id": 904,
+    "category": "other",
+    "question": "在实际经营中，蛀干害虫通常要优先关注哪些问题？"
+  },
+  {
+    "id": 905,
+    "category": "definition",
+    "question": "请解释叶部病害的含义。"
+  },
+  {
+    "id": 906,
+    "category": "classification",
+    "question": "叶部病害通常可以分成哪些类别？"
+  },
+  {
+    "id": 907,
+    "category": "method",
+    "question": "在实际工作中，叶部病害一般怎么实施？"
+  },
+  {
+    "id": 908,
+    "category": "comparison",
+    "question": "在叶部病害和树高之间，核心差异是什么？"
+  },
+  {
+    "id": 909,
+    "category": "entity",
+    "question": "与叶部病害研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 910,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到叶部病害？"
+  },
+  {
+    "id": 911,
+    "category": "other",
+    "question": "在实际经营中，叶部病害通常要优先关注哪些问题？"
+  },
+  {
+    "id": 912,
+    "category": "other",
+    "question": "如果要快速掌握叶部病害，最重要的内容是什么？"
+  },
+  {
+    "id": 913,
+    "category": "definition",
+    "question": "根部病害具体指什么？"
+  },
+  {
+    "id": 914,
+    "category": "classification",
+    "question": "根部病害有哪些常见类型？"
+  },
+  {
+    "id": 915,
+    "category": "method",
+    "question": "进行根部病害时通常要遵循哪些步骤？"
+  },
+  {
+    "id": 916,
+    "category": "comparison",
+    "question": "根部病害和林下植被分别适用于什么情形？"
+  },
+  {
+    "id": 917,
+    "category": "entity",
+    "question": "与根部病害研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 918,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到根部病害？"
+  },
+  {
+    "id": 919,
+    "category": "other",
+    "question": "如果要快速掌握根部病害，最重要的内容是什么？"
+  },
+  {
+    "id": 920,
+    "category": "other",
+    "question": "围绕根部病害，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 921,
+    "category": "definition",
+    "question": "如何理解杂草竞争？"
+  },
+  {
+    "id": 922,
+    "category": "classification",
+    "question": "杂草竞争一般怎样划分层次或类型？"
+  },
+  {
+    "id": 923,
+    "category": "method",
+    "question": "有哪些可操作的方法可以完成杂草竞争？"
+  },
+  {
+    "id": 924,
+    "category": "comparison",
+    "question": "如果把杂草竞争与间伐强度对照，主要分歧在哪里？"
+  },
+  {
+    "id": 925,
+    "category": "entity",
+    "question": "与杂草竞争研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 926,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到杂草竞争？"
+  },
+  {
+    "id": 927,
+    "category": "other",
+    "question": "围绕杂草竞争，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 928,
+    "category": "other",
+    "question": "请简述杂草竞争的主要要点。"
+  },
+  {
+    "id": 929,
+    "category": "definition",
+    "question": "什么是生物入侵？"
+  },
+  {
+    "id": 930,
+    "category": "classification",
+    "question": "生物入侵可以按哪些标准进行分类？"
+  },
+  {
+    "id": 931,
+    "category": "method",
+    "question": "如何开展生物入侵？"
+  },
+  {
+    "id": 932,
+    "category": "comparison",
+    "question": "生物入侵与林下管护有什么区别？"
+  },
+  {
+    "id": 933,
+    "category": "entity",
+    "question": "与生物入侵研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 934,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到生物入侵？"
+  },
+  {
+    "id": 935,
+    "category": "other",
+    "question": "请简述生物入侵的主要要点。"
+  },
+  {
+    "id": 936,
+    "category": "other",
+    "question": "在实际经营中，生物入侵通常要优先关注哪些问题？"
+  },
+  {
+    "id": 937,
+    "category": "definition",
+    "question": "请解释生态风险的含义。"
+  },
+  {
+    "id": 938,
+    "category": "classification",
+    "question": "生态风险通常可以分成哪些类别？"
+  },
+  {
+    "id": 939,
+    "category": "method",
+    "question": "在实际工作中，生态风险一般怎么实施？"
+  },
+  {
+    "id": 940,
+    "category": "comparison",
+    "question": "在生态风险和带状更新之间，核心差异是什么？"
+  },
+  {
+    "id": 941,
+    "category": "entity",
+    "question": "与生态风险研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 942,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到生态风险？"
+  },
+  {
+    "id": 943,
+    "category": "other",
+    "question": "在实际经营中，生态风险通常要优先关注哪些问题？"
+  },
+  {
+    "id": 944,
+    "category": "other",
+    "question": "如果要快速掌握生态风险，最重要的内容是什么？"
+  },
+  {
+    "id": 945,
+    "category": "definition",
+    "question": "经营风险具体指什么？"
+  },
+  {
+    "id": 946,
+    "category": "classification",
+    "question": "经营风险有哪些常见类型？"
+  },
+  {
+    "id": 947,
+    "category": "method",
+    "question": "进行经营风险时通常要遵循哪些步骤？"
+  },
+  {
+    "id": 948,
+    "category": "comparison",
+    "question": "经营风险和更新成功分别适用于什么情形？"
+  },
+  {
+    "id": 949,
+    "category": "entity",
+    "question": "与经营风险研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 950,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到经营风险？"
+  },
+  {
+    "id": 951,
+    "category": "other",
+    "question": "如果要快速掌握经营风险，最重要的内容是什么？"
+  },
+  {
+    "id": 952,
+    "category": "other",
+    "question": "围绕经营风险，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 953,
+    "category": "definition",
+    "question": "如何理解逆境响应？"
+  },
+  {
+    "id": 954,
+    "category": "classification",
+    "question": "逆境响应一般怎样划分层次或类型？"
+  },
+  {
+    "id": 955,
+    "category": "method",
+    "question": "有哪些可操作的方法可以完成逆境响应？"
+  },
+  {
+    "id": 956,
+    "category": "comparison",
+    "question": "如果把逆境响应与喷灌对照，主要分歧在哪里？"
+  },
+  {
+    "id": 957,
+    "category": "entity",
+    "question": "与逆境响应研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 958,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到逆境响应？"
+  },
+  {
+    "id": 959,
+    "category": "other",
+    "question": "围绕逆境响应，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 960,
+    "category": "other",
+    "question": "请简述逆境响应的主要要点。"
+  },
+  {
+    "id": 961,
+    "category": "definition",
+    "question": "什么是森林经营？"
+  },
+  {
+    "id": 962,
+    "category": "classification",
+    "question": "森林经营可以按哪些标准进行分类？"
+  },
+  {
+    "id": 963,
+    "category": "method",
+    "question": "如何开展森林经营？"
+  },
+  {
+    "id": 964,
+    "category": "comparison",
+    "question": "森林经营与水分调控有什么区别？"
+  },
+  {
+    "id": 965,
+    "category": "entity",
+    "question": "与森林经营研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 966,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到森林经营？"
+  },
+  {
+    "id": 967,
+    "category": "other",
+    "question": "请简述森林经营的主要要点。"
+  },
+  {
+    "id": 968,
+    "category": "other",
+    "question": "在实际经营中，森林经营通常要优先关注哪些问题？"
+  },
+  {
+    "id": 969,
+    "category": "definition",
+    "question": "请解释经营方案的含义。"
+  },
+  {
+    "id": 970,
+    "category": "classification",
+    "question": "经营方案通常可以分成哪些类别？"
+  },
+  {
+    "id": 971,
+    "category": "method",
+    "question": "在实际工作中，经营方案一般怎么实施？"
+  },
+  {
+    "id": 972,
+    "category": "comparison",
+    "question": "在经营方案和雪压之间，核心差异是什么？"
+  },
+  {
+    "id": 973,
+    "category": "entity",
+    "question": "与经营方案研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 974,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到经营方案？"
+  },
+  {
+    "id": 975,
+    "category": "other",
+    "question": "在实际经营中，经营方案通常要优先关注哪些问题？"
+  },
+  {
+    "id": 976,
+    "category": "other",
+    "question": "如果要快速掌握经营方案，最重要的内容是什么？"
+  },
+  {
+    "id": 977,
+    "category": "definition",
+    "question": "经营目标具体指什么？"
+  },
+  {
+    "id": 978,
+    "category": "classification",
+    "question": "经营目标有哪些常见类型？"
+  },
+  {
+    "id": 979,
+    "category": "method",
+    "question": "进行经营目标时通常要遵循哪些步骤？"
+  },
+  {
+    "id": 980,
+    "category": "comparison",
+    "question": "经营目标和杂草竞争分别适用于什么情形？"
+  },
+  {
+    "id": 981,
+    "category": "entity",
+    "question": "与经营目标研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 982,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到经营目标？"
+  },
+  {
+    "id": 983,
+    "category": "other",
+    "question": "如果要快速掌握经营目标，最重要的内容是什么？"
+  },
+  {
+    "id": 984,
+    "category": "other",
+    "question": "围绕经营目标，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 985,
+    "category": "definition",
+    "question": "如何理解经营周期？"
+  },
+  {
+    "id": 986,
+    "category": "classification",
+    "question": "经营周期一般怎样划分层次或类型？"
+  },
+  {
+    "id": 987,
+    "category": "method",
+    "question": "有哪些可操作的方法可以完成经营周期？"
+  },
+  {
+    "id": 988,
+    "category": "comparison",
+    "question": "如果把经营周期与经营目标对照，主要分歧在哪里？"
+  },
+  {
+    "id": 989,
+    "category": "entity",
+    "question": "与经营周期研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 990,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到经营周期？"
+  },
+  {
+    "id": 991,
+    "category": "other",
+    "question": "围绕经营周期，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 992,
+    "category": "other",
+    "question": "请简述经营周期的主要要点。"
+  },
+  {
+    "id": 993,
+    "category": "definition",
+    "question": "什么是经营强度？"
+  },
+  {
+    "id": 994,
+    "category": "classification",
+    "question": "经营强度可以按哪些标准进行分类？"
+  },
+  {
+    "id": 995,
+    "category": "method",
+    "question": "如何开展经营强度？"
+  },
+  {
+    "id": 996,
+    "category": "comparison",
+    "question": "经营强度与公益林经营有什么区别？"
+  },
+  {
+    "id": 997,
+    "category": "entity",
+    "question": "与经营强度研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 998,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到经营强度？"
+  },
+  {
+    "id": 999,
+    "category": "other",
+    "question": "请简述经营强度的主要要点。"
+  },
+  {
+    "id": 1000,
+    "category": "other",
+    "question": "在实际经营中，经营强度通常要优先关注哪些问题？"
+  },
+  {
+    "id": 1001,
+    "category": "definition",
+    "question": "请解释林分改造的含义。"
+  },
+  {
+    "id": 1002,
+    "category": "classification",
+    "question": "林分改造通常可以分成哪些类别？"
+  },
+  {
+    "id": 1003,
+    "category": "method",
+    "question": "在实际工作中，林分改造一般怎么实施？"
+  },
+  {
+    "id": 1004,
+    "category": "comparison",
+    "question": "在林分改造和森林资源清查之间，核心差异是什么？"
+  },
+  {
+    "id": 1005,
+    "category": "entity",
+    "question": "与林分改造研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 1006,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到林分改造？"
+  },
+  {
+    "id": 1007,
+    "category": "other",
+    "question": "在实际经营中，林分改造通常要优先关注哪些问题？"
+  },
+  {
+    "id": 1008,
+    "category": "other",
+    "question": "如果要快速掌握林分改造，最重要的内容是什么？"
+  },
+  {
+    "id": 1009,
+    "category": "definition",
+    "question": "结构调整具体指什么？"
+  },
+  {
+    "id": 1010,
+    "category": "classification",
+    "question": "结构调整有哪些常见类型？"
+  },
+  {
+    "id": 1011,
+    "category": "method",
+    "question": "进行结构调整时通常要遵循哪些步骤？"
+  },
+  {
+    "id": 1012,
+    "category": "comparison",
+    "question": "结构调整和景观格局分别适用于什么情形？"
+  },
+  {
+    "id": 1013,
+    "category": "entity",
+    "question": "与结构调整研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 1014,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到结构调整？"
+  },
+  {
+    "id": 1015,
+    "category": "other",
+    "question": "如果要快速掌握结构调整，最重要的内容是什么？"
+  },
+  {
+    "id": 1016,
+    "category": "other",
+    "question": "围绕结构调整，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 1017,
+    "category": "definition",
+    "question": "如何理解生态修复？"
+  },
+  {
+    "id": 1018,
+    "category": "classification",
+    "question": "生态修复一般怎样划分层次或类型？"
+  },
+  {
+    "id": 1019,
+    "category": "method",
+    "question": "有哪些可操作的方法可以完成生态修复？"
+  },
+  {
+    "id": 1020,
+    "category": "comparison",
+    "question": "如果把生态修复与立地质量对照，主要分歧在哪里？"
+  },
+  {
+    "id": 1021,
+    "category": "entity",
+    "question": "与生态修复研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 1022,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到生态修复？"
+  },
+  {
+    "id": 1023,
+    "category": "other",
+    "question": "围绕生态修复，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 1024,
+    "category": "other",
+    "question": "请简述生态修复的主要要点。"
+  },
+  {
+    "id": 1025,
+    "category": "definition",
+    "question": "什么是人工林经营？"
+  },
+  {
+    "id": 1026,
+    "category": "classification",
+    "question": "人工林经营可以按哪些标准进行分类？"
+  },
+  {
+    "id": 1027,
+    "category": "method",
+    "question": "如何开展人工林经营？"
+  },
+  {
+    "id": 1028,
+    "category": "comparison",
+    "question": "人工林经营与坡位有什么区别？"
+  },
+  {
+    "id": 1029,
+    "category": "entity",
+    "question": "与人工林经营研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 1030,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到人工林经营？"
+  },
+  {
+    "id": 1031,
+    "category": "other",
+    "question": "请简述人工林经营的主要要点。"
+  },
+  {
+    "id": 1032,
+    "category": "other",
+    "question": "在实际经营中，人工林经营通常要优先关注哪些问题？"
+  },
+  {
+    "id": 1033,
+    "category": "definition",
+    "question": "请解释公益林经营的含义。"
+  },
+  {
+    "id": 1034,
+    "category": "classification",
+    "question": "公益林经营通常可以分成哪些类别？"
+  },
+  {
+    "id": 1035,
+    "category": "method",
+    "question": "在实际工作中，公益林经营一般怎么实施？"
+  },
+  {
+    "id": 1036,
+    "category": "comparison",
+    "question": "在公益林经营和冻害风险之间，核心差异是什么？"
+  },
+  {
+    "id": 1037,
+    "category": "entity",
+    "question": "与公益林经营研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 1038,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到公益林经营？"
+  },
+  {
+    "id": 1039,
+    "category": "other",
+    "question": "在实际经营中，公益林经营通常要优先关注哪些问题？"
+  },
+  {
+    "id": 1040,
+    "category": "other",
+    "question": "如果要快速掌握公益林经营，最重要的内容是什么？"
+  },
+  {
+    "id": 1041,
+    "category": "definition",
+    "question": "用材林经营具体指什么？"
+  },
+  {
+    "id": 1042,
+    "category": "classification",
+    "question": "用材林经营有哪些常见类型？"
+  },
+  {
+    "id": 1043,
+    "category": "method",
+    "question": "进行用材林经营时通常要遵循哪些步骤？"
+  },
+  {
+    "id": 1044,
+    "category": "comparison",
+    "question": "用材林经营和苗木质量分别适用于什么情形？"
+  },
+  {
+    "id": 1045,
+    "category": "entity",
+    "question": "与用材林经营研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 1046,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到用材林经营？"
+  },
+  {
+    "id": 1047,
+    "category": "other",
+    "question": "如果要快速掌握用材林经营，最重要的内容是什么？"
+  },
+  {
+    "id": 1048,
+    "category": "other",
+    "question": "围绕用材林经营，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 1049,
+    "category": "definition",
+    "question": "如何理解经济林经营？"
+  },
+  {
+    "id": 1050,
+    "category": "classification",
+    "question": "经济林经营一般怎样划分层次或类型？"
+  },
+  {
+    "id": 1051,
+    "category": "method",
+    "question": "有哪些可操作的方法可以完成经济林经营？"
+  },
+  {
+    "id": 1052,
+    "category": "comparison",
+    "question": "如果把经济林经营与苗圃管理对照，主要分歧在哪里？"
+  },
+  {
+    "id": 1053,
+    "category": "entity",
+    "question": "与经济林经营研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 1054,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到经济林经营？"
+  },
+  {
+    "id": 1055,
+    "category": "other",
+    "question": "围绕经济林经营，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 1056,
+    "category": "other",
+    "question": "请简述经济林经营的主要要点。"
+  },
+  {
+    "id": 1057,
+    "category": "definition",
+    "question": "什么是防护林经营？"
+  },
+  {
+    "id": 1058,
+    "category": "classification",
+    "question": "防护林经营可以按哪些标准进行分类？"
+  },
+  {
+    "id": 1059,
+    "category": "method",
+    "question": "如何开展防护林经营？"
+  },
+  {
+    "id": 1060,
+    "category": "comparison",
+    "question": "防护林经营与纯林有什么区别？"
+  },
+  {
+    "id": 1061,
+    "category": "entity",
+    "question": "与防护林经营研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 1062,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到防护林经营？"
+  },
+  {
+    "id": 1063,
+    "category": "other",
+    "question": "请简述防护林经营的主要要点。"
+  },
+  {
+    "id": 1064,
+    "category": "other",
+    "question": "在实际经营中，防护林经营通常要优先关注哪些问题？"
+  },
+  {
+    "id": 1065,
+    "category": "definition",
+    "question": "请解释经营决策的含义。"
+  },
+  {
+    "id": 1066,
+    "category": "classification",
+    "question": "经营决策通常可以分成哪些类别？"
+  },
+  {
+    "id": 1067,
+    "category": "method",
+    "question": "在实际工作中，经营决策一般怎么实施？"
+  },
+  {
+    "id": 1068,
+    "category": "comparison",
+    "question": "在经营决策和乡土树种之间，核心差异是什么？"
+  },
+  {
+    "id": 1069,
+    "category": "entity",
+    "question": "与经营决策研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 1070,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到经营决策？"
+  },
+  {
+    "id": 1071,
+    "category": "other",
+    "question": "在实际经营中，经营决策通常要优先关注哪些问题？"
+  },
+  {
+    "id": 1072,
+    "category": "other",
+    "question": "如果要快速掌握经营决策，最重要的内容是什么？"
+  },
+  {
+    "id": 1073,
+    "category": "definition",
+    "question": "森林认证具体指什么？"
+  },
+  {
+    "id": 1074,
+    "category": "classification",
+    "question": "森林认证有哪些常见类型？"
+  },
+  {
+    "id": 1075,
+    "category": "method",
+    "question": "进行森林认证时通常要遵循哪些步骤？"
+  },
+  {
+    "id": 1076,
+    "category": "comparison",
+    "question": "森林认证和异龄林分别适用于什么情形？"
+  },
+  {
+    "id": 1077,
+    "category": "entity",
+    "question": "与森林认证研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 1078,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到森林认证？"
+  },
+  {
+    "id": 1079,
+    "category": "other",
+    "question": "如果要快速掌握森林认证，最重要的内容是什么？"
+  },
+  {
+    "id": 1080,
+    "category": "other",
+    "question": "围绕森林认证，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 1081,
+    "category": "definition",
+    "question": "如何理解样地调查？"
+  },
+  {
+    "id": 1082,
+    "category": "classification",
+    "question": "样地调查一般怎样划分层次或类型？"
+  },
+  {
+    "id": 1083,
+    "category": "method",
+    "question": "有哪些可操作的方法可以完成样地调查？"
+  },
+  {
+    "id": 1084,
+    "category": "comparison",
+    "question": "如果把样地调查与生产力对照，主要分歧在哪里？"
+  },
+  {
+    "id": 1085,
+    "category": "entity",
+    "question": "与样地调查研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 1086,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到样地调查？"
+  },
+  {
+    "id": 1087,
+    "category": "other",
+    "question": "围绕样地调查，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 1088,
+    "category": "other",
+    "question": "请简述样地调查的主要要点。"
+  },
+  {
+    "id": 1089,
+    "category": "definition",
+    "question": "什么是森林资源清查？"
+  },
+  {
+    "id": 1090,
+    "category": "classification",
+    "question": "森林资源清查可以按哪些标准进行分类？"
+  },
+  {
+    "id": 1091,
+    "category": "method",
+    "question": "如何开展森林资源清查？"
+  },
+  {
+    "id": 1092,
+    "category": "comparison",
+    "question": "森林资源清查与透光伐有什么区别？"
+  },
+  {
+    "id": 1093,
+    "category": "entity",
+    "question": "与森林资源清查研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 1094,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到森林资源清查？"
+  },
+  {
+    "id": 1095,
+    "category": "other",
+    "question": "请简述森林资源清查的主要要点。"
+  },
+  {
+    "id": 1096,
+    "category": "other",
+    "question": "在实际经营中，森林资源清查通常要优先关注哪些问题？"
+  },
+  {
+    "id": 1097,
+    "category": "definition",
+    "question": "请解释遥感监测的含义。"
+  },
+  {
+    "id": 1098,
+    "category": "classification",
+    "question": "遥感监测通常可以分成哪些类别？"
+  },
+  {
+    "id": 1099,
+    "category": "method",
+    "question": "在实际工作中，遥感监测一般怎么实施？"
+  },
+  {
+    "id": 1100,
+    "category": "comparison",
+    "question": "在遥感监测和密度调控之间，核心差异是什么？"
+  },
+  {
+    "id": 1101,
+    "category": "entity",
+    "question": "与遥感监测研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 1102,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到遥感监测？"
+  },
+  {
+    "id": 1103,
+    "category": "other",
+    "question": "在实际经营中，遥感监测通常要优先关注哪些问题？"
+  },
+  {
+    "id": 1104,
+    "category": "other",
+    "question": "如果要快速掌握遥感监测，最重要的内容是什么？"
+  },
+  {
+    "id": 1105,
+    "category": "definition",
+    "question": "生长模型具体指什么？"
+  },
+  {
+    "id": 1106,
+    "category": "classification",
+    "question": "生长模型有哪些常见类型？"
+  },
+  {
+    "id": 1107,
+    "category": "method",
+    "question": "进行生长模型时通常要遵循哪些步骤？"
+  },
+  {
+    "id": 1108,
+    "category": "comparison",
+    "question": "生长模型和人工更新分别适用于什么情形？"
+  },
+  {
+    "id": 1109,
+    "category": "entity",
+    "question": "与生长模型研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 1110,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到生长模型？"
+  },
+  {
+    "id": 1111,
+    "category": "other",
+    "question": "如果要快速掌握生长模型，最重要的内容是什么？"
+  },
+  {
+    "id": 1112,
+    "category": "other",
+    "question": "围绕生长模型，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 1113,
+    "category": "definition",
+    "question": "如何理解地位指数模型？"
+  },
+  {
+    "id": 1114,
+    "category": "classification",
+    "question": "地位指数模型一般怎样划分层次或类型？"
+  },
+  {
+    "id": 1115,
+    "category": "method",
+    "question": "有哪些可操作的方法可以完成地位指数模型？"
+  },
+  {
+    "id": 1116,
+    "category": "comparison",
+    "question": "如果把地位指数模型与更新密度对照，主要分歧在哪里？"
+  },
+  {
+    "id": 1117,
+    "category": "entity",
+    "question": "与地位指数模型研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 1118,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到地位指数模型？"
+  },
+  {
+    "id": 1119,
+    "category": "other",
+    "question": "围绕地位指数模型，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 1120,
+    "category": "other",
+    "question": "请简述地位指数模型的主要要点。"
+  },
+  {
+    "id": 1121,
+    "category": "definition",
+    "question": "什么是材积表？"
+  },
+  {
+    "id": 1122,
+    "category": "classification",
+    "question": "材积表可以按哪些标准进行分类？"
+  },
+  {
+    "id": 1123,
+    "category": "method",
+    "question": "如何开展材积表？"
+  },
+  {
+    "id": 1124,
+    "category": "comparison",
+    "question": "材积表与基肥有什么区别？"
+  },
+  {
+    "id": 1125,
+    "category": "entity",
+    "question": "与材积表研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 1126,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到材积表？"
+  },
+  {
+    "id": 1127,
+    "category": "other",
+    "question": "请简述材积表的主要要点。"
+  },
+  {
+    "id": 1128,
+    "category": "other",
+    "question": "在实际经营中，材积表通常要优先关注哪些问题？"
+  },
+  {
+    "id": 1129,
+    "category": "definition",
+    "question": "请解释树高曲线的含义。"
+  },
+  {
+    "id": 1130,
+    "category": "classification",
+    "question": "树高曲线通常可以分成哪些类别？"
+  },
+  {
+    "id": 1131,
+    "category": "method",
+    "question": "在实际工作中，树高曲线一般怎么实施？"
+  },
+  {
+    "id": 1132,
+    "category": "comparison",
+    "question": "在树高曲线和土壤改良之间，核心差异是什么？"
+  },
+  {
+    "id": 1133,
+    "category": "entity",
+    "question": "与树高曲线研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 1134,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到树高曲线？"
+  },
+  {
+    "id": 1135,
+    "category": "other",
+    "question": "在实际经营中，树高曲线通常要优先关注哪些问题？"
+  },
+  {
+    "id": 1136,
+    "category": "other",
+    "question": "如果要快速掌握树高曲线，最重要的内容是什么？"
+  },
+  {
+    "id": 1137,
+    "category": "definition",
+    "question": "胸径分布具体指什么？"
+  },
+  {
+    "id": 1138,
+    "category": "classification",
+    "question": "胸径分布有哪些常见类型？"
+  },
+  {
+    "id": 1139,
+    "category": "method",
+    "question": "进行胸径分布时通常要遵循哪些步骤？"
+  },
+  {
+    "id": 1140,
+    "category": "comparison",
+    "question": "胸径分布和病虫害防治分别适用于什么情形？"
+  },
+  {
+    "id": 1141,
+    "category": "entity",
+    "question": "与胸径分布研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 1142,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到胸径分布？"
+  },
+  {
+    "id": 1143,
+    "category": "other",
+    "question": "如果要快速掌握胸径分布，最重要的内容是什么？"
+  },
+  {
+    "id": 1144,
+    "category": "other",
+    "question": "围绕胸径分布，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 1145,
+    "category": "definition",
+    "question": "如何理解景观格局？"
+  },
+  {
+    "id": 1146,
+    "category": "classification",
+    "question": "景观格局一般怎样划分层次或类型？"
+  },
+  {
+    "id": 1147,
+    "category": "method",
+    "question": "有哪些可操作的方法可以完成景观格局？"
+  },
+  {
+    "id": 1148,
+    "category": "comparison",
+    "question": "如果把景观格局与蛀干害虫对照，主要分歧在哪里？"
+  },
+  {
+    "id": 1149,
+    "category": "entity",
+    "question": "与景观格局研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 1150,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到景观格局？"
+  },
+  {
+    "id": 1151,
+    "category": "other",
+    "question": "围绕景观格局，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 1152,
+    "category": "other",
+    "question": "请简述景观格局的主要要点。"
+  },
+  {
+    "id": 1153,
+    "category": "definition",
+    "question": "什么是生物多样性？"
+  },
+  {
+    "id": 1154,
+    "category": "classification",
+    "question": "生物多样性可以按哪些标准进行分类？"
+  },
+  {
+    "id": 1155,
+    "category": "method",
+    "question": "如何开展生物多样性？"
+  },
+  {
+    "id": 1156,
+    "category": "comparison",
+    "question": "生物多样性与逆境响应有什么区别？"
+  },
+  {
+    "id": 1157,
+    "category": "entity",
+    "question": "与生物多样性研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 1158,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到生物多样性？"
+  },
+  {
+    "id": 1159,
+    "category": "other",
+    "question": "请简述生物多样性的主要要点。"
+  },
+  {
+    "id": 1160,
+    "category": "other",
+    "question": "在实际经营中，生物多样性通常要优先关注哪些问题？"
+  },
+  {
+    "id": 1161,
+    "category": "definition",
+    "question": "请解释水源涵养的含义。"
+  },
+  {
+    "id": 1162,
+    "category": "classification",
+    "question": "水源涵养通常可以分成哪些类别？"
+  },
+  {
+    "id": 1163,
+    "category": "method",
+    "question": "在实际工作中，水源涵养一般怎么实施？"
+  },
+  {
+    "id": 1164,
+    "category": "comparison",
+    "question": "在水源涵养和结构调整之间，核心差异是什么？"
+  },
+  {
+    "id": 1165,
+    "category": "entity",
+    "question": "与水源涵养研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 1166,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到水源涵养？"
+  },
+  {
+    "id": 1167,
+    "category": "other",
+    "question": "在实际经营中，水源涵养通常要优先关注哪些问题？"
+  },
+  {
+    "id": 1168,
+    "category": "other",
+    "question": "如果要快速掌握水源涵养，最重要的内容是什么？"
+  },
+  {
+    "id": 1169,
+    "category": "definition",
+    "question": "土壤保持具体指什么？"
+  },
+  {
+    "id": 1170,
+    "category": "classification",
+    "question": "土壤保持有哪些常见类型？"
+  },
+  {
+    "id": 1171,
+    "category": "method",
+    "question": "进行土壤保持时通常要遵循哪些步骤？"
+  },
+  {
+    "id": 1172,
+    "category": "comparison",
+    "question": "土壤保持和经营决策分别适用于什么情形？"
+  },
+  {
+    "id": 1173,
+    "category": "entity",
+    "question": "与土壤保持研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 1174,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到土壤保持？"
+  },
+  {
+    "id": 1175,
+    "category": "other",
+    "question": "如果要快速掌握土壤保持，最重要的内容是什么？"
+  },
+  {
+    "id": 1176,
+    "category": "other",
+    "question": "围绕土壤保持，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 1177,
+    "category": "definition",
+    "question": "如何理解碳汇经营？"
+  },
+  {
+    "id": 1178,
+    "category": "classification",
+    "question": "碳汇经营一般怎样划分层次或类型？"
+  },
+  {
+    "id": 1179,
+    "category": "method",
+    "question": "有哪些可操作的方法可以完成碳汇经营？"
+  },
+  {
+    "id": 1180,
+    "category": "comparison",
+    "question": "如果把碳汇经营与材积表对照，主要分歧在哪里？"
+  },
+  {
+    "id": 1181,
+    "category": "entity",
+    "question": "与碳汇经营研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 1182,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到碳汇经营？"
+  },
+  {
+    "id": 1183,
+    "category": "other",
+    "question": "围绕碳汇经营，学生最容易忽略的环节有哪些？"
+  },
+  {
+    "id": 1184,
+    "category": "other",
+    "question": "请简述碳汇经营的主要要点。"
+  },
+  {
+    "id": 1185,
+    "category": "definition",
+    "question": "什么是近自然经营？"
+  },
+  {
+    "id": 1186,
+    "category": "classification",
+    "question": "近自然经营可以按哪些标准进行分类？"
+  },
+  {
+    "id": 1187,
+    "category": "method",
+    "question": "如何开展近自然经营？"
+  },
+  {
+    "id": 1188,
+    "category": "comparison",
+    "question": "近自然经营与碳汇经营有什么区别？"
+  },
+  {
+    "id": 1189,
+    "category": "entity",
+    "question": "与近自然经营研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 1190,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到近自然经营？"
+  },
+  {
+    "id": 1191,
+    "category": "other",
+    "question": "请简述近自然经营的主要要点。"
+  },
+  {
+    "id": 1192,
+    "category": "other",
+    "question": "在实际经营中，近自然经营通常要优先关注哪些问题？"
+  },
+  {
+    "id": 1193,
+    "category": "definition",
+    "question": "请解释永续利用的含义。"
+  },
+  {
+    "id": 1194,
+    "category": "classification",
+    "question": "永续利用通常可以分成哪些类别？"
+  },
+  {
+    "id": 1195,
+    "category": "method",
+    "question": "在实际工作中，永续利用一般怎么实施？"
+  },
+  {
+    "id": 1196,
+    "category": "comparison",
+    "question": "在永续利用和土壤质地之间，核心差异是什么？"
+  },
+  {
+    "id": 1197,
+    "category": "entity",
+    "question": "与永续利用研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 1198,
+    "category": "entity",
+    "question": "教材中哪一章/哪一节会讲到永续利用？"
+  },
+  {
+    "id": 1199,
+    "category": "other",
+    "question": "在实际经营中，永续利用通常要优先关注哪些问题？"
+  },
+  {
+    "id": 1200,
+    "category": "other",
+    "question": "如果要快速掌握永续利用，最重要的内容是什么？"
+  }
+]

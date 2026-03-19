@@ -44,6 +44,7 @@ type CandidateState = CandidateRow & {
   keywordScore: number;
   adjacencyScore: number;
   finalScore: number;
+  noisePenalty: number;
 };
 
 type SearchProfile = {
@@ -59,6 +60,12 @@ type TermStats = {
   docCount: number;
   avgLength: number;
   df: Map<string, number>;
+};
+
+type NoiseAssessment = {
+  drop: boolean;
+  penalty: number;
+  reasons: string[];
 };
 
 type DbConnection = NonNullable<Awaited<ReturnType<typeof getDb>>>;
@@ -584,6 +591,7 @@ function scoreChunk(
   const cleanedQuestion = normalizeForComparison(stripQuestionWords(originalQuestion));
   const stats = options?.stats;
   const intentTerms = options?.intentTerms ?? [];
+  const definitionQuestion = isDefinitionQuestion(originalQuestion, intentTerms);
   const coreKeywords = keywords.filter((kw) => {
     const normalized = normalizeForComparison(kw);
     return normalized.length >= 3 || DOMAIN_VOCAB_KEYS.has(normalized) || QUESTION_INTENT_KEYS.has(normalized);
@@ -658,11 +666,17 @@ function scoreChunk(
     structureBonus += 2.2;
   }
 
+  let definitionBonus = 0;
+  if (definitionQuestion) {
+    definitionBonus += scoreDefinitionCueBonus(content);
+    definitionBonus -= scoreDefinitionNarrativePenalty(content);
+  }
+
   const repetitionPenalty = computeRepetitionPenalty(content);
   const tfPenalty = maxTf > 5 ? Math.max(0.82, 1 - (maxTf - 5) * 0.03) : 1;
   const baseScore = bm25Score * (0.6 + 0.4 * coverage);
 
-  return (baseScore + phraseBonus + chapterBonus + structureBonus) * repetitionPenalty * tfPenalty;
+  return (baseScore + phraseBonus + chapterBonus + structureBonus + definitionBonus) * repetitionPenalty * tfPenalty;
 }
 
 function computeRepetitionPenalty(content: string): number {
@@ -691,6 +705,189 @@ function computeRepetitionPenalty(content: string): number {
 
 function containsEnumerationMarkers(content: string): boolean {
   return /(?:^|\n)\s*(?:[一二三四五六七八九十]+[、．.）)]|\d+[\.、）)]|\([一二三四五六七八九十]+\))/m.test(content);
+}
+
+const CHINESE_SECTION_NUMBER_MAP = new Map([
+  ["零", 0],
+  ["一", 1],
+  ["二", 2],
+  ["三", 3],
+  ["四", 4],
+  ["五", 5],
+  ["六", 6],
+  ["七", 7],
+  ["八", 8],
+  ["九", 9],
+  ["十", 10],
+]);
+
+function parseSectionIndex(line: string): number | null {
+  const trimmed = line.trim();
+  const arabicMatch = trimmed.match(/^(\d{1,3})(?:\.\d+)?(?:[、.．）)]|\s|$)/);
+  if (arabicMatch) {
+    return Number(arabicMatch[1]);
+  }
+
+  const chineseMatch = trimmed.match(/^([零一二三四五六七八九十]{1,3})(?:[、.．）)]|\s|$)/);
+  if (!chineseMatch) return null;
+
+  const token = chineseMatch[1];
+  if (token.length === 1) return CHINESE_SECTION_NUMBER_MAP.get(token) ?? null;
+  if (token === "十") return 10;
+  if (token.length === 2 && token.startsWith("十")) {
+    const ones = CHINESE_SECTION_NUMBER_MAP.get(token.slice(1)) ?? 0;
+    return 10 + ones;
+  }
+  if (token.length === 2 && token.endsWith("十")) {
+    const tens = CHINESE_SECTION_NUMBER_MAP.get(token[0]) ?? 0;
+    return tens * 10;
+  }
+  if (token.length === 3 && token[1] === "十") {
+    const tens = CHINESE_SECTION_NUMBER_MAP.get(token[0]) ?? 0;
+    const ones = CHINESE_SECTION_NUMBER_MAP.get(token[2]) ?? 0;
+    return tens * 10 + ones;
+  }
+
+  return null;
+}
+
+function detectDirectoryStyleNoise(content: string): { score: number; reasons: string[] } {
+  const lines = content
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+
+  if (lines.length < 4) return { score: 0, reasons: [] };
+
+  let numberedLines = 0;
+  let shortLines = 0;
+  let consecutivePairs = 0;
+  let previousIndex: number | null = null;
+
+  for (const line of lines) {
+    if (line.length <= 28) shortLines++;
+
+    const index = parseSectionIndex(line);
+    if (index === null) {
+      previousIndex = null;
+      continue;
+    }
+
+    numberedLines++;
+    if (previousIndex !== null && index === previousIndex + 1) {
+      consecutivePairs++;
+    }
+    previousIndex = index;
+  }
+
+  const numberedRatio = numberedLines / lines.length;
+  const shortRatio = shortLines / lines.length;
+  const chainRatio = consecutivePairs / Math.max(1, numberedLines - 1);
+  const score = numberedRatio * 0.42 + shortRatio * 0.28 + chainRatio * 0.3;
+
+  const reasons: string[] = [];
+  if (numberedLines >= 4) reasons.push("numbered-lines");
+  if (shortRatio >= 0.6) reasons.push("short-lines");
+  if (consecutivePairs >= 3) reasons.push("consecutive-numbering");
+
+  return { score, reasons };
+}
+
+function isNumericChapterNoise(chapter: string | null | undefined): boolean {
+  if (!chapter) return false;
+  return /^\s*(?:\d+(?:\.\d+)?%?|\d+\.\d+)\s*$/.test(chapter);
+}
+
+function isReviewSectionNoise(content: string): boolean {
+  return /^(?:复习思考题|思考题|习题|参考文献)/.test(content.trim());
+}
+
+export function assessNoiseCandidate(content: string, chapter: string | null | undefined): NoiseAssessment {
+  const reasons: string[] = [];
+  let penalty = 1;
+
+  if (isNumericChapterNoise(chapter)) {
+    reasons.push("numeric-chapter");
+    return { drop: true, penalty: 0, reasons };
+  }
+
+  if (isReviewSectionNoise(content)) {
+    reasons.push("review-section");
+    return { drop: true, penalty: 0, reasons };
+  }
+
+  const directory = detectDirectoryStyleNoise(content);
+  if (directory.score >= 0.76 && directory.reasons.length >= 2) {
+    reasons.push(...directory.reasons);
+    return { drop: true, penalty: 0, reasons };
+  }
+
+  if (directory.score >= 0.56) {
+    reasons.push(...directory.reasons);
+    penalty *= 0.18;
+  } else if (directory.score >= 0.36) {
+    reasons.push(...directory.reasons);
+    penalty *= 0.45;
+  }
+
+  return { drop: false, penalty, reasons };
+}
+
+function isDefinitionQuestion(originalQuestion: string, intentTerms: string[]): boolean {
+  const normalizedQuestion = normalizeForComparison(originalQuestion);
+  if (/(什么是|何谓|是指|定义|概念|含义)/.test(normalizedQuestion)) return true;
+
+  return intentTerms.some((term) => {
+    const key = normalizeForComparison(term);
+    return key === "定义" || key === "概念" || key === "是指" || key === "含义";
+  });
+}
+
+function scoreDefinitionCueBonus(content: string): number {
+  const sentences = content
+    .split(/[。！？\n]/)
+    .map((sentence) => sentence.trim())
+    .filter(Boolean);
+
+  if (sentences.length === 0) return 0;
+
+  const head = sentences[0];
+  const compactHead = normalizeForComparison(head);
+  const compactContent = normalizeForComparison(content);
+
+  let bonus = 0;
+  if (/(定义为|定义是|是指|指的是|通常指|一般指|也称为|即为|即是)/.test(head)) {
+    bonus += 4.8;
+  }
+
+  if (/^(?:[^。！？\n]{0,18})?(?:是指|指的是|定义为|定义是|即指|即是)/.test(head)) {
+    bonus += 2.2;
+  }
+
+  if (/^(?:[^。！？\n]{0,32})?(?:是|属于|为)(?:[^。！？\n]{1,16})?(?:一种|一类|一种)/.test(head)) {
+    bonus += 1.2;
+  }
+
+  if (compactContent.includes("定义") || compactContent.includes("概念") || compactContent.includes("是指")) {
+    bonus += 0.8;
+  }
+
+  if (compactHead.includes("是指") || compactHead.includes("指的是") || compactHead.includes("定义为")) {
+    bonus += 1.6;
+  }
+
+  return bonus;
+}
+
+function scoreDefinitionNarrativePenalty(content: string): number {
+  const head = normalizeForComparison(content.slice(0, 120));
+  if (
+    /(在.*时期|随着.*发展|历史上|最初|早在|起源于|起初|后来|过去|曾经|传统上|长期以来|沿革|演变)/.test(head)
+  ) {
+    return 1.8;
+  }
+
+  return 0;
 }
 
 function buildBaseFilters(
@@ -726,6 +923,7 @@ function mergeCandidate(
     keywordScore: 0,
     adjacencyScore: 0,
     finalScore: 0,
+    noisePenalty: 1,
   };
   map.set(row.id, state);
   return state;
@@ -1003,17 +1201,24 @@ export async function semanticSearch(
     );
 
     const rankedRows = routeRows
-      .map((row) => ({
-        row,
-        score: scoreChunk(row.content, route.terms, question, row.chapter ?? undefined, {
-          intentTerms: profile.intentTerms,
-        }),
-      }))
-      .filter((item) => item.score > 0)
+      .map((row) => {
+        const noise = assessNoiseCandidate(row.content, row.chapter);
+        if (noise.drop) return null;
+
+        return {
+          row,
+          noise,
+          score: scoreChunk(row.content, route.terms, question, row.chapter ?? undefined, {
+            intentTerms: profile.intentTerms,
+          }) * noise.penalty,
+        };
+      })
+      .filter((item): item is NonNullable<typeof item> => item !== null && item.score > 0)
       .sort((a, b) => b.score - a.score);
 
     rankedRows.forEach((item, index) => {
       const candidate = mergeCandidate(candidateMap, item.row);
+      candidate.noisePenalty = Math.min(candidate.noisePenalty, item.noise.penalty);
       candidate.routeHits[route.route] += 1;
       candidate.recallScore += route.weight / (index + 1.5);
     });
@@ -1042,7 +1247,11 @@ export async function semanticSearch(
   const neighborRows = await fetchNeighborCandidates(db, seedCandidates, materialIds, languageFilter);
 
   for (const row of neighborRows) {
+    const noise = assessNoiseCandidate(row.content, row.chapter);
+    if (noise.drop) continue;
+
     const candidate = mergeCandidate(candidateMap, row);
+    candidate.noisePenalty = Math.min(candidate.noisePenalty, noise.penalty);
     let adjacencyBoost = candidate.adjacencyScore;
 
     for (const seed of seedCandidates) {
@@ -1051,7 +1260,7 @@ export async function semanticSearch(
       }
     }
 
-    candidate.adjacencyScore = Math.max(candidate.adjacencyScore, adjacencyBoost);
+    candidate.adjacencyScore = Math.max(candidate.adjacencyScore, adjacencyBoost * noise.penalty);
   }
 
   candidates = Array.from(candidateMap.values());
@@ -1072,7 +1281,7 @@ export async function semanticSearch(
     const normKeyword = candidate.keywordScore / maxKeyword;
     const normRecall = candidate.recallScore / maxRecall;
     const normAdjacency = candidate.adjacencyScore / maxAdjacency;
-    candidate.finalScore = normKeyword * 0.58 + normRecall * 0.27 + normAdjacency * 0.15;
+    candidate.finalScore = (normKeyword * 0.58 + normRecall * 0.27 + normAdjacency * 0.15) * candidate.noisePenalty;
   }
 
   candidates.sort((a, b) => b.finalScore - a.finalScore);
