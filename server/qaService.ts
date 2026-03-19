@@ -239,15 +239,15 @@ function buildAnswerBlueprint(analysis: QuestionAnalysis, questionLang: "zh" | "
   if (questionLang === "en") {
     switch (analysis.intent) {
       case "classification":
-        return `1. Short overview\n2. Complete list of types/classes mentioned in the excerpts\n3. Item-by-item explanation\n4. Completeness note`;
+        return `1. One-sentence direct answer (optional)\n2. Complete list of types/classes from excerpts\n3. Item-by-item explanation in short lines`;
       case "method":
-        return `1. Short overview\n2. Complete list of methods/steps mentioned in the excerpts\n3. Details for each method/step\n4. Notes and constraints`;
+        return `1. One-sentence direct answer (optional)\n2. Complete list of methods/steps from excerpts\n3. Key points for each item`;
       case "comparison":
         return `1. Objects being compared\n2. Side-by-side comparison table\n3. Key differences and conclusion`;
       case "condition":
-        return `1. Short overview of the topic\n2. Complete list of conditions/requirements from the excerpts\n3. Brief explanation of each\n4. Completeness note`;
+        return `1. One-sentence direct answer (optional)\n2. Complete list of conditions/requirements from excerpts\n3. Brief explanation of each item`;
       case "advantage":
-        return `1. Short overview\n2. Advantages listed from the excerpts\n3. Disadvantages listed from the excerpts\n4. Summary or recommendation if present`;
+        return `1. Direct answer sentence (optional)\n2. Advantages from excerpts\n3. Disadvantages from excerpts`;
       case "definition":
         return analysis.conciseDefinition
           ? `1. One direct definition sentence\n2. 1-2 supporting sentences from excerpts\n3. Stop; no background expansion`
@@ -256,21 +256,21 @@ function buildAnswerBlueprint(analysis: QuestionAnalysis, questionLang: "zh" | "
         if (analysis.conciseEntity) {
           return `1. Directly state what the excerpts say about the queried term/person\n2. Give 1-3 excerpt-grounded facts\n3. Stop; no expansion`;
         }
-        return `1. Short overview\n2. Structured explanation\n3. Completeness note if the excerpts are partial`;
+        return `1. Direct answer first\n2. Structured explanation with only key points`;
     }
   }
 
   switch (analysis.intent) {
     case "classification":
-      return `1. 一句话概述\n2. 完整列出教材明确出现的类型/分类/条目\n3. 逐项说明每一项\n4. 说明是否存在教材未覆盖的部分`;
+      return `1. 可选一句结论\n2. 完整列出教材中的类型/分类/条目\n3. 每项用1-2句说明`;
     case "method":
-      return `1. 一句话概述\n2. 完整列出教材明确出现的方法/步骤\n3. 逐项说明每一项的条件、要点或作用\n4. 说明是否存在教材未覆盖的部分`;
+      return `1. 可选一句结论\n2. 完整列出教材中的方法/步骤\n3. 逐项说明条件、要点或作用`;
     case "comparison":
       return `1. 说明比较对象\n2. 用对比表或分点对比列出差异\n3. 给出结论`;
     case "condition":
-      return `1. 简要概述主题\n2. 完整列出教材中明确出现的条件/要求\n3. 逐项简要说明\n4. 说明是否存在教材未覆盖的部分`;
+      return `1. 可选一句结论\n2. 完整列出教材中的条件/要求\n3. 逐项简要说明`;
     case "advantage":
-      return `1. 简要概述\n2. 列出教材中明确出现的优点/优势\n3. 列出教材中明确出现的缺点/劣势\n4. 总结或建议（如教材有提及）`;
+      return `1. 可选一句结论\n2. 列出教材中的优点/优势\n3. 列出教材中的缺点/劣势`;
     case "definition":
       return analysis.conciseDefinition
         ? `1. 先给出一句最直接定义\n2. 再补1-2句教材内关键说明\n3. 到此结束，不延伸历史、分类、目的等`
@@ -279,7 +279,7 @@ function buildAnswerBlueprint(analysis: QuestionAnalysis, questionLang: "zh" | "
       if (analysis.conciseEntity) {
         return `1. 直接回答教材中关于该词/人名的明确信息\n2. 只列1-3条片段内事实\n3. 到此结束，不展开延伸`;
       }
-      return `1. 简要概述\n2. 结构化展开\n3. 说明教材是否仅覆盖部分内容`;
+      return `1. 直接回答问题\n2. 结构化展开关键要点`;
   }
 }
 
@@ -305,51 +305,35 @@ Only information explicitly stated in the excerpts is included.`;
 Example 1 (classification):
 Q: What types are mentioned?
 A:
-## Overview
-The excerpts clearly mention several types [1][2].
 ## Types
 1. **Type A**: ... [1]
 2. **Type B**: ... [2]
 3. **Type C**: ... [3]
-## Completeness note
-Only the items explicitly mentioned in the excerpts are listed.
 
 Example 2 (method):
 Q: What methods or steps are described?
 A:
-## Overview
-The excerpts provide a complete list of the described methods/steps [1].
 ## Methods / steps
 1. **Method 1**: ... [1]
 2. **Method 2**: ... [2]
-3. **Method 3**: ... [3]
-## Notes
-If the excerpts only cover part of the topic, say so explicitly.`;
+3. **Method 3**: ... [3]`;
   }
 
   return `示例1（分类题）：
 用户问题：某对象有哪些类型？
 回答：
-## 一、概述
-教材明确提到了若干类型[1][2]。
-## 二、类型清单
+## 类型清单
 1. **第一类**：...[1]
 2. **第二类**：...[2]
 3. **第三类**：...[3]
-## 三、完整性说明
-以上仅列出教材明确出现的项目，不额外补充。
 
 示例2（方法题）：
 用户问题：某操作有哪些方法或步骤？
 回答：
-## 一、概述
-教材给出了完整或部分的方法/步骤[1]。
-## 二、方法/步骤清单
+## 方法/步骤清单
 1. **方法一**：...[1]
 2. **方法二**：...[2]
-3. **方法三**：...[3]
-## 三、注意事项
-如教材只覆盖部分内容，应明确说明。`;
+3. **方法三**：...[3]`;
 }
 
 function buildSystemHeader(
@@ -372,7 +356,8 @@ Answering protocol:
 4. If the excerpts only cover part of the topic, say so plainly and do not invent missing items.
 5. Use Markdown only. Do not wrap the final answer in JSON or code fences.
 6. CITATION REQUIRED: For every factual claim, add an inline citation marker like [1], [2] matching the excerpt number. Example: "Silviculture covers the full cultivation cycle [1] including thinning operations [3]."
-7. Never add background history or external knowledge not supported by excerpts.`;
+7. Never add background history or external knowledge not supported by excerpts.
+8. Do not add meta commentary like "the textbook clearly states", "completeness note", or process explanations.`;
   }
 
   const materialNote =
@@ -391,7 +376,8 @@ ${materialNote}
 5. 回答前先在内部检查一次：是否覆盖所有相关片段、是否存在漏项、是否还带有教材外补充。检查不过就重写。
 6. 直接输出 Markdown，不要包裹在 JSON 或代码块中。
 7. 引用标注：每个事实性陈述后必须添加引用标记 [1]、[2]，对应片段编号。例如："森林培育涵盖从种子到成林的全过程[1]，包括间伐经营[3]。"
-8. 严禁扩展教材外知识，不要凭常识或通用知识补充。`;
+8. 严禁扩展教材外知识，不要凭常识或通用知识补充。
+9. 禁止写过程性废话或自我说明，如"教材明确将…""完整性说明""本回答完全限定于…"。直接给答案内容。`;
 }
 
 export function buildSystemPrompt(
@@ -452,10 +438,10 @@ ${titleList}
 回答要求：
 1. 知识来源：只能基于提供的教材片段回答，不得使用教材外知识。如果教材未涉及该内容，明确回复"教材中未涉及此内容"。
 2. ${analysis.conciseDefinition ? "简洁定义模式：仅基于教材给出定义本身，控制在2-4句，不做延伸讲解。" : "全面完整：综合所有提供的教材片段信息，给出尽可能全面、详尽的回答。对于分类、类型、方法、步骤、比较等题目，要完整列出每一项，并逐项说明。"}
-3. 结构清晰：${analysis.conciseDefinition ? `直接按"定义句 + 1-2句补充说明"输出。` : `按照"定义与概述→分类/类型→具体方法/步骤→原则与注意事项→应用场景"等逻辑顺序组织。`} ${buildAnswerBlueprint(analysis, questionLang)}
+3. 结构清晰：${analysis.conciseDefinition ? `直接按"定义句 + 1-2句补充说明"输出。` : `优先"直接回答 + 清单/要点"。`} ${buildAnswerBlueprint(analysis, questionLang)}
 4. 突出重点：使用 **加粗** 标记关键术语、重要概念和核心结论。对于教材中的数据、公式、比例等要精确引用。
 5. 保留教材表述：尽量使用教材中的原始术语和表述，可以适当组织和概括，但核心信息必须来自教材。如果教材中有多个观点或说法，应完整列出。
-6. 格式规范：${analysis.conciseDefinition ? "直接输出 Markdown，2-4句即可，不要使用长篇多级标题。" : "直接输出 Markdown 格式，不要包裹在 JSON 或代码块中。开头先用1-2句话概括主题，再展开详细内容。"}
+6. 格式规范：${analysis.conciseDefinition ? "直接输出 Markdown，2-4句即可，不要使用长篇多级标题。" : "直接输出 Markdown 格式，不要包裹在 JSON 或代码块中。不要求固定写'一、概述/三、完整性说明'。"}
 7. 内联引用标注：每个事实性陈述后必须添加 [1]、[2]、[3] 等标记，对应其来自的片段编号。每个关键陈述至少有一个引用标记。例如：造林密度取决于立地条件[2]和树种特性[4]。
 ${analysis.conciseDefinition ? `\n8. 当前是简洁定义题，仅回答定义本身（2-4句），不得扩展到历史、分类、目的、发展、问题等延伸内容。` : ""}
 
@@ -521,8 +507,8 @@ ${buildAnswerBlueprint(analysis, questionLang)}
 - 如果片段中没有答案，直接告知"教材中未涉及此内容"。
 - 每个事实性陈述后必须标注来源片段编号，如 [1]、[2]。
 - 如果是分类/方法/步骤/比较题，必须把教材中明确出现的项目全部列出。
-- 不要只写概述，必须先总述再逐项展开。
-- 如果教材只覆盖部分内容，要明确说明"教材只明确提到以下项目"。
+- 直接列与问题最相关的条目，可选1句总述，不要求概述段。
+- 仅在确实缺失时，用1句短注说明，不要扩展解释过程。
 ${analysis.conciseDefinition ? "- 这是简洁定义题：只用2-4句话回答定义本身，禁止历史背景/分类/目的等延伸。" : ""}
 
 【教材内容片段（共 ${chunks.length} 条）】
@@ -861,6 +847,7 @@ async function callLLM(
   if (analysis.conciseAnswer) {
     answer = enforceConciseDefinition(answer, questionLang);
   }
+  answer = removeAnswerBoilerplate(answer, questionLang, analysis);
 
   const localReview = assessAnswerLocally(answer, effectiveResults, analysis, questionLang);
   const grounding = assessGrounding(answer, effectiveResults, questionLang);
@@ -906,7 +893,7 @@ async function callLLM(
         const regenParsed = parseLLMOutput(regenerated.content);
         const regenAnswer = stripCitationMarkers(regenParsed ? regenParsed.answer : regenerated.content);
         if (regenAnswer.replace(/\s+/g, "").length >= answer.replace(/\s+/g, "").length * 0.8) {
-          answer = regenAnswer;
+          answer = removeAnswerBoilerplate(regenAnswer, questionLang, analysis);
         }
       } catch {
         // 重写失败时保留原答案
@@ -918,6 +905,7 @@ async function callLLM(
   if (!finalReview.complete) {
     answer = appendDegradationNote(answer, finalReview.downgradeNote);
   }
+  answer = removeAnswerBoilerplate(answer, questionLang, analysis);
 
   // 判断是否在教材中找到了内容
   const notFoundPhrases = ["未涉及", "not cover", "没有相关", "未找到", "not found"];
@@ -1069,8 +1057,8 @@ function assessAnswerLocally(
   const complete = issues.length === 0;
   const downgradeNote =
     questionLang === "en"
-      ? "The excerpts only cover part of the topic, so this answer summarizes the explicitly mentioned items only."
-      : "教材片段只覆盖了该问题的部分要点，以下仅整理已明确出现的内容。";
+      ? "Only items explicitly mentioned in the excerpts are listed."
+      : "仅列出教材明确提及的项目。";
 
   return {
     complete,
@@ -1299,8 +1287,75 @@ ${sourceTexts}
 }
 
 function appendDegradationNote(answer: string, note: string): string {
-  if (answer.includes(note)) return answer;
+  const normalizedAnswer = normalizeForFocus(answer);
+  const normalizedNote = normalizeForFocus(note);
+  if (normalizedNote && normalizedAnswer.includes(normalizedNote)) return answer;
   return `${answer}\n\n> ${note}`;
+}
+
+function removeAnswerBoilerplate(
+  answer: string,
+  questionLang: "zh" | "en",
+  analysis: QuestionAnalysis
+): string {
+  const lines = answer.replace(/\r\n/g, "\n").split("\n");
+  const filtered: string[] = [];
+  const zhDropPatterns = [
+    /^#+\s*[一二三四五六七八九十]+[、.．]?\s*概述\s*$/i,
+    /^#+\s*[一二三四五六七八九十]+[、.．]?\s*完整性说明\s*$/i,
+    /^(?:[一二三四五六七八九十]+[、.．])\s*概述\s*$/,
+    /^(?:[一二三四五六七八九十]+[、.．])\s*完整性说明\s*$/,
+    /^教材明确将/,
+    /^教材未设专节/,
+    /^教材中唯一出现且可直接提取/,
+    /^教材仅明确列出/,
+    /^教材未涉及“/,
+    /^未使用“/,
+    /^未将“/,
+    /^因此，本回答/,
+    /^以上仅列出教材明确出现/,
+    /^无任何召回遗漏/,
+    /^无任何外部补充/,
+    /^仅整理已明确出现的内容/,
+  ];
+  const enDropPatterns = [
+    /^#+\s*overview\s*$/i,
+    /^#+\s*completeness\s*note\s*$/i,
+    /^the excerpts clearly/i,
+    /^this answer is strictly limited to/i,
+    /^only items explicitly mentioned/i,
+  ];
+
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line) {
+      if (filtered.length > 0 && filtered[filtered.length - 1] !== "") filtered.push("");
+      continue;
+    }
+
+    const shouldDrop = questionLang === "en"
+      ? enDropPatterns.some((re) => re.test(line))
+      : zhDropPatterns.some((re) => re.test(line));
+    if (shouldDrop) continue;
+
+    if (filtered.length > 0 && normalizeForFocus(filtered[filtered.length - 1]) === normalizeForFocus(line)) {
+      continue;
+    }
+    filtered.push(line);
+  }
+
+  let cleaned = filtered.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+  if (!cleaned) return answer.trim();
+
+  if (analysis.expectsEnumeration) {
+    cleaned = cleaned
+      .replace(/^#+\s*[一二三四五六七八九十]+[、.．]?\s*概述\s*$/gim, "")
+      .replace(/^#+\s*overview\s*$/gim, "")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+  }
+
+  return cleaned;
 }
 
 function buildSources(
@@ -2218,6 +2273,7 @@ export async function generateAnswerStream(
     if (questionAnalysis.conciseAnswer) {
       fullAnswer = enforceConciseDefinition(fullAnswer, questionLanguage);
     }
+    fullAnswer = removeAnswerBoilerplate(fullAnswer, questionLanguage, questionAnalysis);
 
     // 统一质量管线（与 sync 模式一致）
     const localReview = assessAnswerLocally(fullAnswer, effectiveResults, questionAnalysis, questionLanguage);
@@ -2252,7 +2308,7 @@ export async function generateAnswerStream(
           const regenParsed = parseLLMOutput(regenerated.content);
           const regenAnswer = stripCitationMarkers(regenParsed ? regenParsed.answer : regenerated.content);
           if (regenAnswer.replace(/\s+/g, "").length >= fullAnswer.replace(/\s+/g, "").length * 0.8) {
-            fullAnswer = regenAnswer;
+            fullAnswer = removeAnswerBoilerplate(regenAnswer, questionLanguage, questionAnalysis);
           }
         } catch {
           // 重写失败时保留原答案
@@ -2267,6 +2323,7 @@ export async function generateAnswerStream(
     if (!finalReview.complete) {
       fullAnswer = appendDegradationNote(fullAnswer, finalReview.downgradeNote);
     }
+    fullAnswer = removeAnswerBoilerplate(fullAnswer, questionLanguage, questionAnalysis);
 
     const responseTimeMs = Date.now() - startTime;
 

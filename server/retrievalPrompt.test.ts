@@ -169,7 +169,7 @@ describe("prompt builders", () => {
 
     expect(prompt).toContain("回答协议");
     expect(prompt).toContain("分类、方法、步骤或比较题");
-    expect(prompt).toContain("定义与概述→分类/类型→具体方法/步骤→原则与注意事项→应用场景");
+    expect(prompt).toContain("优先\"直接回答 + 清单/要点\"");
     expect(prompt).toContain("示例1（分类题）");
     expect(prompt).toContain("示例2（方法题）");
     expect(prompt).toContain("内联引用标注");
