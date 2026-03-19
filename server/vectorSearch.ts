@@ -291,6 +291,124 @@ async function fetchChunkDetails(
   return map;
 }
 
+type FallbackMergedRow = CandidateRow & {
+  materialTitle: string;
+  hitCount: number;
+  matchedTerms: Set<string>;
+};
+
+function buildEmergencyTerms(question: string, questionLang: "zh" | "en"): string[] {
+  const stripped = stripQuestionWords(normalizeForLookup(question)).trim();
+  const kw = questionLang === "en" ? extractKeywordsEn(question) : extractKeywords(question);
+  return uniqueSortedTerms([
+    stripped,
+    ...kw,
+    ...(stripped && stripped.length >= 2 && stripped.length <= 24 ? [stripped] : []),
+  ])
+    .map((t) => t.trim())
+    .filter((t) => normalizeForComparison(t).length >= (questionLang === "en" ? 3 : 2))
+    .slice(0, 8);
+}
+
+async function emergencyLikeFallbackSearch(
+  db: DbConnection,
+  question: string,
+  materialIds: number[] | undefined,
+  topK: number,
+  languageFilter: "zh" | "en" | "all"
+): Promise<SearchResult[]> {
+  const questionLang = detectLanguage(question);
+  const profile = buildSearchProfile(question, questionLang);
+  const terms = buildEmergencyTerms(question, questionLang);
+  if (terms.length === 0) return [];
+
+  console.log(`[EmergencyFallback] terms=[${terms.join(',')}], lang=${questionLang}, langFilter=${languageFilter}`);
+
+  // 先按请求语言查；若无结果再退化到 all
+  const languagePlan: Array<"zh" | "en" | "all"> =
+    languageFilter === "all" ? ["all"] : [languageFilter, "all"];
+
+  const merged = new Map<number, FallbackMergedRow>();
+
+  for (const lang of languagePlan) {
+    for (const term of terms) {
+      const escaped = term.replace(/[\\%_]/g, "\\$&");
+      const rows = await db
+        .select({
+          id: materialChunks.id,
+          materialId: materialChunks.materialId,
+          chunkIndex: materialChunks.chunkIndex,
+          content: materialChunks.content,
+          chapter: materialChunks.chapter,
+          pageStart: materialChunks.pageStart,
+          pageEnd: materialChunks.pageEnd,
+          materialTitle: materials.title,
+        })
+        .from(materialChunks)
+        .innerJoin(materials, eq(materialChunks.materialId, materials.id))
+        .where(and(...buildBaseFilters(materialIds, lang), like(materialChunks.content, `%${escaped}%`)))
+        .limit(Math.max(60, topK * 20));
+
+      for (const row of rows) {
+        const existing = merged.get(row.id);
+        if (existing) {
+          existing.hitCount += 1;
+          existing.matchedTerms.add(term);
+          continue;
+        }
+        merged.set(row.id, {
+          id: row.id,
+          materialId: row.materialId,
+          chunkIndex: row.chunkIndex,
+          content: row.content,
+          chapter: row.chapter,
+          pageStart: row.pageStart,
+          pageEnd: row.pageEnd,
+          materialTitle: row.materialTitle,
+          hitCount: 1,
+          matchedTerms: new Set([term]),
+        });
+      }
+    }
+
+    if (merged.size > 0) break;
+  }
+
+  if (merged.size === 0) return [];
+
+  const mergedRows = Array.from(merged.values());
+  const scoringTerms = profile.scoringTerms.length > 0 ? profile.scoringTerms : terms;
+  const stats = countTermStats(mergedRows, scoringTerms);
+
+  const scored = mergedRows
+    .map((row) => {
+      const textScore = scoreChunk(row.content, scoringTerms, question, row.chapter ?? undefined, {
+        stats,
+        intentTerms: profile.intentTerms,
+      });
+      const fallbackBoost = row.hitCount * 1.1 + row.matchedTerms.size * 1.5;
+      return { row, score: textScore + fallbackBoost };
+    })
+    .filter((x) => x.score > 0)
+    .sort((a, b) => b.score - a.score);
+
+  if (scored.length === 0) return [];
+
+  console.log(`[EmergencyFallback] Returning ${Math.min(scored.length, topK)} results (from ${merged.size} candidates)`);
+
+  return scored.slice(0, Math.max(1, topK)).map(({ row, score }) => ({
+    chunkId: row.id,
+    chunkIndex: row.chunkIndex,
+    materialId: row.materialId,
+    materialTitle: row.materialTitle,
+    chapter: row.chapter,
+    pageStart: row.pageStart,
+    pageEnd: row.pageEnd,
+    content: row.content,
+    similarity: score,
+  }));
+}
+
 // ─── 林业领域同义词扩展表 ───────────────────────────────────────────────────
 // 用于评分阶段（不用于SQL检索），帮助识别相关但措辞不同的chunk
 const SYNONYM_MAP: Record<string, string[]> = {
@@ -1355,8 +1473,8 @@ export async function semanticSearch(
   console.log(`[HybridSearch] After embedding-only merge: candidateMap.size=${candidateMap.size}, embeddingOnlyIds=${embeddingOnlyIds.length}`);
 
   if (candidateMap.size === 0) {
-    console.log(`[HybridSearch] candidateMap is empty, returning []`);
-    return [];
+    console.warn(`[HybridSearch] candidateMap is empty, using emergency LIKE fallback`);
+    return emergencyLikeFallbackSearch(db, question, materialIds, topK, languageFilter);
   }
 
   let candidates = Array.from(candidateMap.values());
@@ -1439,7 +1557,10 @@ export async function semanticSearch(
   const topResults = applyDiversitySelection(candidates, topK).filter((candidate) => candidate.finalScore > 0);
 
   console.log(`[HybridSearch] Final: ${topResults.length} results after diversity+filter (topK=${topK})`);
-  if (topResults.length === 0) return [];
+  if (topResults.length === 0) {
+    console.warn(`[HybridSearch] topResults is empty after ranking, using emergency LIKE fallback`);
+    return emergencyLikeFallbackSearch(db, question, materialIds, topK, languageFilter);
+  }
 
   const matIds = Array.from(new Set(topResults.map((c) => c.materialId)));
   const matDetails = await db
