@@ -1,0 +1,837 @@
+[
+  {
+    "id": 1,
+    "type": "definition",
+    "question": "什么是立地质量？"
+  },
+  {
+    "id": 7,
+    "type": "definition",
+    "question": "什么是立地条件？"
+  },
+  {
+    "id": 13,
+    "type": "definition",
+    "question": "什么是立地指数？"
+  },
+  {
+    "id": 19,
+    "type": "definition",
+    "question": "什么是立地类型？"
+  },
+  {
+    "id": 25,
+    "type": "definition",
+    "question": "什么是立地因子？"
+  },
+  {
+    "id": 31,
+    "type": "definition",
+    "question": "什么是立地评价？"
+  },
+  {
+    "id": 37,
+    "type": "definition",
+    "question": "什么是立地分类？"
+  },
+  {
+    "id": 43,
+    "type": "definition",
+    "question": "什么是地位指数？"
+  },
+  {
+    "id": 49,
+    "type": "definition",
+    "question": "什么是生境条件？"
+  },
+  {
+    "id": 55,
+    "type": "definition",
+    "question": "什么是立地等级？"
+  },
+  {
+    "id": 61,
+    "type": "definition",
+    "question": "什么是坡向？"
+  },
+  {
+    "id": 67,
+    "type": "definition",
+    "question": "什么是坡度？"
+  },
+  {
+    "id": 73,
+    "type": "definition",
+    "question": "什么是海拔？"
+  },
+  {
+    "id": 79,
+    "type": "definition",
+    "question": "什么是坡位？"
+  },
+  {
+    "id": 85,
+    "type": "definition",
+    "question": "什么是地貌？"
+  },
+  {
+    "id": 91,
+    "type": "definition",
+    "question": "什么是地形？"
+  },
+  {
+    "id": 97,
+    "type": "definition",
+    "question": "什么是地形因子？"
+  },
+  {
+    "id": 103,
+    "type": "definition",
+    "question": "什么是土层厚度？"
+  },
+  {
+    "id": 109,
+    "type": "definition",
+    "question": "什么是含水条件？"
+  },
+  {
+    "id": 115,
+    "type": "definition",
+    "question": "什么是土壤湿度？"
+  },
+  {
+    "id": 121,
+    "type": "definition",
+    "question": "什么是土壤质地？"
+  },
+  {
+    "id": 127,
+    "type": "definition",
+    "question": "什么是土壤肥力？"
+  },
+  {
+    "id": 133,
+    "type": "definition",
+    "question": "什么是酸碱度？"
+  },
+  {
+    "id": 139,
+    "type": "definition",
+    "question": "什么是排水条件？"
+  },
+  {
+    "id": 145,
+    "type": "definition",
+    "question": "什么是日照条件？"
+  },
+  {
+    "id": 151,
+    "type": "definition",
+    "question": "什么是温度条件？"
+  },
+  {
+    "id": 157,
+    "type": "definition",
+    "question": "什么是降水条件？"
+  },
+  {
+    "id": 163,
+    "type": "definition",
+    "question": "什么是山位？"
+  },
+  {
+    "id": 169,
+    "type": "definition",
+    "question": "什么是坡面？"
+  },
+  {
+    "id": 175,
+    "type": "definition",
+    "question": "什么是立地调查？"
+  },
+  {
+    "id": 181,
+    "type": "definition",
+    "question": "什么是树种选择？"
+  },
+  {
+    "id": 187,
+    "type": "definition",
+    "question": "什么是造林树种？"
+  },
+  {
+    "id": 193,
+    "type": "definition",
+    "question": "什么是适地适树？"
+  },
+  {
+    "id": 199,
+    "type": "definition",
+    "question": "什么是造林密度？"
+  },
+  {
+    "id": 205,
+    "type": "definition",
+    "question": "什么是林分密度？"
+  },
+  {
+    "id": 211,
+    "type": "definition",
+    "question": "什么是合理密度？"
+  },
+  {
+    "id": 217,
+    "type": "definition",
+    "question": "什么是初植密度？"
+  },
+  {
+    "id": 223,
+    "type": "definition",
+    "question": "什么是种植密度？"
+  },
+  {
+    "id": 229,
+    "type": "definition",
+    "question": "什么是株行距？"
+  },
+  {
+    "id": 235,
+    "type": "definition",
+    "question": "什么是株距？"
+  },
+  {
+    "id": 241,
+    "type": "definition",
+    "question": "什么是行距？"
+  },
+  {
+    "id": 247,
+    "type": "definition",
+    "question": "什么是种植点配置？"
+  },
+  {
+    "id": 253,
+    "type": "definition",
+    "question": "什么是正方形配置？"
+  },
+  {
+    "id": 259,
+    "type": "definition",
+    "question": "什么是三角形配置？"
+  },
+  {
+    "id": 265,
+    "type": "definition",
+    "question": "什么是长方形配置？"
+  },
+  {
+    "id": 271,
+    "type": "definition",
+    "question": "什么是造林方法？"
+  },
+  {
+    "id": 277,
+    "type": "definition",
+    "question": "什么是造林方式？"
+  },
+  {
+    "id": 283,
+    "type": "definition",
+    "question": "什么是直播造林？"
+  },
+  {
+    "id": 289,
+    "type": "definition",
+    "question": "什么是播种造林？"
+  },
+  {
+    "id": 295,
+    "type": "definition",
+    "question": "什么是植苗造林？"
+  },
+  {
+    "id": 301,
+    "type": "definition",
+    "question": "什么是分殖造林？"
+  },
+  {
+    "id": 307,
+    "type": "definition",
+    "question": "什么是人工造林？"
+  },
+  {
+    "id": 313,
+    "type": "definition",
+    "question": "什么是混交造林？"
+  },
+  {
+    "id": 319,
+    "type": "definition",
+    "question": "什么是造林技术？"
+  },
+  {
+    "id": 325,
+    "type": "definition",
+    "question": "什么是造林设计？"
+  },
+  {
+    "id": 331,
+    "type": "definition",
+    "question": "什么是造林作业？"
+  },
+  {
+    "id": 337,
+    "type": "definition",
+    "question": "什么是造林成活率？"
+  },
+  {
+    "id": 343,
+    "type": "definition",
+    "question": "什么是造林质量？"
+  },
+  {
+    "id": 349,
+    "type": "definition",
+    "question": "什么是造林季节？"
+  },
+  {
+    "id": 355,
+    "type": "definition",
+    "question": "什么是造林时间？"
+  },
+  {
+    "id": 361,
+    "type": "definition",
+    "question": "什么是种子？"
+  },
+  {
+    "id": 367,
+    "type": "definition",
+    "question": "什么是种子质量？"
+  },
+  {
+    "id": 373,
+    "type": "definition",
+    "question": "什么是种子处理？"
+  },
+  {
+    "id": 379,
+    "type": "definition",
+    "question": "什么是种子催芽？"
+  },
+  {
+    "id": 385,
+    "type": "definition",
+    "question": "什么是种子采集？"
+  },
+  {
+    "id": 391,
+    "type": "definition",
+    "question": "什么是种子贮藏？"
+  },
+  {
+    "id": 397,
+    "type": "definition",
+    "question": "什么是种子园？"
+  },
+  {
+    "id": 403,
+    "type": "definition",
+    "question": "什么是母树林？"
+  },
+  {
+    "id": 409,
+    "type": "definition",
+    "question": "什么是苗木质量？"
+  },
+  {
+    "id": 415,
+    "type": "definition",
+    "question": "什么是苗木培育？"
+  },
+  {
+    "id": 421,
+    "type": "definition",
+    "question": "什么是苗圃？"
+  },
+  {
+    "id": 427,
+    "type": "definition",
+    "question": "什么是育苗？"
+  },
+  {
+    "id": 433,
+    "type": "definition",
+    "question": "什么是苗木繁殖？"
+  },
+  {
+    "id": 439,
+    "type": "definition",
+    "question": "什么是苗木分级？"
+  },
+  {
+    "id": 445,
+    "type": "definition",
+    "question": "什么是苗木标准？"
+  },
+  {
+    "id": 451,
+    "type": "definition",
+    "question": "什么是容器苗？"
+  },
+  {
+    "id": 457,
+    "type": "definition",
+    "question": "什么是裸根苗？"
+  },
+  {
+    "id": 463,
+    "type": "definition",
+    "question": "什么是扦插？"
+  },
+  {
+    "id": 469,
+    "type": "definition",
+    "question": "什么是嫁接？"
+  },
+  {
+    "id": 475,
+    "type": "definition",
+    "question": "什么是浸种？"
+  },
+  {
+    "id": 481,
+    "type": "definition",
+    "question": "什么是层积催芽？"
+  },
+  {
+    "id": 487,
+    "type": "definition",
+    "question": "什么是机械催芽？"
+  },
+  {
+    "id": 493,
+    "type": "definition",
+    "question": "什么是化学催芽？"
+  },
+  {
+    "id": 499,
+    "type": "definition",
+    "question": "什么是物理催芽？"
+  },
+  {
+    "id": 505,
+    "type": "definition",
+    "question": "什么是生理后熟？"
+  },
+  {
+    "id": 511,
+    "type": "definition",
+    "question": "什么是种子休眠？"
+  },
+  {
+    "id": 517,
+    "type": "definition",
+    "question": "什么是发芽率？"
+  },
+  {
+    "id": 523,
+    "type": "definition",
+    "question": "什么是催芽处理？"
+  },
+  {
+    "id": 529,
+    "type": "definition",
+    "question": "什么是苗木活力？"
+  },
+  {
+    "id": 535,
+    "type": "definition",
+    "question": "什么是苗木成活率？"
+  },
+  {
+    "id": 541,
+    "type": "definition",
+    "question": "什么是混交林？"
+  },
+  {
+    "id": 547,
+    "type": "definition",
+    "question": "什么是混交方式？"
+  },
+  {
+    "id": 553,
+    "type": "definition",
+    "question": "什么是混交类型？"
+  },
+  {
+    "id": 559,
+    "type": "definition",
+    "question": "什么是混交比例？"
+  },
+  {
+    "id": 565,
+    "type": "definition",
+    "question": "什么是纯林？"
+  },
+  {
+    "id": 571,
+    "type": "definition",
+    "question": "什么是针阔混交？"
+  },
+  {
+    "id": 577,
+    "type": "definition",
+    "question": "什么是乔灌混交？"
+  },
+  {
+    "id": 583,
+    "type": "definition",
+    "question": "什么是株间混交？"
+  },
+  {
+    "id": 589,
+    "type": "definition",
+    "question": "什么是行间混交？"
+  },
+  {
+    "id": 595,
+    "type": "definition",
+    "question": "什么是带状混交？"
+  },
+  {
+    "id": 601,
+    "type": "definition",
+    "question": "什么是块状混交？"
+  },
+  {
+    "id": 607,
+    "type": "definition",
+    "question": "什么是星状混交？"
+  },
+  {
+    "id": 613,
+    "type": "definition",
+    "question": "什么是植生组混交？"
+  },
+  {
+    "id": 619,
+    "type": "definition",
+    "question": "什么是不规则混交？"
+  },
+  {
+    "id": 625,
+    "type": "definition",
+    "question": "什么是森林更新？"
+  },
+  {
+    "id": 631,
+    "type": "definition",
+    "question": "什么是天然更新？"
+  },
+  {
+    "id": 637,
+    "type": "definition",
+    "question": "什么是人工更新？"
+  },
+  {
+    "id": 643,
+    "type": "definition",
+    "question": "什么是补植？"
+  },
+  {
+    "id": 649,
+    "type": "definition",
+    "question": "什么是造林更新？"
+  },
+  {
+    "id": 655,
+    "type": "definition",
+    "question": "什么是更新造林？"
+  },
+  {
+    "id": 661,
+    "type": "definition",
+    "question": "什么是天然下种更新？"
+  },
+  {
+    "id": 667,
+    "type": "definition",
+    "question": "什么是萌芽更新？"
+  },
+  {
+    "id": 673,
+    "type": "definition",
+    "question": "什么是根蘖更新？"
+  },
+  {
+    "id": 679,
+    "type": "definition",
+    "question": "什么是人工促进更新？"
+  },
+  {
+    "id": 685,
+    "type": "definition",
+    "question": "什么是皆伐更新？"
+  },
+  {
+    "id": 691,
+    "type": "definition",
+    "question": "什么是渐伐更新？"
+  },
+  {
+    "id": 697,
+    "type": "definition",
+    "question": "什么是择伐更新？"
+  },
+  {
+    "id": 703,
+    "type": "definition",
+    "question": "什么是更新方式？"
+  },
+  {
+    "id": 709,
+    "type": "definition",
+    "question": "什么是更新作业？"
+  },
+  {
+    "id": 715,
+    "type": "definition",
+    "question": "什么是更新周期？"
+  },
+  {
+    "id": 721,
+    "type": "definition",
+    "question": "什么是抚育？"
+  },
+  {
+    "id": 727,
+    "type": "definition",
+    "question": "什么是森林抚育？"
+  },
+  {
+    "id": 733,
+    "type": "definition",
+    "question": "什么是幼林抚育？"
+  },
+  {
+    "id": 739,
+    "type": "definition",
+    "question": "什么是抚育间伐？"
+  },
+  {
+    "id": 745,
+    "type": "definition",
+    "question": "什么是间伐？"
+  },
+  {
+    "id": 751,
+    "type": "definition",
+    "question": "什么是透光伐？"
+  },
+  {
+    "id": 757,
+    "type": "definition",
+    "question": "什么是生长伐？"
+  },
+  {
+    "id": 763,
+    "type": "definition",
+    "question": "什么是卫生伐？"
+  },
+  {
+    "id": 769,
+    "type": "definition",
+    "question": "什么是修枝？"
+  },
+  {
+    "id": 775,
+    "type": "definition",
+    "question": "什么是采伐？"
+  },
+  {
+    "id": 781,
+    "type": "definition",
+    "question": "什么是主伐？"
+  },
+  {
+    "id": 787,
+    "type": "definition",
+    "question": "什么是皆伐？"
+  },
+  {
+    "id": 793,
+    "type": "definition",
+    "question": "什么是择伐？"
+  },
+  {
+    "id": 799,
+    "type": "definition",
+    "question": "什么是渐伐？"
+  },
+  {
+    "id": 805,
+    "type": "definition",
+    "question": "什么是轮伐期？"
+  },
+  {
+    "id": 811,
+    "type": "definition",
+    "question": "什么是采伐方式？"
+  },
+  {
+    "id": 817,
+    "type": "definition",
+    "question": "什么是伐区？"
+  },
+  {
+    "id": 823,
+    "type": "definition",
+    "question": "什么是透光抚育？"
+  },
+  {
+    "id": 829,
+    "type": "definition",
+    "question": "什么是保留木？"
+  },
+  {
+    "id": 835,
+    "type": "definition",
+    "question": "什么是目标树？"
+  },
+  {
+    "id": 841,
+    "type": "definition",
+    "question": "什么是林分改造？"
+  },
+  {
+    "id": 847,
+    "type": "definition",
+    "question": "什么是林分结构？"
+  },
+  {
+    "id": 853,
+    "type": "definition",
+    "question": "什么是郁闭度？"
+  },
+  {
+    "id": 859,
+    "type": "definition",
+    "question": "什么是郁闭后抚育？"
+  },
+  {
+    "id": 865,
+    "type": "definition",
+    "question": "什么是竞争木？"
+  },
+  {
+    "id": 871,
+    "type": "definition",
+    "question": "什么是促进木？"
+  },
+  {
+    "id": 877,
+    "type": "definition",
+    "question": "什么是经营强度？"
+  },
+  {
+    "id": 883,
+    "type": "definition",
+    "question": "什么是伐后管理？"
+  },
+  {
+    "id": 889,
+    "type": "definition",
+    "question": "什么是幼龄林？"
+  },
+  {
+    "id": 895,
+    "type": "definition",
+    "question": "什么是森林经营？"
+  },
+  {
+    "id": 901,
+    "type": "definition",
+    "question": "什么是森林经营方案？"
+  },
+  {
+    "id": 907,
+    "type": "definition",
+    "question": "什么是近自然经营？"
+  },
+  {
+    "id": 913,
+    "type": "definition",
+    "question": "什么是森林抚育经营？"
+  },
+  {
+    "id": 919,
+    "type": "definition",
+    "question": "什么是经营方案？"
+  },
+  {
+    "id": 925,
+    "type": "definition",
+    "question": "什么是防护林？"
+  },
+  {
+    "id": 931,
+    "type": "definition",
+    "question": "什么是水土保持林？"
+  },
+  {
+    "id": 937,
+    "type": "definition",
+    "question": "什么是水源涵养林？"
+  },
+  {
+    "id": 943,
+    "type": "definition",
+    "question": "什么是农田防护林？"
+  },
+  {
+    "id": 949,
+    "type": "definition",
+    "question": "什么是护林防火？"
+  },
+  {
+    "id": 955,
+    "type": "definition",
+    "question": "什么是管护措施？"
+  },
+  {
+    "id": 961,
+    "type": "definition",
+    "question": "什么是造林作业设计？"
+  },
+  {
+    "id": 967,
+    "type": "definition",
+    "question": "什么是样地调查？"
+  },
+  {
+    "id": 973,
+    "type": "definition",
+    "question": "什么是胸径分布？"
+  },
+  {
+    "id": 979,
+    "type": "definition",
+    "question": "什么是胸径？"
+  },
+  {
+    "id": 985,
+    "type": "definition",
+    "question": "什么是树高？"
+  },
+  {
+    "id": 991,
+    "type": "definition",
+    "question": "什么是蓄积量？"
+  },
+  {
+    "id": 997,
+    "type": "definition",
+    "question": "什么是立木？"
+  }
+]

@@ -34,6 +34,11 @@ type StreamMeta = {
 };
 
 function normalizeAnswerMarkdown(text: string): string {
+  // 把粘在正文里的块级标记拆行，避免标题/列表/引用块挤在同一行。
+  const blockStartPattern = /([^\n#])(?:[ \t]*)(#{1,6}\s+|>\s+|[-*+]\s+|\d{1,3}[.)]\s+)/g;
+  // 清掉行首残留空白时，也顺手覆盖常见的块级标记前缀。
+  const leadingBlockPattern = /^\s*(#{1,6}\s+|>\s+|[-*+]\s+|\d{1,3}[.)]\s+)/gm;
+
   return text
     .replace(/\r\n/g, "\n")
     .replace(/\r/g, "\n")
@@ -41,8 +46,8 @@ function normalizeAnswerMarkdown(text: string): string {
     .replace(/\[citation_indices?:\s*[\d,\s]+\]/gi, "")
     .replace(/【?片段\d+】?/g, "")
     .replace(/片段\[?\d+\]?至?\[?\d*\]?/g, "")
-    .replace(/([^\n])\s+(#{1,6}\s+)/g, "$1\n\n$2")
-    .replace(/\n[ \t]*([#>-])/g, "\n$1")
+    .replace(blockStartPattern, "$1\n\n$2")
+    .replace(leadingBlockPattern, "$1")
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();

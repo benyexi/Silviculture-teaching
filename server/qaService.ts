@@ -118,37 +118,59 @@ type AnswerReview = {
 
 function detectQuestionIntent(question: string, questionLang: "zh" | "en"): QuestionAnalysis {
   const q = question.toLowerCase();
+  const trimmedQ = q.trim();
   const intents: QuestionIntent[] = [];
 
-  if (
+  const hasComparisonCue =
     questionLang === "zh"
       ? /(比较|对比|区别|差异|异同|有何不同|怎么区分|区分)/.test(q)
-      : /(compare|difference|differences|compare and contrast|versus|vs\.?)/.test(q)
-  ) {
+      : /(compare|difference|differences|compare and contrast|versus|vs\.?)/.test(q);
+
+  const hasDefinitionCue =
+    questionLang === "zh"
+      ? /(什么是|定义|含义|概念|解释|说明|何谓|是指|指的是)/.test(q)
+      : /(what is|define|definition|meaning|concept|explain)/.test(q);
+
+  const startsWithDefinitionCue =
+    questionLang === "zh"
+      ? /^(什么是|何谓|是指|定义|含义|概念)/.test(trimmedQ)
+      : /^(what is|define|definition of|meaning of|concept of)/.test(trimmedQ);
+
+  const hasExplicitListCue =
+    questionLang === "zh"
+      ? /(有哪些|有哪|包括哪些|几类|几种|分为|可分为|列出|罗列)/.test(q)
+      : /(which|what).*?(types?|kinds?|categories?|classes?)|list/.test(q);
+
+  const hasClassificationCue =
+    questionLang === "zh"
+      ? (/(分类|类型|种类)/.test(q) && hasExplicitListCue) || /(有哪些分类|有哪些类型|分为|可分为|几类|几种|列出|罗列)/.test(q)
+      : /(types?|kinds?|categories?|classes?|which kinds|what types|list)/.test(q);
+
+  const hasMethodCue =
+    questionLang === "zh"
+      ? /(如何|怎么|怎样|步骤|流程|程序|实施|操作|方法有哪些|有哪些方法|方式有哪些|有哪些方式)/.test(q)
+      : /(methods?|ways?|steps?|process|procedure|how to|how do|how should)/.test(q);
+
+  const prioritizeDefinition =
+    startsWithDefinitionCue && hasDefinitionCue && !hasComparisonCue && !hasExplicitListCue && !hasMethodCue;
+
+  if (prioritizeDefinition) {
+    intents.push("definition");
+  }
+
+  if (hasComparisonCue) {
     intents.push("comparison");
   }
 
-  if (
-    questionLang === "zh"
-      ? /(分类|类型|种类|有哪些|包括哪些|几类|几种|分为|可分为|列出|罗列)/.test(q)
-      : /(types?|kinds?|categories?|classes?|which kinds|what types|list)/.test(q)
-  ) {
+  if (hasClassificationCue) {
     intents.push("classification");
   }
 
-  if (
-    questionLang === "zh"
-      ? /(方法|方式|步骤|流程|程序|如何|怎么|怎样|实施|操作|处理|进行)/.test(q)
-      : /(methods?|ways?|steps?|process|procedure|how to|how do|how should)/.test(q)
-  ) {
+  if (hasMethodCue) {
     intents.push("method");
   }
 
-  if (
-    questionLang === "zh"
-      ? /(什么是|定义|含义|概念|解释|说明|何谓|是指|指的是)/.test(q)
-      : /(what is|define|definition|meaning|concept|explain)/.test(q)
-  ) {
+  if (!prioritizeDefinition && hasDefinitionCue) {
     intents.push("definition");
   }
 
@@ -544,6 +566,52 @@ function pickFocusTerms(
   return unique.slice(0, 8);
 }
 
+function isNumericLikeChapter(chapter: string): boolean {
+  const trimmed = chapter.trim();
+  if (!trimmed) return false;
+  if (/^(?:\d+(?:\.\d+){0,6}%?)$/.test(trimmed)) return true;
+  if (/^[\d.%\-]+$/.test(trimmed) && !/[\u4e00-\u9fa5a-z]/i.test(trimmed)) return true;
+  return false;
+}
+
+function looksLikeCatalogBlock(text: string): boolean {
+  const lines = text
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (lines.length < 5) return false;
+
+  const probe = lines.slice(0, 12);
+  let shortLines = 0;
+  let numberedLines = 0;
+  for (const line of probe) {
+    if (line.length <= 24) shortLines++;
+    if (
+      /^(\d+(?:\.\d+){1,6}|[一二三四五六七八九十]+[、．.)]|\(?\d+[)）.、．]|[A-Za-z][.)])/.test(line)
+    ) {
+      numberedLines++;
+    }
+  }
+
+  return shortLines >= Math.ceil(probe.length * 0.65) && numberedLines >= 3;
+}
+
+function isNoisySearchResult(row: SearchResult): boolean {
+  const chapter = (row.chapter || "").trim();
+  const content = row.content.trim();
+  if (!content) return true;
+  if (chapter && isNumericLikeChapter(chapter)) return true;
+  if (/^(复习思考题|思考题|习题|练习题|参考文献|目录)/.test(content)) return true;
+  if (looksLikeCatalogBlock(content)) return true;
+  return false;
+}
+
+function filterNoisySearchResults(searchResults: SearchResult[]): SearchResult[] {
+  if (searchResults.length <= 1) return searchResults;
+  const filtered = searchResults.filter((row) => !isNoisySearchResult(row));
+  return filtered.length > 0 ? filtered : searchResults;
+}
+
 function focusResultsByChapter(
   question: string,
   searchResults: SearchResult[],
@@ -631,6 +699,8 @@ function focusResultsByChapter(
 }
 
 function pickSourceLimit(questionLang: "zh" | "en", analysis: QuestionAnalysis): number {
+  if (analysis.conciseDefinition) return 2;
+  if (analysis.conciseEntity) return 2;
   if (analysis.conciseAnswer) return 3;
   if (analysis.intent === "definition") return questionLang === "en" ? 4 : 5;
   if (analysis.requestDetail) return questionLang === "en" ? 8 : 9;
@@ -639,6 +709,14 @@ function pickSourceLimit(questionLang: "zh" | "en", analysis: QuestionAnalysis):
 }
 
 function pickTopK(questionLang: "zh" | "en", analysis: QuestionAnalysis, forAuxEnglish = false): number {
+  if (analysis.conciseDefinition) {
+    if (questionLang === "en") return forAuxEnglish ? 1 : 3;
+    return forAuxEnglish ? 2 : 4;
+  }
+  if (analysis.conciseEntity) {
+    if (questionLang === "en") return forAuxEnglish ? 1 : 2;
+    return forAuxEnglish ? 2 : 3;
+  }
   if (analysis.conciseAnswer) {
     if (questionLang === "en") return forAuxEnglish ? 1 : 3;
     return forAuxEnglish ? 2 : 4;
@@ -738,7 +816,8 @@ async function callLLM(
   materialLang: "zh" | "en",
   analysis: QuestionAnalysis = detectQuestionIntent(question, questionLang)
 ): Promise<CallLLMResult> {
-  if (searchResults.length === 0) {
+  const cleanedResults = filterNoisySearchResults(searchResults);
+  if (cleanedResults.length === 0) {
     const answer =
       questionLang === "en"
         ? "The provided textbook excerpts do not cover this topic."
@@ -755,16 +834,29 @@ async function callLLM(
 
   const keywords = questionLang === "en" ? extractKeywordsEn(question) : extractKeywords(question);
   let effectiveResults = analysis.conciseDefinition
-    ? [...searchResults]
-    : focusResultsByChapter(question, searchResults, questionLang, analysis);
+    ? [...cleanedResults]
+    : focusResultsByChapter(question, cleanedResults, questionLang, analysis);
   if (analysis.conciseDefinition) {
     effectiveResults = await enrichDefinitionResults(question, effectiveResults, questionLang, analysis);
+    effectiveResults = filterNoisySearchResults(effectiveResults);
   }
   const sourceLimit = pickSourceLimit(questionLang, analysis);
   const materialTitles = Array.from(new Set(effectiveResults.map((r) => r.materialTitle)));
   const extractive = analysis.conciseAnswer
     ? buildExtractiveAnswer(question, effectiveResults, questionLang, analysis)
     : null;
+  if (analysis.conciseDefinition && !extractive) {
+    const answer = questionLang === "en"
+      ? "The provided excerpts do not contain a direct definition sentence for this term."
+      : "教材片段中未检索到该术语的直接定义句（如“是指/定义为”）。请尝试补充更具体术语后再问。";
+    return {
+      answer,
+      sources: [],
+      modelUsed: "extractive",
+      foundInMaterials: false,
+      confidence: 0.2,
+    };
+  }
   if (extractive) {
     const conciseResults = effectiveResults.filter((r) => extractive.usedChunkIds.includes(r.chunkId));
     const sources = buildSources(conciseResults, true, keywords, sourceLimit);
@@ -890,9 +982,11 @@ function stripCitationMarkers(text: string): string {
 }
 
 function normalizeMarkdownSpacing(text: string): string {
+  const blockStartPattern = /([^\n#])(?:[ \t]*)(#{1,6}\s+|>\s+|[-*+]\s+|\d{1,3}[.)、．]\s+)/g;
+  const leadingBlockPattern = /^\s*(#{1,6}\s+|>\s+|[-*+]\s+|\d{1,3}[.)、．]\s+)/gm;
   return text
-    .replace(/([^\n])\s+(#{1,6}\s+)/g, "$1\n\n$2")
-    .replace(/\n[ \t]*([#>-])/g, "\n$1")
+    .replace(blockStartPattern, "$1\n\n$2")
+    .replace(leadingBlockPattern, "$1")
     .replace(/[ \t]{2,}/g, " ")
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
@@ -1320,6 +1414,23 @@ function hasHistoricalCue(text: string, questionLang: "zh" | "en"): boolean {
   return /(历史|发展|20世纪|年代|文革|出版|编写|奠基|繁荣)/.test(text);
 }
 
+function isDefinitionBoilerplateSentence(text: string, questionLang: "zh" | "en"): boolean {
+  const trimmed = text.trim();
+  if (!trimmed) return true;
+  if (/^(复习思考题|思考题|习题|练习题|目录|参考文献)/.test(trimmed)) return true;
+  if (/^\d+(?:\.\d+){1,6}\s*$/.test(trimmed)) return true;
+
+  if (questionLang === "en") {
+    return /^(chapter|section)\s+\d+/i.test(trimmed);
+  }
+
+  if (/^(第[一二三四五六七八九十百零\d]+[章节篇部编]|[\d]+(?:\.[\d]+){1,6})/.test(trimmed) && trimmed.length <= 24) {
+    return true;
+  }
+
+  return /^(本章|本节|本部分|教材)(重点|主要|将|阐述|介绍|说明)/.test(trimmed);
+}
+
 function pickDefinitionTargets(question: string, keywords: string[], questionLang: "zh" | "en"): string[] {
   const cleanedQuestion = questionLang === "en"
     ? question.toLowerCase().replace(/[^a-z0-9\s-]/g, " ").replace(/\s+/g, " ").trim()
@@ -1481,11 +1592,25 @@ function buildExtractiveAnswer(
   const definitionTargets = analysis.conciseDefinition
     ? pickDefinitionTargets(question, keywords, questionLang)
     : [];
+  const conciseEntityTarget = analysis.conciseEntity
+    ? normalizeQuestion(
+        questionLang === "en"
+          ? question.replace(/\b(who|what|is|are|was|were|about|tell me)\b/gi, " ")
+          : question.replace(/什么是|请问|介绍|说明|解释|是谁|谁是/g, " ")
+      )
+    : "";
   const effectiveResults = analysis.conciseDefinition
     ? prioritizeDefinitionResults(question, searchResults, questionLang, keywords)
     : searchResults;
 
-  const scored: Array<{ sentence: string; score: number; chunkId: number }> = [];
+  const scored: Array<{
+    sentence: string;
+    score: number;
+    chunkId: number;
+    targetHit: boolean;
+    cueHit: boolean;
+    definitionalHit: boolean;
+  }> = [];
   const sanitizeSentence = (sentence: string): string =>
     sentence
       .replace(/【[^】]{0,80}】/g, " ")
@@ -1516,31 +1641,58 @@ function buildExtractiveAnswer(
 
     for (const sentence of sentences) {
       const sNorm = normalizeQuestion(sentence);
+      if (analysis.conciseEntity && conciseEntityTarget && !sNorm.includes(conciseEntityTarget)) {
+        continue;
+      }
       let score = 0;
       if (queryNorm && sNorm.includes(queryNorm)) score += 8;
       for (const kw of keywords) {
         if (sNorm.includes(normalizeQuestion(kw))) score += Math.min(4, kw.length);
       }
       if (analysis.conciseDefinition) {
+        if (isDefinitionBoilerplateSentence(sentence, questionLang)) continue;
         const sentenceLower = sentence.toLowerCase();
         const targetHit = definitionTargets.some((term) => sentenceLower.includes(term));
         const cueHit = hasDefinitionCue(sentence, questionLang);
+        const definitionalHit = questionLang === "en"
+          ? /\b(is|means|refers to|defined as)\b/i.test(sentence)
+          : /(?:^|，|。)\s*(?:[^。！？\n]{0,14})(?:是指|指的是|定义为|定义是|是研究|是一种|是一类|是将|是对|是按|是从)/.test(sentence);
         if (targetHit) score += 6;
         if (cueHit) score += 7;
+        if (definitionalHit) score += 5;
         if (targetHit && cueHit) score += 8;
         if (hasHistoricalCue(sentence, questionLang)) score -= 4;
+        if (!targetHit && !cueHit) score -= 2;
+        if (score > 0) {
+          scored.push({ sentence, score, chunkId: chunk.chunkId, targetHit, cueHit, definitionalHit });
+        }
+        continue;
       }
-      if (score > 0) scored.push({ sentence, score, chunkId: chunk.chunkId });
+      if (score > 0) {
+        scored.push({
+          sentence,
+          score,
+          chunkId: chunk.chunkId,
+          targetHit: false,
+          cueHit: false,
+          definitionalHit: false,
+        });
+      }
     }
   }
 
   if (scored.length === 0) return null;
 
+  if (analysis.conciseDefinition) {
+    const hasStrongDefinitionSentence = scored.some((item) => item.targetHit && (item.cueHit || item.definitionalHit));
+    if (!hasStrongDefinitionSentence) return null;
+  }
+
   scored.sort((a, b) => b.score - a.score);
   const used = new Set<number>();
   const picked: Array<{ sentence: string; chunkId: number }> = [];
   const seen = new Set<string>();
-  const maxItems = analysis.conciseDefinition ? 2 : analysis.conciseAnswer ? 3 : 5;
+  const maxItems = analysis.conciseDefinition ? 2 : analysis.conciseEntity ? 2 : analysis.conciseAnswer ? 3 : 5;
 
   for (const item of scored) {
     const key = normalizeQuestion(item.sentence).slice(0, 120);
@@ -1556,12 +1708,16 @@ function buildExtractiveAnswer(
   const lines = picked.map((p) => {
     const trimmed = truncateSentenceSmart(p.sentence, questionLang, questionLang === "en" ? 180 : 90);
     if (questionLang === "en") return `- ${trimmed}${/[.!?…]$/.test(trimmed) ? "" : "."}`;
-    return `- ${trimmed}${/[。！？…]$/.test(trimmed) ? "" : "。"} `;
+    return `- ${trimmed}${/[。！？…]$/.test(trimmed) ? "" : "。"}`;
   });
 
-  const prefix = questionLang === "en"
-    ? `Direct excerpt-grounded information about "${question.trim()}":`
-    : `教材中关于“${question.trim()}”的直接信息：`;
+  const prefix = analysis.conciseDefinition
+    ? (questionLang === "en"
+      ? `Definition-grounded information about "${question.trim()}":`
+      : `教材中关于“${question.trim()}”的定义性信息：`)
+    : (questionLang === "en"
+      ? `Direct excerpt-grounded information about "${question.trim()}":`
+      : `教材中关于“${question.trim()}”的直接信息：`);
 
   return {
     answer: `${prefix}\n${lines.join("\n")}`.replace(/[ \t]+\n/g, "\n").trim(),
@@ -1640,6 +1796,7 @@ export async function generateAnswerStream(
     } else {
       searchResults = await semanticSearch(req.question, undefined, pickTopK("zh", questionAnalysis), "zh", useRAG);
     }
+    searchResults = filterNoisySearchResults(searchResults);
     let effectiveResults = questionAnalysis.conciseDefinition
       ? [...searchResults]
       : focusResultsByChapter(req.question, searchResults, questionLanguage, questionAnalysis);
@@ -1650,6 +1807,7 @@ export async function generateAnswerStream(
         questionLanguage,
         questionAnalysis
       );
+      effectiveResults = filterNoisySearchResults(effectiveResults);
     }
     const sourceLimit = pickSourceLimit(questionLanguage, questionAnalysis);
 
@@ -1673,6 +1831,37 @@ export async function generateAnswerStream(
     const extractive = questionAnalysis.conciseAnswer
       ? buildExtractiveAnswer(req.question, effectiveResults, questionLanguage, questionAnalysis)
       : null;
+    if (questionAnalysis.conciseDefinition && !extractive) {
+      const answer = questionLanguage === "en"
+        ? "The provided excerpts do not contain a direct definition sentence for this term."
+        : "教材片段中未检索到该术语的直接定义句（如“是指/定义为”）。请尝试补充更具体术语后再问。";
+      const responseTimeMs = Date.now() - startTime;
+      const queryId = await createQuery({
+        question: req.question,
+        answer,
+        sources: [],
+        modelUsed: "extractive",
+        responseTimeMs,
+        visitorIp: req.visitorIp,
+        visitorCity: req.visitorCity,
+        visitorRegion: req.visitorRegion,
+        visitorCountry: req.visitorCountry,
+        visitorLat: req.visitorLat,
+        visitorLng: req.visitorLng,
+      });
+      onMeta({
+        sources: [],
+        modelUsed: "extractive",
+        foundInMaterials: false,
+        confidence: 0.2,
+        questionLanguage,
+        queryId,
+        responseTimeMs,
+      });
+      onToken(answer);
+      onDone(answer);
+      return;
+    }
     if (extractive) {
       const conciseResults = effectiveResults.filter((r) => extractive.usedChunkIds.includes(r.chunkId));
       const sources = buildSources(conciseResults, true, keywords, sourceLimit);

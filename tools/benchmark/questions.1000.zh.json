@@ -1,0 +1,5002 @@
+[
+  {
+    "id": 1,
+    "type": "definition",
+    "question": "什么是立地质量？"
+  },
+  {
+    "id": 2,
+    "type": "classification",
+    "question": "立地质量有哪些类型？"
+  },
+  {
+    "id": 3,
+    "type": "method",
+    "question": "如何进行立地质量？"
+  },
+  {
+    "id": 4,
+    "type": "comparison",
+    "question": "立地质量与排水条件有什么区别？"
+  },
+  {
+    "id": 5,
+    "type": "entity",
+    "question": "与立地质量研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 6,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲立地质量？"
+  },
+  {
+    "id": 7,
+    "type": "definition",
+    "question": "什么是立地条件？"
+  },
+  {
+    "id": 8,
+    "type": "classification",
+    "question": "立地条件有哪些类型？"
+  },
+  {
+    "id": 9,
+    "type": "method",
+    "question": "如何进行立地条件？"
+  },
+  {
+    "id": 10,
+    "type": "comparison",
+    "question": "立地条件与日照条件有什么区别？"
+  },
+  {
+    "id": 11,
+    "type": "entity",
+    "question": "与立地条件研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 12,
+    "type": "other",
+    "question": "请简述立地条件的要点。"
+  },
+  {
+    "id": 13,
+    "type": "definition",
+    "question": "什么是立地指数？"
+  },
+  {
+    "id": 14,
+    "type": "classification",
+    "question": "立地指数有哪些类型？"
+  },
+  {
+    "id": 15,
+    "type": "method",
+    "question": "如何进行立地指数？"
+  },
+  {
+    "id": 16,
+    "type": "comparison",
+    "question": "立地指数与温度条件有什么区别？"
+  },
+  {
+    "id": 17,
+    "type": "entity",
+    "question": "与立地指数研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 18,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲立地指数？"
+  },
+  {
+    "id": 19,
+    "type": "definition",
+    "question": "什么是立地类型？"
+  },
+  {
+    "id": 20,
+    "type": "classification",
+    "question": "立地类型有哪些类型？"
+  },
+  {
+    "id": 21,
+    "type": "method",
+    "question": "如何进行立地类型？"
+  },
+  {
+    "id": 22,
+    "type": "comparison",
+    "question": "立地类型与降水条件有什么区别？"
+  },
+  {
+    "id": 23,
+    "type": "entity",
+    "question": "与立地类型研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 24,
+    "type": "other",
+    "question": "请简述立地类型的要点。"
+  },
+  {
+    "id": 25,
+    "type": "definition",
+    "question": "什么是立地因子？"
+  },
+  {
+    "id": 26,
+    "type": "classification",
+    "question": "立地因子有哪些类型？"
+  },
+  {
+    "id": 27,
+    "type": "method",
+    "question": "如何进行立地因子？"
+  },
+  {
+    "id": 28,
+    "type": "comparison",
+    "question": "立地因子与山位有什么区别？"
+  },
+  {
+    "id": 29,
+    "type": "entity",
+    "question": "与立地因子研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 30,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲立地因子？"
+  },
+  {
+    "id": 31,
+    "type": "definition",
+    "question": "什么是立地评价？"
+  },
+  {
+    "id": 32,
+    "type": "classification",
+    "question": "立地评价有哪些类型？"
+  },
+  {
+    "id": 33,
+    "type": "method",
+    "question": "如何进行立地评价？"
+  },
+  {
+    "id": 34,
+    "type": "comparison",
+    "question": "立地评价与坡面有什么区别？"
+  },
+  {
+    "id": 35,
+    "type": "entity",
+    "question": "与立地评价研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 36,
+    "type": "other",
+    "question": "请简述立地评价的要点。"
+  },
+  {
+    "id": 37,
+    "type": "definition",
+    "question": "什么是立地分类？"
+  },
+  {
+    "id": 38,
+    "type": "classification",
+    "question": "立地分类有哪些类型？"
+  },
+  {
+    "id": 39,
+    "type": "method",
+    "question": "如何进行立地分类？"
+  },
+  {
+    "id": 40,
+    "type": "comparison",
+    "question": "立地分类与立地调查有什么区别？"
+  },
+  {
+    "id": 41,
+    "type": "entity",
+    "question": "与立地分类研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 42,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲立地分类？"
+  },
+  {
+    "id": 43,
+    "type": "definition",
+    "question": "什么是地位指数？"
+  },
+  {
+    "id": 44,
+    "type": "classification",
+    "question": "地位指数有哪些类型？"
+  },
+  {
+    "id": 45,
+    "type": "method",
+    "question": "如何进行地位指数？"
+  },
+  {
+    "id": 46,
+    "type": "comparison",
+    "question": "地位指数与树种选择有什么区别？"
+  },
+  {
+    "id": 47,
+    "type": "entity",
+    "question": "与地位指数研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 48,
+    "type": "other",
+    "question": "请简述地位指数的要点。"
+  },
+  {
+    "id": 49,
+    "type": "definition",
+    "question": "什么是生境条件？"
+  },
+  {
+    "id": 50,
+    "type": "classification",
+    "question": "生境条件有哪些类型？"
+  },
+  {
+    "id": 51,
+    "type": "method",
+    "question": "如何进行生境条件？"
+  },
+  {
+    "id": 52,
+    "type": "comparison",
+    "question": "生境条件与造林树种有什么区别？"
+  },
+  {
+    "id": 53,
+    "type": "entity",
+    "question": "与生境条件研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 54,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲生境条件？"
+  },
+  {
+    "id": 55,
+    "type": "definition",
+    "question": "什么是立地等级？"
+  },
+  {
+    "id": 56,
+    "type": "classification",
+    "question": "立地等级有哪些类型？"
+  },
+  {
+    "id": 57,
+    "type": "method",
+    "question": "如何进行立地等级？"
+  },
+  {
+    "id": 58,
+    "type": "comparison",
+    "question": "立地等级与适地适树有什么区别？"
+  },
+  {
+    "id": 59,
+    "type": "entity",
+    "question": "与立地等级研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 60,
+    "type": "other",
+    "question": "请简述立地等级的要点。"
+  },
+  {
+    "id": 61,
+    "type": "definition",
+    "question": "什么是坡向？"
+  },
+  {
+    "id": 62,
+    "type": "classification",
+    "question": "坡向有哪些类型？"
+  },
+  {
+    "id": 63,
+    "type": "method",
+    "question": "如何进行坡向？"
+  },
+  {
+    "id": 64,
+    "type": "comparison",
+    "question": "坡向与造林密度有什么区别？"
+  },
+  {
+    "id": 65,
+    "type": "entity",
+    "question": "与坡向研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 66,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲坡向？"
+  },
+  {
+    "id": 67,
+    "type": "definition",
+    "question": "什么是坡度？"
+  },
+  {
+    "id": 68,
+    "type": "classification",
+    "question": "坡度有哪些类型？"
+  },
+  {
+    "id": 69,
+    "type": "method",
+    "question": "如何进行坡度？"
+  },
+  {
+    "id": 70,
+    "type": "comparison",
+    "question": "坡度与林分密度有什么区别？"
+  },
+  {
+    "id": 71,
+    "type": "entity",
+    "question": "与坡度研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 72,
+    "type": "other",
+    "question": "请简述坡度的要点。"
+  },
+  {
+    "id": 73,
+    "type": "definition",
+    "question": "什么是海拔？"
+  },
+  {
+    "id": 74,
+    "type": "classification",
+    "question": "海拔有哪些类型？"
+  },
+  {
+    "id": 75,
+    "type": "method",
+    "question": "如何进行海拔？"
+  },
+  {
+    "id": 76,
+    "type": "comparison",
+    "question": "海拔与合理密度有什么区别？"
+  },
+  {
+    "id": 77,
+    "type": "entity",
+    "question": "与海拔研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 78,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲海拔？"
+  },
+  {
+    "id": 79,
+    "type": "definition",
+    "question": "什么是坡位？"
+  },
+  {
+    "id": 80,
+    "type": "classification",
+    "question": "坡位有哪些类型？"
+  },
+  {
+    "id": 81,
+    "type": "method",
+    "question": "如何进行坡位？"
+  },
+  {
+    "id": 82,
+    "type": "comparison",
+    "question": "坡位与初植密度有什么区别？"
+  },
+  {
+    "id": 83,
+    "type": "entity",
+    "question": "与坡位研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 84,
+    "type": "other",
+    "question": "请简述坡位的要点。"
+  },
+  {
+    "id": 85,
+    "type": "definition",
+    "question": "什么是地貌？"
+  },
+  {
+    "id": 86,
+    "type": "classification",
+    "question": "地貌有哪些类型？"
+  },
+  {
+    "id": 87,
+    "type": "method",
+    "question": "如何进行地貌？"
+  },
+  {
+    "id": 88,
+    "type": "comparison",
+    "question": "地貌与种植密度有什么区别？"
+  },
+  {
+    "id": 89,
+    "type": "entity",
+    "question": "与地貌研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 90,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲地貌？"
+  },
+  {
+    "id": 91,
+    "type": "definition",
+    "question": "什么是地形？"
+  },
+  {
+    "id": 92,
+    "type": "classification",
+    "question": "地形有哪些类型？"
+  },
+  {
+    "id": 93,
+    "type": "method",
+    "question": "如何进行地形？"
+  },
+  {
+    "id": 94,
+    "type": "comparison",
+    "question": "地形与株行距有什么区别？"
+  },
+  {
+    "id": 95,
+    "type": "entity",
+    "question": "与地形研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 96,
+    "type": "other",
+    "question": "请简述地形的要点。"
+  },
+  {
+    "id": 97,
+    "type": "definition",
+    "question": "什么是地形因子？"
+  },
+  {
+    "id": 98,
+    "type": "classification",
+    "question": "地形因子有哪些类型？"
+  },
+  {
+    "id": 99,
+    "type": "method",
+    "question": "如何进行地形因子？"
+  },
+  {
+    "id": 100,
+    "type": "comparison",
+    "question": "地形因子与株距有什么区别？"
+  },
+  {
+    "id": 101,
+    "type": "entity",
+    "question": "与地形因子研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 102,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲地形因子？"
+  },
+  {
+    "id": 103,
+    "type": "definition",
+    "question": "什么是土层厚度？"
+  },
+  {
+    "id": 104,
+    "type": "classification",
+    "question": "土层厚度有哪些类型？"
+  },
+  {
+    "id": 105,
+    "type": "method",
+    "question": "如何进行土层厚度？"
+  },
+  {
+    "id": 106,
+    "type": "comparison",
+    "question": "土层厚度与行距有什么区别？"
+  },
+  {
+    "id": 107,
+    "type": "entity",
+    "question": "与土层厚度研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 108,
+    "type": "other",
+    "question": "请简述土层厚度的要点。"
+  },
+  {
+    "id": 109,
+    "type": "definition",
+    "question": "什么是含水条件？"
+  },
+  {
+    "id": 110,
+    "type": "classification",
+    "question": "含水条件有哪些类型？"
+  },
+  {
+    "id": 111,
+    "type": "method",
+    "question": "如何进行含水条件？"
+  },
+  {
+    "id": 112,
+    "type": "comparison",
+    "question": "含水条件与种植点配置有什么区别？"
+  },
+  {
+    "id": 113,
+    "type": "entity",
+    "question": "与含水条件研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 114,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲含水条件？"
+  },
+  {
+    "id": 115,
+    "type": "definition",
+    "question": "什么是土壤湿度？"
+  },
+  {
+    "id": 116,
+    "type": "classification",
+    "question": "土壤湿度有哪些类型？"
+  },
+  {
+    "id": 117,
+    "type": "method",
+    "question": "如何进行土壤湿度？"
+  },
+  {
+    "id": 118,
+    "type": "comparison",
+    "question": "土壤湿度与正方形配置有什么区别？"
+  },
+  {
+    "id": 119,
+    "type": "entity",
+    "question": "与土壤湿度研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 120,
+    "type": "other",
+    "question": "请简述土壤湿度的要点。"
+  },
+  {
+    "id": 121,
+    "type": "definition",
+    "question": "什么是土壤质地？"
+  },
+  {
+    "id": 122,
+    "type": "classification",
+    "question": "土壤质地有哪些类型？"
+  },
+  {
+    "id": 123,
+    "type": "method",
+    "question": "如何进行土壤质地？"
+  },
+  {
+    "id": 124,
+    "type": "comparison",
+    "question": "土壤质地与三角形配置有什么区别？"
+  },
+  {
+    "id": 125,
+    "type": "entity",
+    "question": "与土壤质地研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 126,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲土壤质地？"
+  },
+  {
+    "id": 127,
+    "type": "definition",
+    "question": "什么是土壤肥力？"
+  },
+  {
+    "id": 128,
+    "type": "classification",
+    "question": "土壤肥力有哪些类型？"
+  },
+  {
+    "id": 129,
+    "type": "method",
+    "question": "如何进行土壤肥力？"
+  },
+  {
+    "id": 130,
+    "type": "comparison",
+    "question": "土壤肥力与长方形配置有什么区别？"
+  },
+  {
+    "id": 131,
+    "type": "entity",
+    "question": "与土壤肥力研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 132,
+    "type": "other",
+    "question": "请简述土壤肥力的要点。"
+  },
+  {
+    "id": 133,
+    "type": "definition",
+    "question": "什么是酸碱度？"
+  },
+  {
+    "id": 134,
+    "type": "classification",
+    "question": "酸碱度有哪些类型？"
+  },
+  {
+    "id": 135,
+    "type": "method",
+    "question": "如何进行酸碱度？"
+  },
+  {
+    "id": 136,
+    "type": "comparison",
+    "question": "酸碱度与造林方法有什么区别？"
+  },
+  {
+    "id": 137,
+    "type": "entity",
+    "question": "与酸碱度研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 138,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲酸碱度？"
+  },
+  {
+    "id": 139,
+    "type": "definition",
+    "question": "什么是排水条件？"
+  },
+  {
+    "id": 140,
+    "type": "classification",
+    "question": "排水条件有哪些类型？"
+  },
+  {
+    "id": 141,
+    "type": "method",
+    "question": "如何进行排水条件？"
+  },
+  {
+    "id": 142,
+    "type": "comparison",
+    "question": "排水条件与造林方式有什么区别？"
+  },
+  {
+    "id": 143,
+    "type": "entity",
+    "question": "与排水条件研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 144,
+    "type": "other",
+    "question": "请简述排水条件的要点。"
+  },
+  {
+    "id": 145,
+    "type": "definition",
+    "question": "什么是日照条件？"
+  },
+  {
+    "id": 146,
+    "type": "classification",
+    "question": "日照条件有哪些类型？"
+  },
+  {
+    "id": 147,
+    "type": "method",
+    "question": "如何进行日照条件？"
+  },
+  {
+    "id": 148,
+    "type": "comparison",
+    "question": "日照条件与直播造林有什么区别？"
+  },
+  {
+    "id": 149,
+    "type": "entity",
+    "question": "与日照条件研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 150,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲日照条件？"
+  },
+  {
+    "id": 151,
+    "type": "definition",
+    "question": "什么是温度条件？"
+  },
+  {
+    "id": 152,
+    "type": "classification",
+    "question": "温度条件有哪些类型？"
+  },
+  {
+    "id": 153,
+    "type": "method",
+    "question": "如何进行温度条件？"
+  },
+  {
+    "id": 154,
+    "type": "comparison",
+    "question": "温度条件与播种造林有什么区别？"
+  },
+  {
+    "id": 155,
+    "type": "entity",
+    "question": "与温度条件研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 156,
+    "type": "other",
+    "question": "请简述温度条件的要点。"
+  },
+  {
+    "id": 157,
+    "type": "definition",
+    "question": "什么是降水条件？"
+  },
+  {
+    "id": 158,
+    "type": "classification",
+    "question": "降水条件有哪些类型？"
+  },
+  {
+    "id": 159,
+    "type": "method",
+    "question": "如何进行降水条件？"
+  },
+  {
+    "id": 160,
+    "type": "comparison",
+    "question": "降水条件与植苗造林有什么区别？"
+  },
+  {
+    "id": 161,
+    "type": "entity",
+    "question": "与降水条件研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 162,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲降水条件？"
+  },
+  {
+    "id": 163,
+    "type": "definition",
+    "question": "什么是山位？"
+  },
+  {
+    "id": 164,
+    "type": "classification",
+    "question": "山位有哪些类型？"
+  },
+  {
+    "id": 165,
+    "type": "method",
+    "question": "如何进行山位？"
+  },
+  {
+    "id": 166,
+    "type": "comparison",
+    "question": "山位与分殖造林有什么区别？"
+  },
+  {
+    "id": 167,
+    "type": "entity",
+    "question": "与山位研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 168,
+    "type": "other",
+    "question": "请简述山位的要点。"
+  },
+  {
+    "id": 169,
+    "type": "definition",
+    "question": "什么是坡面？"
+  },
+  {
+    "id": 170,
+    "type": "classification",
+    "question": "坡面有哪些类型？"
+  },
+  {
+    "id": 171,
+    "type": "method",
+    "question": "如何进行坡面？"
+  },
+  {
+    "id": 172,
+    "type": "comparison",
+    "question": "坡面与人工造林有什么区别？"
+  },
+  {
+    "id": 173,
+    "type": "entity",
+    "question": "与坡面研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 174,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲坡面？"
+  },
+  {
+    "id": 175,
+    "type": "definition",
+    "question": "什么是立地调查？"
+  },
+  {
+    "id": 176,
+    "type": "classification",
+    "question": "立地调查有哪些类型？"
+  },
+  {
+    "id": 177,
+    "type": "method",
+    "question": "如何进行立地调查？"
+  },
+  {
+    "id": 178,
+    "type": "comparison",
+    "question": "立地调查与混交造林有什么区别？"
+  },
+  {
+    "id": 179,
+    "type": "entity",
+    "question": "与立地调查研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 180,
+    "type": "other",
+    "question": "请简述立地调查的要点。"
+  },
+  {
+    "id": 181,
+    "type": "definition",
+    "question": "什么是树种选择？"
+  },
+  {
+    "id": 182,
+    "type": "classification",
+    "question": "树种选择有哪些类型？"
+  },
+  {
+    "id": 183,
+    "type": "method",
+    "question": "如何进行树种选择？"
+  },
+  {
+    "id": 184,
+    "type": "comparison",
+    "question": "树种选择与造林技术有什么区别？"
+  },
+  {
+    "id": 185,
+    "type": "entity",
+    "question": "与树种选择研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 186,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲树种选择？"
+  },
+  {
+    "id": 187,
+    "type": "definition",
+    "question": "什么是造林树种？"
+  },
+  {
+    "id": 188,
+    "type": "classification",
+    "question": "造林树种有哪些类型？"
+  },
+  {
+    "id": 189,
+    "type": "method",
+    "question": "如何进行造林树种？"
+  },
+  {
+    "id": 190,
+    "type": "comparison",
+    "question": "造林树种与造林设计有什么区别？"
+  },
+  {
+    "id": 191,
+    "type": "entity",
+    "question": "与造林树种研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 192,
+    "type": "other",
+    "question": "请简述造林树种的要点。"
+  },
+  {
+    "id": 193,
+    "type": "definition",
+    "question": "什么是适地适树？"
+  },
+  {
+    "id": 194,
+    "type": "classification",
+    "question": "适地适树有哪些类型？"
+  },
+  {
+    "id": 195,
+    "type": "method",
+    "question": "如何进行适地适树？"
+  },
+  {
+    "id": 196,
+    "type": "comparison",
+    "question": "适地适树与造林作业有什么区别？"
+  },
+  {
+    "id": 197,
+    "type": "entity",
+    "question": "与适地适树研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 198,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲适地适树？"
+  },
+  {
+    "id": 199,
+    "type": "definition",
+    "question": "什么是造林密度？"
+  },
+  {
+    "id": 200,
+    "type": "classification",
+    "question": "造林密度有哪些类型？"
+  },
+  {
+    "id": 201,
+    "type": "method",
+    "question": "如何进行造林密度？"
+  },
+  {
+    "id": 202,
+    "type": "comparison",
+    "question": "造林密度与造林成活率有什么区别？"
+  },
+  {
+    "id": 203,
+    "type": "entity",
+    "question": "与造林密度研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 204,
+    "type": "other",
+    "question": "请简述造林密度的要点。"
+  },
+  {
+    "id": 205,
+    "type": "definition",
+    "question": "什么是林分密度？"
+  },
+  {
+    "id": 206,
+    "type": "classification",
+    "question": "林分密度有哪些类型？"
+  },
+  {
+    "id": 207,
+    "type": "method",
+    "question": "如何进行林分密度？"
+  },
+  {
+    "id": 208,
+    "type": "comparison",
+    "question": "林分密度与造林质量有什么区别？"
+  },
+  {
+    "id": 209,
+    "type": "entity",
+    "question": "与林分密度研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 210,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲林分密度？"
+  },
+  {
+    "id": 211,
+    "type": "definition",
+    "question": "什么是合理密度？"
+  },
+  {
+    "id": 212,
+    "type": "classification",
+    "question": "合理密度有哪些类型？"
+  },
+  {
+    "id": 213,
+    "type": "method",
+    "question": "如何进行合理密度？"
+  },
+  {
+    "id": 214,
+    "type": "comparison",
+    "question": "合理密度与造林季节有什么区别？"
+  },
+  {
+    "id": 215,
+    "type": "entity",
+    "question": "与合理密度研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 216,
+    "type": "other",
+    "question": "请简述合理密度的要点。"
+  },
+  {
+    "id": 217,
+    "type": "definition",
+    "question": "什么是初植密度？"
+  },
+  {
+    "id": 218,
+    "type": "classification",
+    "question": "初植密度有哪些类型？"
+  },
+  {
+    "id": 219,
+    "type": "method",
+    "question": "如何进行初植密度？"
+  },
+  {
+    "id": 220,
+    "type": "comparison",
+    "question": "初植密度与造林时间有什么区别？"
+  },
+  {
+    "id": 221,
+    "type": "entity",
+    "question": "与初植密度研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 222,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲初植密度？"
+  },
+  {
+    "id": 223,
+    "type": "definition",
+    "question": "什么是种植密度？"
+  },
+  {
+    "id": 224,
+    "type": "classification",
+    "question": "种植密度有哪些类型？"
+  },
+  {
+    "id": 225,
+    "type": "method",
+    "question": "如何进行种植密度？"
+  },
+  {
+    "id": 226,
+    "type": "comparison",
+    "question": "种植密度与种子有什么区别？"
+  },
+  {
+    "id": 227,
+    "type": "entity",
+    "question": "与种植密度研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 228,
+    "type": "other",
+    "question": "请简述种植密度的要点。"
+  },
+  {
+    "id": 229,
+    "type": "definition",
+    "question": "什么是株行距？"
+  },
+  {
+    "id": 230,
+    "type": "classification",
+    "question": "株行距有哪些类型？"
+  },
+  {
+    "id": 231,
+    "type": "method",
+    "question": "如何进行株行距？"
+  },
+  {
+    "id": 232,
+    "type": "comparison",
+    "question": "株行距与种子质量有什么区别？"
+  },
+  {
+    "id": 233,
+    "type": "entity",
+    "question": "与株行距研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 234,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲株行距？"
+  },
+  {
+    "id": 235,
+    "type": "definition",
+    "question": "什么是株距？"
+  },
+  {
+    "id": 236,
+    "type": "classification",
+    "question": "株距有哪些类型？"
+  },
+  {
+    "id": 237,
+    "type": "method",
+    "question": "如何进行株距？"
+  },
+  {
+    "id": 238,
+    "type": "comparison",
+    "question": "株距与种子处理有什么区别？"
+  },
+  {
+    "id": 239,
+    "type": "entity",
+    "question": "与株距研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 240,
+    "type": "other",
+    "question": "请简述株距的要点。"
+  },
+  {
+    "id": 241,
+    "type": "definition",
+    "question": "什么是行距？"
+  },
+  {
+    "id": 242,
+    "type": "classification",
+    "question": "行距有哪些类型？"
+  },
+  {
+    "id": 243,
+    "type": "method",
+    "question": "如何进行行距？"
+  },
+  {
+    "id": 244,
+    "type": "comparison",
+    "question": "行距与种子催芽有什么区别？"
+  },
+  {
+    "id": 245,
+    "type": "entity",
+    "question": "与行距研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 246,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲行距？"
+  },
+  {
+    "id": 247,
+    "type": "definition",
+    "question": "什么是种植点配置？"
+  },
+  {
+    "id": 248,
+    "type": "classification",
+    "question": "种植点配置有哪些类型？"
+  },
+  {
+    "id": 249,
+    "type": "method",
+    "question": "如何进行种植点配置？"
+  },
+  {
+    "id": 250,
+    "type": "comparison",
+    "question": "种植点配置与种子采集有什么区别？"
+  },
+  {
+    "id": 251,
+    "type": "entity",
+    "question": "与种植点配置研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 252,
+    "type": "other",
+    "question": "请简述种植点配置的要点。"
+  },
+  {
+    "id": 253,
+    "type": "definition",
+    "question": "什么是正方形配置？"
+  },
+  {
+    "id": 254,
+    "type": "classification",
+    "question": "正方形配置有哪些类型？"
+  },
+  {
+    "id": 255,
+    "type": "method",
+    "question": "如何进行正方形配置？"
+  },
+  {
+    "id": 256,
+    "type": "comparison",
+    "question": "正方形配置与种子贮藏有什么区别？"
+  },
+  {
+    "id": 257,
+    "type": "entity",
+    "question": "与正方形配置研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 258,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲正方形配置？"
+  },
+  {
+    "id": 259,
+    "type": "definition",
+    "question": "什么是三角形配置？"
+  },
+  {
+    "id": 260,
+    "type": "classification",
+    "question": "三角形配置有哪些类型？"
+  },
+  {
+    "id": 261,
+    "type": "method",
+    "question": "如何进行三角形配置？"
+  },
+  {
+    "id": 262,
+    "type": "comparison",
+    "question": "三角形配置与种子园有什么区别？"
+  },
+  {
+    "id": 263,
+    "type": "entity",
+    "question": "与三角形配置研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 264,
+    "type": "other",
+    "question": "请简述三角形配置的要点。"
+  },
+  {
+    "id": 265,
+    "type": "definition",
+    "question": "什么是长方形配置？"
+  },
+  {
+    "id": 266,
+    "type": "classification",
+    "question": "长方形配置有哪些类型？"
+  },
+  {
+    "id": 267,
+    "type": "method",
+    "question": "如何进行长方形配置？"
+  },
+  {
+    "id": 268,
+    "type": "comparison",
+    "question": "长方形配置与母树林有什么区别？"
+  },
+  {
+    "id": 269,
+    "type": "entity",
+    "question": "与长方形配置研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 270,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲长方形配置？"
+  },
+  {
+    "id": 271,
+    "type": "definition",
+    "question": "什么是造林方法？"
+  },
+  {
+    "id": 272,
+    "type": "classification",
+    "question": "造林方法有哪些类型？"
+  },
+  {
+    "id": 273,
+    "type": "method",
+    "question": "如何进行造林方法？"
+  },
+  {
+    "id": 274,
+    "type": "comparison",
+    "question": "造林方法与苗木质量有什么区别？"
+  },
+  {
+    "id": 275,
+    "type": "entity",
+    "question": "与造林方法研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 276,
+    "type": "other",
+    "question": "请简述造林方法的要点。"
+  },
+  {
+    "id": 277,
+    "type": "definition",
+    "question": "什么是造林方式？"
+  },
+  {
+    "id": 278,
+    "type": "classification",
+    "question": "造林方式有哪些类型？"
+  },
+  {
+    "id": 279,
+    "type": "method",
+    "question": "如何进行造林方式？"
+  },
+  {
+    "id": 280,
+    "type": "comparison",
+    "question": "造林方式与苗木培育有什么区别？"
+  },
+  {
+    "id": 281,
+    "type": "entity",
+    "question": "与造林方式研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 282,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲造林方式？"
+  },
+  {
+    "id": 283,
+    "type": "definition",
+    "question": "什么是直播造林？"
+  },
+  {
+    "id": 284,
+    "type": "classification",
+    "question": "直播造林有哪些类型？"
+  },
+  {
+    "id": 285,
+    "type": "method",
+    "question": "如何进行直播造林？"
+  },
+  {
+    "id": 286,
+    "type": "comparison",
+    "question": "直播造林与苗圃有什么区别？"
+  },
+  {
+    "id": 287,
+    "type": "entity",
+    "question": "与直播造林研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 288,
+    "type": "other",
+    "question": "请简述直播造林的要点。"
+  },
+  {
+    "id": 289,
+    "type": "definition",
+    "question": "什么是播种造林？"
+  },
+  {
+    "id": 290,
+    "type": "classification",
+    "question": "播种造林有哪些类型？"
+  },
+  {
+    "id": 291,
+    "type": "method",
+    "question": "如何进行播种造林？"
+  },
+  {
+    "id": 292,
+    "type": "comparison",
+    "question": "播种造林与育苗有什么区别？"
+  },
+  {
+    "id": 293,
+    "type": "entity",
+    "question": "与播种造林研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 294,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲播种造林？"
+  },
+  {
+    "id": 295,
+    "type": "definition",
+    "question": "什么是植苗造林？"
+  },
+  {
+    "id": 296,
+    "type": "classification",
+    "question": "植苗造林有哪些类型？"
+  },
+  {
+    "id": 297,
+    "type": "method",
+    "question": "如何进行植苗造林？"
+  },
+  {
+    "id": 298,
+    "type": "comparison",
+    "question": "植苗造林与苗木繁殖有什么区别？"
+  },
+  {
+    "id": 299,
+    "type": "entity",
+    "question": "与植苗造林研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 300,
+    "type": "other",
+    "question": "请简述植苗造林的要点。"
+  },
+  {
+    "id": 301,
+    "type": "definition",
+    "question": "什么是分殖造林？"
+  },
+  {
+    "id": 302,
+    "type": "classification",
+    "question": "分殖造林有哪些类型？"
+  },
+  {
+    "id": 303,
+    "type": "method",
+    "question": "如何进行分殖造林？"
+  },
+  {
+    "id": 304,
+    "type": "comparison",
+    "question": "分殖造林与苗木分级有什么区别？"
+  },
+  {
+    "id": 305,
+    "type": "entity",
+    "question": "与分殖造林研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 306,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲分殖造林？"
+  },
+  {
+    "id": 307,
+    "type": "definition",
+    "question": "什么是人工造林？"
+  },
+  {
+    "id": 308,
+    "type": "classification",
+    "question": "人工造林有哪些类型？"
+  },
+  {
+    "id": 309,
+    "type": "method",
+    "question": "如何进行人工造林？"
+  },
+  {
+    "id": 310,
+    "type": "comparison",
+    "question": "人工造林与苗木标准有什么区别？"
+  },
+  {
+    "id": 311,
+    "type": "entity",
+    "question": "与人工造林研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 312,
+    "type": "other",
+    "question": "请简述人工造林的要点。"
+  },
+  {
+    "id": 313,
+    "type": "definition",
+    "question": "什么是混交造林？"
+  },
+  {
+    "id": 314,
+    "type": "classification",
+    "question": "混交造林有哪些类型？"
+  },
+  {
+    "id": 315,
+    "type": "method",
+    "question": "如何进行混交造林？"
+  },
+  {
+    "id": 316,
+    "type": "comparison",
+    "question": "混交造林与容器苗有什么区别？"
+  },
+  {
+    "id": 317,
+    "type": "entity",
+    "question": "与混交造林研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 318,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲混交造林？"
+  },
+  {
+    "id": 319,
+    "type": "definition",
+    "question": "什么是造林技术？"
+  },
+  {
+    "id": 320,
+    "type": "classification",
+    "question": "造林技术有哪些类型？"
+  },
+  {
+    "id": 321,
+    "type": "method",
+    "question": "如何进行造林技术？"
+  },
+  {
+    "id": 322,
+    "type": "comparison",
+    "question": "造林技术与裸根苗有什么区别？"
+  },
+  {
+    "id": 323,
+    "type": "entity",
+    "question": "与造林技术研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 324,
+    "type": "other",
+    "question": "请简述造林技术的要点。"
+  },
+  {
+    "id": 325,
+    "type": "definition",
+    "question": "什么是造林设计？"
+  },
+  {
+    "id": 326,
+    "type": "classification",
+    "question": "造林设计有哪些类型？"
+  },
+  {
+    "id": 327,
+    "type": "method",
+    "question": "如何进行造林设计？"
+  },
+  {
+    "id": 328,
+    "type": "comparison",
+    "question": "造林设计与扦插有什么区别？"
+  },
+  {
+    "id": 329,
+    "type": "entity",
+    "question": "与造林设计研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 330,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲造林设计？"
+  },
+  {
+    "id": 331,
+    "type": "definition",
+    "question": "什么是造林作业？"
+  },
+  {
+    "id": 332,
+    "type": "classification",
+    "question": "造林作业有哪些类型？"
+  },
+  {
+    "id": 333,
+    "type": "method",
+    "question": "如何进行造林作业？"
+  },
+  {
+    "id": 334,
+    "type": "comparison",
+    "question": "造林作业与嫁接有什么区别？"
+  },
+  {
+    "id": 335,
+    "type": "entity",
+    "question": "与造林作业研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 336,
+    "type": "other",
+    "question": "请简述造林作业的要点。"
+  },
+  {
+    "id": 337,
+    "type": "definition",
+    "question": "什么是造林成活率？"
+  },
+  {
+    "id": 338,
+    "type": "classification",
+    "question": "造林成活率有哪些类型？"
+  },
+  {
+    "id": 339,
+    "type": "method",
+    "question": "如何进行造林成活率？"
+  },
+  {
+    "id": 340,
+    "type": "comparison",
+    "question": "造林成活率与浸种有什么区别？"
+  },
+  {
+    "id": 341,
+    "type": "entity",
+    "question": "与造林成活率研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 342,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲造林成活率？"
+  },
+  {
+    "id": 343,
+    "type": "definition",
+    "question": "什么是造林质量？"
+  },
+  {
+    "id": 344,
+    "type": "classification",
+    "question": "造林质量有哪些类型？"
+  },
+  {
+    "id": 345,
+    "type": "method",
+    "question": "如何进行造林质量？"
+  },
+  {
+    "id": 346,
+    "type": "comparison",
+    "question": "造林质量与层积催芽有什么区别？"
+  },
+  {
+    "id": 347,
+    "type": "entity",
+    "question": "与造林质量研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 348,
+    "type": "other",
+    "question": "请简述造林质量的要点。"
+  },
+  {
+    "id": 349,
+    "type": "definition",
+    "question": "什么是造林季节？"
+  },
+  {
+    "id": 350,
+    "type": "classification",
+    "question": "造林季节有哪些类型？"
+  },
+  {
+    "id": 351,
+    "type": "method",
+    "question": "如何进行造林季节？"
+  },
+  {
+    "id": 352,
+    "type": "comparison",
+    "question": "造林季节与机械催芽有什么区别？"
+  },
+  {
+    "id": 353,
+    "type": "entity",
+    "question": "与造林季节研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 354,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲造林季节？"
+  },
+  {
+    "id": 355,
+    "type": "definition",
+    "question": "什么是造林时间？"
+  },
+  {
+    "id": 356,
+    "type": "classification",
+    "question": "造林时间有哪些类型？"
+  },
+  {
+    "id": 357,
+    "type": "method",
+    "question": "如何进行造林时间？"
+  },
+  {
+    "id": 358,
+    "type": "comparison",
+    "question": "造林时间与化学催芽有什么区别？"
+  },
+  {
+    "id": 359,
+    "type": "entity",
+    "question": "与造林时间研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 360,
+    "type": "other",
+    "question": "请简述造林时间的要点。"
+  },
+  {
+    "id": 361,
+    "type": "definition",
+    "question": "什么是种子？"
+  },
+  {
+    "id": 362,
+    "type": "classification",
+    "question": "种子有哪些类型？"
+  },
+  {
+    "id": 363,
+    "type": "method",
+    "question": "如何进行种子？"
+  },
+  {
+    "id": 364,
+    "type": "comparison",
+    "question": "种子与物理催芽有什么区别？"
+  },
+  {
+    "id": 365,
+    "type": "entity",
+    "question": "与种子研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 366,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲种子？"
+  },
+  {
+    "id": 367,
+    "type": "definition",
+    "question": "什么是种子质量？"
+  },
+  {
+    "id": 368,
+    "type": "classification",
+    "question": "种子质量有哪些类型？"
+  },
+  {
+    "id": 369,
+    "type": "method",
+    "question": "如何进行种子质量？"
+  },
+  {
+    "id": 370,
+    "type": "comparison",
+    "question": "种子质量与生理后熟有什么区别？"
+  },
+  {
+    "id": 371,
+    "type": "entity",
+    "question": "与种子质量研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 372,
+    "type": "other",
+    "question": "请简述种子质量的要点。"
+  },
+  {
+    "id": 373,
+    "type": "definition",
+    "question": "什么是种子处理？"
+  },
+  {
+    "id": 374,
+    "type": "classification",
+    "question": "种子处理有哪些类型？"
+  },
+  {
+    "id": 375,
+    "type": "method",
+    "question": "如何进行种子处理？"
+  },
+  {
+    "id": 376,
+    "type": "comparison",
+    "question": "种子处理与种子休眠有什么区别？"
+  },
+  {
+    "id": 377,
+    "type": "entity",
+    "question": "与种子处理研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 378,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲种子处理？"
+  },
+  {
+    "id": 379,
+    "type": "definition",
+    "question": "什么是种子催芽？"
+  },
+  {
+    "id": 380,
+    "type": "classification",
+    "question": "种子催芽有哪些类型？"
+  },
+  {
+    "id": 381,
+    "type": "method",
+    "question": "如何进行种子催芽？"
+  },
+  {
+    "id": 382,
+    "type": "comparison",
+    "question": "种子催芽与发芽率有什么区别？"
+  },
+  {
+    "id": 383,
+    "type": "entity",
+    "question": "与种子催芽研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 384,
+    "type": "other",
+    "question": "请简述种子催芽的要点。"
+  },
+  {
+    "id": 385,
+    "type": "definition",
+    "question": "什么是种子采集？"
+  },
+  {
+    "id": 386,
+    "type": "classification",
+    "question": "种子采集有哪些类型？"
+  },
+  {
+    "id": 387,
+    "type": "method",
+    "question": "如何进行种子采集？"
+  },
+  {
+    "id": 388,
+    "type": "comparison",
+    "question": "种子采集与催芽处理有什么区别？"
+  },
+  {
+    "id": 389,
+    "type": "entity",
+    "question": "与种子采集研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 390,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲种子采集？"
+  },
+  {
+    "id": 391,
+    "type": "definition",
+    "question": "什么是种子贮藏？"
+  },
+  {
+    "id": 392,
+    "type": "classification",
+    "question": "种子贮藏有哪些类型？"
+  },
+  {
+    "id": 393,
+    "type": "method",
+    "question": "如何进行种子贮藏？"
+  },
+  {
+    "id": 394,
+    "type": "comparison",
+    "question": "种子贮藏与苗木活力有什么区别？"
+  },
+  {
+    "id": 395,
+    "type": "entity",
+    "question": "与种子贮藏研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 396,
+    "type": "other",
+    "question": "请简述种子贮藏的要点。"
+  },
+  {
+    "id": 397,
+    "type": "definition",
+    "question": "什么是种子园？"
+  },
+  {
+    "id": 398,
+    "type": "classification",
+    "question": "种子园有哪些类型？"
+  },
+  {
+    "id": 399,
+    "type": "method",
+    "question": "如何进行种子园？"
+  },
+  {
+    "id": 400,
+    "type": "comparison",
+    "question": "种子园与苗木成活率有什么区别？"
+  },
+  {
+    "id": 401,
+    "type": "entity",
+    "question": "与种子园研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 402,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲种子园？"
+  },
+  {
+    "id": 403,
+    "type": "definition",
+    "question": "什么是母树林？"
+  },
+  {
+    "id": 404,
+    "type": "classification",
+    "question": "母树林有哪些类型？"
+  },
+  {
+    "id": 405,
+    "type": "method",
+    "question": "如何进行母树林？"
+  },
+  {
+    "id": 406,
+    "type": "comparison",
+    "question": "母树林与混交林有什么区别？"
+  },
+  {
+    "id": 407,
+    "type": "entity",
+    "question": "与母树林研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 408,
+    "type": "other",
+    "question": "请简述母树林的要点。"
+  },
+  {
+    "id": 409,
+    "type": "definition",
+    "question": "什么是苗木质量？"
+  },
+  {
+    "id": 410,
+    "type": "classification",
+    "question": "苗木质量有哪些类型？"
+  },
+  {
+    "id": 411,
+    "type": "method",
+    "question": "如何进行苗木质量？"
+  },
+  {
+    "id": 412,
+    "type": "comparison",
+    "question": "苗木质量与混交方式有什么区别？"
+  },
+  {
+    "id": 413,
+    "type": "entity",
+    "question": "与苗木质量研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 414,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲苗木质量？"
+  },
+  {
+    "id": 415,
+    "type": "definition",
+    "question": "什么是苗木培育？"
+  },
+  {
+    "id": 416,
+    "type": "classification",
+    "question": "苗木培育有哪些类型？"
+  },
+  {
+    "id": 417,
+    "type": "method",
+    "question": "如何进行苗木培育？"
+  },
+  {
+    "id": 418,
+    "type": "comparison",
+    "question": "苗木培育与混交类型有什么区别？"
+  },
+  {
+    "id": 419,
+    "type": "entity",
+    "question": "与苗木培育研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 420,
+    "type": "other",
+    "question": "请简述苗木培育的要点。"
+  },
+  {
+    "id": 421,
+    "type": "definition",
+    "question": "什么是苗圃？"
+  },
+  {
+    "id": 422,
+    "type": "classification",
+    "question": "苗圃有哪些类型？"
+  },
+  {
+    "id": 423,
+    "type": "method",
+    "question": "如何进行苗圃？"
+  },
+  {
+    "id": 424,
+    "type": "comparison",
+    "question": "苗圃与混交比例有什么区别？"
+  },
+  {
+    "id": 425,
+    "type": "entity",
+    "question": "与苗圃研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 426,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲苗圃？"
+  },
+  {
+    "id": 427,
+    "type": "definition",
+    "question": "什么是育苗？"
+  },
+  {
+    "id": 428,
+    "type": "classification",
+    "question": "育苗有哪些类型？"
+  },
+  {
+    "id": 429,
+    "type": "method",
+    "question": "如何进行育苗？"
+  },
+  {
+    "id": 430,
+    "type": "comparison",
+    "question": "育苗与纯林有什么区别？"
+  },
+  {
+    "id": 431,
+    "type": "entity",
+    "question": "与育苗研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 432,
+    "type": "other",
+    "question": "请简述育苗的要点。"
+  },
+  {
+    "id": 433,
+    "type": "definition",
+    "question": "什么是苗木繁殖？"
+  },
+  {
+    "id": 434,
+    "type": "classification",
+    "question": "苗木繁殖有哪些类型？"
+  },
+  {
+    "id": 435,
+    "type": "method",
+    "question": "如何进行苗木繁殖？"
+  },
+  {
+    "id": 436,
+    "type": "comparison",
+    "question": "苗木繁殖与针阔混交有什么区别？"
+  },
+  {
+    "id": 437,
+    "type": "entity",
+    "question": "与苗木繁殖研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 438,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲苗木繁殖？"
+  },
+  {
+    "id": 439,
+    "type": "definition",
+    "question": "什么是苗木分级？"
+  },
+  {
+    "id": 440,
+    "type": "classification",
+    "question": "苗木分级有哪些类型？"
+  },
+  {
+    "id": 441,
+    "type": "method",
+    "question": "如何进行苗木分级？"
+  },
+  {
+    "id": 442,
+    "type": "comparison",
+    "question": "苗木分级与乔灌混交有什么区别？"
+  },
+  {
+    "id": 443,
+    "type": "entity",
+    "question": "与苗木分级研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 444,
+    "type": "other",
+    "question": "请简述苗木分级的要点。"
+  },
+  {
+    "id": 445,
+    "type": "definition",
+    "question": "什么是苗木标准？"
+  },
+  {
+    "id": 446,
+    "type": "classification",
+    "question": "苗木标准有哪些类型？"
+  },
+  {
+    "id": 447,
+    "type": "method",
+    "question": "如何进行苗木标准？"
+  },
+  {
+    "id": 448,
+    "type": "comparison",
+    "question": "苗木标准与株间混交有什么区别？"
+  },
+  {
+    "id": 449,
+    "type": "entity",
+    "question": "与苗木标准研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 450,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲苗木标准？"
+  },
+  {
+    "id": 451,
+    "type": "definition",
+    "question": "什么是容器苗？"
+  },
+  {
+    "id": 452,
+    "type": "classification",
+    "question": "容器苗有哪些类型？"
+  },
+  {
+    "id": 453,
+    "type": "method",
+    "question": "如何进行容器苗？"
+  },
+  {
+    "id": 454,
+    "type": "comparison",
+    "question": "容器苗与行间混交有什么区别？"
+  },
+  {
+    "id": 455,
+    "type": "entity",
+    "question": "与容器苗研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 456,
+    "type": "other",
+    "question": "请简述容器苗的要点。"
+  },
+  {
+    "id": 457,
+    "type": "definition",
+    "question": "什么是裸根苗？"
+  },
+  {
+    "id": 458,
+    "type": "classification",
+    "question": "裸根苗有哪些类型？"
+  },
+  {
+    "id": 459,
+    "type": "method",
+    "question": "如何进行裸根苗？"
+  },
+  {
+    "id": 460,
+    "type": "comparison",
+    "question": "裸根苗与带状混交有什么区别？"
+  },
+  {
+    "id": 461,
+    "type": "entity",
+    "question": "与裸根苗研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 462,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲裸根苗？"
+  },
+  {
+    "id": 463,
+    "type": "definition",
+    "question": "什么是扦插？"
+  },
+  {
+    "id": 464,
+    "type": "classification",
+    "question": "扦插有哪些类型？"
+  },
+  {
+    "id": 465,
+    "type": "method",
+    "question": "如何进行扦插？"
+  },
+  {
+    "id": 466,
+    "type": "comparison",
+    "question": "扦插与块状混交有什么区别？"
+  },
+  {
+    "id": 467,
+    "type": "entity",
+    "question": "与扦插研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 468,
+    "type": "other",
+    "question": "请简述扦插的要点。"
+  },
+  {
+    "id": 469,
+    "type": "definition",
+    "question": "什么是嫁接？"
+  },
+  {
+    "id": 470,
+    "type": "classification",
+    "question": "嫁接有哪些类型？"
+  },
+  {
+    "id": 471,
+    "type": "method",
+    "question": "如何进行嫁接？"
+  },
+  {
+    "id": 472,
+    "type": "comparison",
+    "question": "嫁接与星状混交有什么区别？"
+  },
+  {
+    "id": 473,
+    "type": "entity",
+    "question": "与嫁接研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 474,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲嫁接？"
+  },
+  {
+    "id": 475,
+    "type": "definition",
+    "question": "什么是浸种？"
+  },
+  {
+    "id": 476,
+    "type": "classification",
+    "question": "浸种有哪些类型？"
+  },
+  {
+    "id": 477,
+    "type": "method",
+    "question": "如何进行浸种？"
+  },
+  {
+    "id": 478,
+    "type": "comparison",
+    "question": "浸种与植生组混交有什么区别？"
+  },
+  {
+    "id": 479,
+    "type": "entity",
+    "question": "与浸种研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 480,
+    "type": "other",
+    "question": "请简述浸种的要点。"
+  },
+  {
+    "id": 481,
+    "type": "definition",
+    "question": "什么是层积催芽？"
+  },
+  {
+    "id": 482,
+    "type": "classification",
+    "question": "层积催芽有哪些类型？"
+  },
+  {
+    "id": 483,
+    "type": "method",
+    "question": "如何进行层积催芽？"
+  },
+  {
+    "id": 484,
+    "type": "comparison",
+    "question": "层积催芽与不规则混交有什么区别？"
+  },
+  {
+    "id": 485,
+    "type": "entity",
+    "question": "与层积催芽研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 486,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲层积催芽？"
+  },
+  {
+    "id": 487,
+    "type": "definition",
+    "question": "什么是机械催芽？"
+  },
+  {
+    "id": 488,
+    "type": "classification",
+    "question": "机械催芽有哪些类型？"
+  },
+  {
+    "id": 489,
+    "type": "method",
+    "question": "如何进行机械催芽？"
+  },
+  {
+    "id": 490,
+    "type": "comparison",
+    "question": "机械催芽与森林更新有什么区别？"
+  },
+  {
+    "id": 491,
+    "type": "entity",
+    "question": "与机械催芽研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 492,
+    "type": "other",
+    "question": "请简述机械催芽的要点。"
+  },
+  {
+    "id": 493,
+    "type": "definition",
+    "question": "什么是化学催芽？"
+  },
+  {
+    "id": 494,
+    "type": "classification",
+    "question": "化学催芽有哪些类型？"
+  },
+  {
+    "id": 495,
+    "type": "method",
+    "question": "如何进行化学催芽？"
+  },
+  {
+    "id": 496,
+    "type": "comparison",
+    "question": "化学催芽与天然更新有什么区别？"
+  },
+  {
+    "id": 497,
+    "type": "entity",
+    "question": "与化学催芽研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 498,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲化学催芽？"
+  },
+  {
+    "id": 499,
+    "type": "definition",
+    "question": "什么是物理催芽？"
+  },
+  {
+    "id": 500,
+    "type": "classification",
+    "question": "物理催芽有哪些类型？"
+  },
+  {
+    "id": 501,
+    "type": "method",
+    "question": "如何进行物理催芽？"
+  },
+  {
+    "id": 502,
+    "type": "comparison",
+    "question": "物理催芽与人工更新有什么区别？"
+  },
+  {
+    "id": 503,
+    "type": "entity",
+    "question": "与物理催芽研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 504,
+    "type": "other",
+    "question": "请简述物理催芽的要点。"
+  },
+  {
+    "id": 505,
+    "type": "definition",
+    "question": "什么是生理后熟？"
+  },
+  {
+    "id": 506,
+    "type": "classification",
+    "question": "生理后熟有哪些类型？"
+  },
+  {
+    "id": 507,
+    "type": "method",
+    "question": "如何进行生理后熟？"
+  },
+  {
+    "id": 508,
+    "type": "comparison",
+    "question": "生理后熟与补植有什么区别？"
+  },
+  {
+    "id": 509,
+    "type": "entity",
+    "question": "与生理后熟研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 510,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲生理后熟？"
+  },
+  {
+    "id": 511,
+    "type": "definition",
+    "question": "什么是种子休眠？"
+  },
+  {
+    "id": 512,
+    "type": "classification",
+    "question": "种子休眠有哪些类型？"
+  },
+  {
+    "id": 513,
+    "type": "method",
+    "question": "如何进行种子休眠？"
+  },
+  {
+    "id": 514,
+    "type": "comparison",
+    "question": "种子休眠与造林更新有什么区别？"
+  },
+  {
+    "id": 515,
+    "type": "entity",
+    "question": "与种子休眠研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 516,
+    "type": "other",
+    "question": "请简述种子休眠的要点。"
+  },
+  {
+    "id": 517,
+    "type": "definition",
+    "question": "什么是发芽率？"
+  },
+  {
+    "id": 518,
+    "type": "classification",
+    "question": "发芽率有哪些类型？"
+  },
+  {
+    "id": 519,
+    "type": "method",
+    "question": "如何进行发芽率？"
+  },
+  {
+    "id": 520,
+    "type": "comparison",
+    "question": "发芽率与更新造林有什么区别？"
+  },
+  {
+    "id": 521,
+    "type": "entity",
+    "question": "与发芽率研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 522,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲发芽率？"
+  },
+  {
+    "id": 523,
+    "type": "definition",
+    "question": "什么是催芽处理？"
+  },
+  {
+    "id": 524,
+    "type": "classification",
+    "question": "催芽处理有哪些类型？"
+  },
+  {
+    "id": 525,
+    "type": "method",
+    "question": "如何进行催芽处理？"
+  },
+  {
+    "id": 526,
+    "type": "comparison",
+    "question": "催芽处理与天然下种更新有什么区别？"
+  },
+  {
+    "id": 527,
+    "type": "entity",
+    "question": "与催芽处理研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 528,
+    "type": "other",
+    "question": "请简述催芽处理的要点。"
+  },
+  {
+    "id": 529,
+    "type": "definition",
+    "question": "什么是苗木活力？"
+  },
+  {
+    "id": 530,
+    "type": "classification",
+    "question": "苗木活力有哪些类型？"
+  },
+  {
+    "id": 531,
+    "type": "method",
+    "question": "如何进行苗木活力？"
+  },
+  {
+    "id": 532,
+    "type": "comparison",
+    "question": "苗木活力与萌芽更新有什么区别？"
+  },
+  {
+    "id": 533,
+    "type": "entity",
+    "question": "与苗木活力研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 534,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲苗木活力？"
+  },
+  {
+    "id": 535,
+    "type": "definition",
+    "question": "什么是苗木成活率？"
+  },
+  {
+    "id": 536,
+    "type": "classification",
+    "question": "苗木成活率有哪些类型？"
+  },
+  {
+    "id": 537,
+    "type": "method",
+    "question": "如何进行苗木成活率？"
+  },
+  {
+    "id": 538,
+    "type": "comparison",
+    "question": "苗木成活率与根蘖更新有什么区别？"
+  },
+  {
+    "id": 539,
+    "type": "entity",
+    "question": "与苗木成活率研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 540,
+    "type": "other",
+    "question": "请简述苗木成活率的要点。"
+  },
+  {
+    "id": 541,
+    "type": "definition",
+    "question": "什么是混交林？"
+  },
+  {
+    "id": 542,
+    "type": "classification",
+    "question": "混交林有哪些类型？"
+  },
+  {
+    "id": 543,
+    "type": "method",
+    "question": "如何进行混交林？"
+  },
+  {
+    "id": 544,
+    "type": "comparison",
+    "question": "混交林与人工促进更新有什么区别？"
+  },
+  {
+    "id": 545,
+    "type": "entity",
+    "question": "与混交林研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 546,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲混交林？"
+  },
+  {
+    "id": 547,
+    "type": "definition",
+    "question": "什么是混交方式？"
+  },
+  {
+    "id": 548,
+    "type": "classification",
+    "question": "混交方式有哪些类型？"
+  },
+  {
+    "id": 549,
+    "type": "method",
+    "question": "如何进行混交方式？"
+  },
+  {
+    "id": 550,
+    "type": "comparison",
+    "question": "混交方式与皆伐更新有什么区别？"
+  },
+  {
+    "id": 551,
+    "type": "entity",
+    "question": "与混交方式研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 552,
+    "type": "other",
+    "question": "请简述混交方式的要点。"
+  },
+  {
+    "id": 553,
+    "type": "definition",
+    "question": "什么是混交类型？"
+  },
+  {
+    "id": 554,
+    "type": "classification",
+    "question": "混交类型有哪些类型？"
+  },
+  {
+    "id": 555,
+    "type": "method",
+    "question": "如何进行混交类型？"
+  },
+  {
+    "id": 556,
+    "type": "comparison",
+    "question": "混交类型与渐伐更新有什么区别？"
+  },
+  {
+    "id": 557,
+    "type": "entity",
+    "question": "与混交类型研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 558,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲混交类型？"
+  },
+  {
+    "id": 559,
+    "type": "definition",
+    "question": "什么是混交比例？"
+  },
+  {
+    "id": 560,
+    "type": "classification",
+    "question": "混交比例有哪些类型？"
+  },
+  {
+    "id": 561,
+    "type": "method",
+    "question": "如何进行混交比例？"
+  },
+  {
+    "id": 562,
+    "type": "comparison",
+    "question": "混交比例与择伐更新有什么区别？"
+  },
+  {
+    "id": 563,
+    "type": "entity",
+    "question": "与混交比例研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 564,
+    "type": "other",
+    "question": "请简述混交比例的要点。"
+  },
+  {
+    "id": 565,
+    "type": "definition",
+    "question": "什么是纯林？"
+  },
+  {
+    "id": 566,
+    "type": "classification",
+    "question": "纯林有哪些类型？"
+  },
+  {
+    "id": 567,
+    "type": "method",
+    "question": "如何进行纯林？"
+  },
+  {
+    "id": 568,
+    "type": "comparison",
+    "question": "纯林与更新方式有什么区别？"
+  },
+  {
+    "id": 569,
+    "type": "entity",
+    "question": "与纯林研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 570,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲纯林？"
+  },
+  {
+    "id": 571,
+    "type": "definition",
+    "question": "什么是针阔混交？"
+  },
+  {
+    "id": 572,
+    "type": "classification",
+    "question": "针阔混交有哪些类型？"
+  },
+  {
+    "id": 573,
+    "type": "method",
+    "question": "如何进行针阔混交？"
+  },
+  {
+    "id": 574,
+    "type": "comparison",
+    "question": "针阔混交与更新作业有什么区别？"
+  },
+  {
+    "id": 575,
+    "type": "entity",
+    "question": "与针阔混交研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 576,
+    "type": "other",
+    "question": "请简述针阔混交的要点。"
+  },
+  {
+    "id": 577,
+    "type": "definition",
+    "question": "什么是乔灌混交？"
+  },
+  {
+    "id": 578,
+    "type": "classification",
+    "question": "乔灌混交有哪些类型？"
+  },
+  {
+    "id": 579,
+    "type": "method",
+    "question": "如何进行乔灌混交？"
+  },
+  {
+    "id": 580,
+    "type": "comparison",
+    "question": "乔灌混交与更新周期有什么区别？"
+  },
+  {
+    "id": 581,
+    "type": "entity",
+    "question": "与乔灌混交研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 582,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲乔灌混交？"
+  },
+  {
+    "id": 583,
+    "type": "definition",
+    "question": "什么是株间混交？"
+  },
+  {
+    "id": 584,
+    "type": "classification",
+    "question": "株间混交有哪些类型？"
+  },
+  {
+    "id": 585,
+    "type": "method",
+    "question": "如何进行株间混交？"
+  },
+  {
+    "id": 586,
+    "type": "comparison",
+    "question": "株间混交与抚育有什么区别？"
+  },
+  {
+    "id": 587,
+    "type": "entity",
+    "question": "与株间混交研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 588,
+    "type": "other",
+    "question": "请简述株间混交的要点。"
+  },
+  {
+    "id": 589,
+    "type": "definition",
+    "question": "什么是行间混交？"
+  },
+  {
+    "id": 590,
+    "type": "classification",
+    "question": "行间混交有哪些类型？"
+  },
+  {
+    "id": 591,
+    "type": "method",
+    "question": "如何进行行间混交？"
+  },
+  {
+    "id": 592,
+    "type": "comparison",
+    "question": "行间混交与森林抚育有什么区别？"
+  },
+  {
+    "id": 593,
+    "type": "entity",
+    "question": "与行间混交研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 594,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲行间混交？"
+  },
+  {
+    "id": 595,
+    "type": "definition",
+    "question": "什么是带状混交？"
+  },
+  {
+    "id": 596,
+    "type": "classification",
+    "question": "带状混交有哪些类型？"
+  },
+  {
+    "id": 597,
+    "type": "method",
+    "question": "如何进行带状混交？"
+  },
+  {
+    "id": 598,
+    "type": "comparison",
+    "question": "带状混交与幼林抚育有什么区别？"
+  },
+  {
+    "id": 599,
+    "type": "entity",
+    "question": "与带状混交研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 600,
+    "type": "other",
+    "question": "请简述带状混交的要点。"
+  },
+  {
+    "id": 601,
+    "type": "definition",
+    "question": "什么是块状混交？"
+  },
+  {
+    "id": 602,
+    "type": "classification",
+    "question": "块状混交有哪些类型？"
+  },
+  {
+    "id": 603,
+    "type": "method",
+    "question": "如何进行块状混交？"
+  },
+  {
+    "id": 604,
+    "type": "comparison",
+    "question": "块状混交与抚育间伐有什么区别？"
+  },
+  {
+    "id": 605,
+    "type": "entity",
+    "question": "与块状混交研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 606,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲块状混交？"
+  },
+  {
+    "id": 607,
+    "type": "definition",
+    "question": "什么是星状混交？"
+  },
+  {
+    "id": 608,
+    "type": "classification",
+    "question": "星状混交有哪些类型？"
+  },
+  {
+    "id": 609,
+    "type": "method",
+    "question": "如何进行星状混交？"
+  },
+  {
+    "id": 610,
+    "type": "comparison",
+    "question": "星状混交与间伐有什么区别？"
+  },
+  {
+    "id": 611,
+    "type": "entity",
+    "question": "与星状混交研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 612,
+    "type": "other",
+    "question": "请简述星状混交的要点。"
+  },
+  {
+    "id": 613,
+    "type": "definition",
+    "question": "什么是植生组混交？"
+  },
+  {
+    "id": 614,
+    "type": "classification",
+    "question": "植生组混交有哪些类型？"
+  },
+  {
+    "id": 615,
+    "type": "method",
+    "question": "如何进行植生组混交？"
+  },
+  {
+    "id": 616,
+    "type": "comparison",
+    "question": "植生组混交与透光伐有什么区别？"
+  },
+  {
+    "id": 617,
+    "type": "entity",
+    "question": "与植生组混交研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 618,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲植生组混交？"
+  },
+  {
+    "id": 619,
+    "type": "definition",
+    "question": "什么是不规则混交？"
+  },
+  {
+    "id": 620,
+    "type": "classification",
+    "question": "不规则混交有哪些类型？"
+  },
+  {
+    "id": 621,
+    "type": "method",
+    "question": "如何进行不规则混交？"
+  },
+  {
+    "id": 622,
+    "type": "comparison",
+    "question": "不规则混交与生长伐有什么区别？"
+  },
+  {
+    "id": 623,
+    "type": "entity",
+    "question": "与不规则混交研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 624,
+    "type": "other",
+    "question": "请简述不规则混交的要点。"
+  },
+  {
+    "id": 625,
+    "type": "definition",
+    "question": "什么是森林更新？"
+  },
+  {
+    "id": 626,
+    "type": "classification",
+    "question": "森林更新有哪些类型？"
+  },
+  {
+    "id": 627,
+    "type": "method",
+    "question": "如何进行森林更新？"
+  },
+  {
+    "id": 628,
+    "type": "comparison",
+    "question": "森林更新与卫生伐有什么区别？"
+  },
+  {
+    "id": 629,
+    "type": "entity",
+    "question": "与森林更新研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 630,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲森林更新？"
+  },
+  {
+    "id": 631,
+    "type": "definition",
+    "question": "什么是天然更新？"
+  },
+  {
+    "id": 632,
+    "type": "classification",
+    "question": "天然更新有哪些类型？"
+  },
+  {
+    "id": 633,
+    "type": "method",
+    "question": "如何进行天然更新？"
+  },
+  {
+    "id": 634,
+    "type": "comparison",
+    "question": "天然更新与修枝有什么区别？"
+  },
+  {
+    "id": 635,
+    "type": "entity",
+    "question": "与天然更新研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 636,
+    "type": "other",
+    "question": "请简述天然更新的要点。"
+  },
+  {
+    "id": 637,
+    "type": "definition",
+    "question": "什么是人工更新？"
+  },
+  {
+    "id": 638,
+    "type": "classification",
+    "question": "人工更新有哪些类型？"
+  },
+  {
+    "id": 639,
+    "type": "method",
+    "question": "如何进行人工更新？"
+  },
+  {
+    "id": 640,
+    "type": "comparison",
+    "question": "人工更新与采伐有什么区别？"
+  },
+  {
+    "id": 641,
+    "type": "entity",
+    "question": "与人工更新研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 642,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲人工更新？"
+  },
+  {
+    "id": 643,
+    "type": "definition",
+    "question": "什么是补植？"
+  },
+  {
+    "id": 644,
+    "type": "classification",
+    "question": "补植有哪些类型？"
+  },
+  {
+    "id": 645,
+    "type": "method",
+    "question": "如何进行补植？"
+  },
+  {
+    "id": 646,
+    "type": "comparison",
+    "question": "补植与主伐有什么区别？"
+  },
+  {
+    "id": 647,
+    "type": "entity",
+    "question": "与补植研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 648,
+    "type": "other",
+    "question": "请简述补植的要点。"
+  },
+  {
+    "id": 649,
+    "type": "definition",
+    "question": "什么是造林更新？"
+  },
+  {
+    "id": 650,
+    "type": "classification",
+    "question": "造林更新有哪些类型？"
+  },
+  {
+    "id": 651,
+    "type": "method",
+    "question": "如何进行造林更新？"
+  },
+  {
+    "id": 652,
+    "type": "comparison",
+    "question": "造林更新与皆伐有什么区别？"
+  },
+  {
+    "id": 653,
+    "type": "entity",
+    "question": "与造林更新研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 654,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲造林更新？"
+  },
+  {
+    "id": 655,
+    "type": "definition",
+    "question": "什么是更新造林？"
+  },
+  {
+    "id": 656,
+    "type": "classification",
+    "question": "更新造林有哪些类型？"
+  },
+  {
+    "id": 657,
+    "type": "method",
+    "question": "如何进行更新造林？"
+  },
+  {
+    "id": 658,
+    "type": "comparison",
+    "question": "更新造林与择伐有什么区别？"
+  },
+  {
+    "id": 659,
+    "type": "entity",
+    "question": "与更新造林研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 660,
+    "type": "other",
+    "question": "请简述更新造林的要点。"
+  },
+  {
+    "id": 661,
+    "type": "definition",
+    "question": "什么是天然下种更新？"
+  },
+  {
+    "id": 662,
+    "type": "classification",
+    "question": "天然下种更新有哪些类型？"
+  },
+  {
+    "id": 663,
+    "type": "method",
+    "question": "如何进行天然下种更新？"
+  },
+  {
+    "id": 664,
+    "type": "comparison",
+    "question": "天然下种更新与渐伐有什么区别？"
+  },
+  {
+    "id": 665,
+    "type": "entity",
+    "question": "与天然下种更新研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 666,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲天然下种更新？"
+  },
+  {
+    "id": 667,
+    "type": "definition",
+    "question": "什么是萌芽更新？"
+  },
+  {
+    "id": 668,
+    "type": "classification",
+    "question": "萌芽更新有哪些类型？"
+  },
+  {
+    "id": 669,
+    "type": "method",
+    "question": "如何进行萌芽更新？"
+  },
+  {
+    "id": 670,
+    "type": "comparison",
+    "question": "萌芽更新与轮伐期有什么区别？"
+  },
+  {
+    "id": 671,
+    "type": "entity",
+    "question": "与萌芽更新研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 672,
+    "type": "other",
+    "question": "请简述萌芽更新的要点。"
+  },
+  {
+    "id": 673,
+    "type": "definition",
+    "question": "什么是根蘖更新？"
+  },
+  {
+    "id": 674,
+    "type": "classification",
+    "question": "根蘖更新有哪些类型？"
+  },
+  {
+    "id": 675,
+    "type": "method",
+    "question": "如何进行根蘖更新？"
+  },
+  {
+    "id": 676,
+    "type": "comparison",
+    "question": "根蘖更新与采伐方式有什么区别？"
+  },
+  {
+    "id": 677,
+    "type": "entity",
+    "question": "与根蘖更新研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 678,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲根蘖更新？"
+  },
+  {
+    "id": 679,
+    "type": "definition",
+    "question": "什么是人工促进更新？"
+  },
+  {
+    "id": 680,
+    "type": "classification",
+    "question": "人工促进更新有哪些类型？"
+  },
+  {
+    "id": 681,
+    "type": "method",
+    "question": "如何进行人工促进更新？"
+  },
+  {
+    "id": 682,
+    "type": "comparison",
+    "question": "人工促进更新与伐区有什么区别？"
+  },
+  {
+    "id": 683,
+    "type": "entity",
+    "question": "与人工促进更新研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 684,
+    "type": "other",
+    "question": "请简述人工促进更新的要点。"
+  },
+  {
+    "id": 685,
+    "type": "definition",
+    "question": "什么是皆伐更新？"
+  },
+  {
+    "id": 686,
+    "type": "classification",
+    "question": "皆伐更新有哪些类型？"
+  },
+  {
+    "id": 687,
+    "type": "method",
+    "question": "如何进行皆伐更新？"
+  },
+  {
+    "id": 688,
+    "type": "comparison",
+    "question": "皆伐更新与透光抚育有什么区别？"
+  },
+  {
+    "id": 689,
+    "type": "entity",
+    "question": "与皆伐更新研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 690,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲皆伐更新？"
+  },
+  {
+    "id": 691,
+    "type": "definition",
+    "question": "什么是渐伐更新？"
+  },
+  {
+    "id": 692,
+    "type": "classification",
+    "question": "渐伐更新有哪些类型？"
+  },
+  {
+    "id": 693,
+    "type": "method",
+    "question": "如何进行渐伐更新？"
+  },
+  {
+    "id": 694,
+    "type": "comparison",
+    "question": "渐伐更新与保留木有什么区别？"
+  },
+  {
+    "id": 695,
+    "type": "entity",
+    "question": "与渐伐更新研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 696,
+    "type": "other",
+    "question": "请简述渐伐更新的要点。"
+  },
+  {
+    "id": 697,
+    "type": "definition",
+    "question": "什么是择伐更新？"
+  },
+  {
+    "id": 698,
+    "type": "classification",
+    "question": "择伐更新有哪些类型？"
+  },
+  {
+    "id": 699,
+    "type": "method",
+    "question": "如何进行择伐更新？"
+  },
+  {
+    "id": 700,
+    "type": "comparison",
+    "question": "择伐更新与目标树有什么区别？"
+  },
+  {
+    "id": 701,
+    "type": "entity",
+    "question": "与择伐更新研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 702,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲择伐更新？"
+  },
+  {
+    "id": 703,
+    "type": "definition",
+    "question": "什么是更新方式？"
+  },
+  {
+    "id": 704,
+    "type": "classification",
+    "question": "更新方式有哪些类型？"
+  },
+  {
+    "id": 705,
+    "type": "method",
+    "question": "如何进行更新方式？"
+  },
+  {
+    "id": 706,
+    "type": "comparison",
+    "question": "更新方式与林分改造有什么区别？"
+  },
+  {
+    "id": 707,
+    "type": "entity",
+    "question": "与更新方式研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 708,
+    "type": "other",
+    "question": "请简述更新方式的要点。"
+  },
+  {
+    "id": 709,
+    "type": "definition",
+    "question": "什么是更新作业？"
+  },
+  {
+    "id": 710,
+    "type": "classification",
+    "question": "更新作业有哪些类型？"
+  },
+  {
+    "id": 711,
+    "type": "method",
+    "question": "如何进行更新作业？"
+  },
+  {
+    "id": 712,
+    "type": "comparison",
+    "question": "更新作业与林分结构有什么区别？"
+  },
+  {
+    "id": 713,
+    "type": "entity",
+    "question": "与更新作业研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 714,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲更新作业？"
+  },
+  {
+    "id": 715,
+    "type": "definition",
+    "question": "什么是更新周期？"
+  },
+  {
+    "id": 716,
+    "type": "classification",
+    "question": "更新周期有哪些类型？"
+  },
+  {
+    "id": 717,
+    "type": "method",
+    "question": "如何进行更新周期？"
+  },
+  {
+    "id": 718,
+    "type": "comparison",
+    "question": "更新周期与郁闭度有什么区别？"
+  },
+  {
+    "id": 719,
+    "type": "entity",
+    "question": "与更新周期研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 720,
+    "type": "other",
+    "question": "请简述更新周期的要点。"
+  },
+  {
+    "id": 721,
+    "type": "definition",
+    "question": "什么是抚育？"
+  },
+  {
+    "id": 722,
+    "type": "classification",
+    "question": "抚育有哪些类型？"
+  },
+  {
+    "id": 723,
+    "type": "method",
+    "question": "如何进行抚育？"
+  },
+  {
+    "id": 724,
+    "type": "comparison",
+    "question": "抚育与郁闭后抚育有什么区别？"
+  },
+  {
+    "id": 725,
+    "type": "entity",
+    "question": "与抚育研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 726,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲抚育？"
+  },
+  {
+    "id": 727,
+    "type": "definition",
+    "question": "什么是森林抚育？"
+  },
+  {
+    "id": 728,
+    "type": "classification",
+    "question": "森林抚育有哪些类型？"
+  },
+  {
+    "id": 729,
+    "type": "method",
+    "question": "如何进行森林抚育？"
+  },
+  {
+    "id": 730,
+    "type": "comparison",
+    "question": "森林抚育与竞争木有什么区别？"
+  },
+  {
+    "id": 731,
+    "type": "entity",
+    "question": "与森林抚育研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 732,
+    "type": "other",
+    "question": "请简述森林抚育的要点。"
+  },
+  {
+    "id": 733,
+    "type": "definition",
+    "question": "什么是幼林抚育？"
+  },
+  {
+    "id": 734,
+    "type": "classification",
+    "question": "幼林抚育有哪些类型？"
+  },
+  {
+    "id": 735,
+    "type": "method",
+    "question": "如何进行幼林抚育？"
+  },
+  {
+    "id": 736,
+    "type": "comparison",
+    "question": "幼林抚育与促进木有什么区别？"
+  },
+  {
+    "id": 737,
+    "type": "entity",
+    "question": "与幼林抚育研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 738,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲幼林抚育？"
+  },
+  {
+    "id": 739,
+    "type": "definition",
+    "question": "什么是抚育间伐？"
+  },
+  {
+    "id": 740,
+    "type": "classification",
+    "question": "抚育间伐有哪些类型？"
+  },
+  {
+    "id": 741,
+    "type": "method",
+    "question": "如何进行抚育间伐？"
+  },
+  {
+    "id": 742,
+    "type": "comparison",
+    "question": "抚育间伐与经营强度有什么区别？"
+  },
+  {
+    "id": 743,
+    "type": "entity",
+    "question": "与抚育间伐研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 744,
+    "type": "other",
+    "question": "请简述抚育间伐的要点。"
+  },
+  {
+    "id": 745,
+    "type": "definition",
+    "question": "什么是间伐？"
+  },
+  {
+    "id": 746,
+    "type": "classification",
+    "question": "间伐有哪些类型？"
+  },
+  {
+    "id": 747,
+    "type": "method",
+    "question": "如何进行间伐？"
+  },
+  {
+    "id": 748,
+    "type": "comparison",
+    "question": "间伐与伐后管理有什么区别？"
+  },
+  {
+    "id": 749,
+    "type": "entity",
+    "question": "与间伐研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 750,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲间伐？"
+  },
+  {
+    "id": 751,
+    "type": "definition",
+    "question": "什么是透光伐？"
+  },
+  {
+    "id": 752,
+    "type": "classification",
+    "question": "透光伐有哪些类型？"
+  },
+  {
+    "id": 753,
+    "type": "method",
+    "question": "如何进行透光伐？"
+  },
+  {
+    "id": 754,
+    "type": "comparison",
+    "question": "透光伐与幼龄林有什么区别？"
+  },
+  {
+    "id": 755,
+    "type": "entity",
+    "question": "与透光伐研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 756,
+    "type": "other",
+    "question": "请简述透光伐的要点。"
+  },
+  {
+    "id": 757,
+    "type": "definition",
+    "question": "什么是生长伐？"
+  },
+  {
+    "id": 758,
+    "type": "classification",
+    "question": "生长伐有哪些类型？"
+  },
+  {
+    "id": 759,
+    "type": "method",
+    "question": "如何进行生长伐？"
+  },
+  {
+    "id": 760,
+    "type": "comparison",
+    "question": "生长伐与森林经营有什么区别？"
+  },
+  {
+    "id": 761,
+    "type": "entity",
+    "question": "与生长伐研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 762,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲生长伐？"
+  },
+  {
+    "id": 763,
+    "type": "definition",
+    "question": "什么是卫生伐？"
+  },
+  {
+    "id": 764,
+    "type": "classification",
+    "question": "卫生伐有哪些类型？"
+  },
+  {
+    "id": 765,
+    "type": "method",
+    "question": "如何进行卫生伐？"
+  },
+  {
+    "id": 766,
+    "type": "comparison",
+    "question": "卫生伐与森林经营方案有什么区别？"
+  },
+  {
+    "id": 767,
+    "type": "entity",
+    "question": "与卫生伐研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 768,
+    "type": "other",
+    "question": "请简述卫生伐的要点。"
+  },
+  {
+    "id": 769,
+    "type": "definition",
+    "question": "什么是修枝？"
+  },
+  {
+    "id": 770,
+    "type": "classification",
+    "question": "修枝有哪些类型？"
+  },
+  {
+    "id": 771,
+    "type": "method",
+    "question": "如何进行修枝？"
+  },
+  {
+    "id": 772,
+    "type": "comparison",
+    "question": "修枝与近自然经营有什么区别？"
+  },
+  {
+    "id": 773,
+    "type": "entity",
+    "question": "与修枝研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 774,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲修枝？"
+  },
+  {
+    "id": 775,
+    "type": "definition",
+    "question": "什么是采伐？"
+  },
+  {
+    "id": 776,
+    "type": "classification",
+    "question": "采伐有哪些类型？"
+  },
+  {
+    "id": 777,
+    "type": "method",
+    "question": "如何进行采伐？"
+  },
+  {
+    "id": 778,
+    "type": "comparison",
+    "question": "采伐与森林抚育经营有什么区别？"
+  },
+  {
+    "id": 779,
+    "type": "entity",
+    "question": "与采伐研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 780,
+    "type": "other",
+    "question": "请简述采伐的要点。"
+  },
+  {
+    "id": 781,
+    "type": "definition",
+    "question": "什么是主伐？"
+  },
+  {
+    "id": 782,
+    "type": "classification",
+    "question": "主伐有哪些类型？"
+  },
+  {
+    "id": 783,
+    "type": "method",
+    "question": "如何进行主伐？"
+  },
+  {
+    "id": 784,
+    "type": "comparison",
+    "question": "主伐与经营方案有什么区别？"
+  },
+  {
+    "id": 785,
+    "type": "entity",
+    "question": "与主伐研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 786,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲主伐？"
+  },
+  {
+    "id": 787,
+    "type": "definition",
+    "question": "什么是皆伐？"
+  },
+  {
+    "id": 788,
+    "type": "classification",
+    "question": "皆伐有哪些类型？"
+  },
+  {
+    "id": 789,
+    "type": "method",
+    "question": "如何进行皆伐？"
+  },
+  {
+    "id": 790,
+    "type": "comparison",
+    "question": "皆伐与防护林有什么区别？"
+  },
+  {
+    "id": 791,
+    "type": "entity",
+    "question": "与皆伐研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 792,
+    "type": "other",
+    "question": "请简述皆伐的要点。"
+  },
+  {
+    "id": 793,
+    "type": "definition",
+    "question": "什么是择伐？"
+  },
+  {
+    "id": 794,
+    "type": "classification",
+    "question": "择伐有哪些类型？"
+  },
+  {
+    "id": 795,
+    "type": "method",
+    "question": "如何进行择伐？"
+  },
+  {
+    "id": 796,
+    "type": "comparison",
+    "question": "择伐与水土保持林有什么区别？"
+  },
+  {
+    "id": 797,
+    "type": "entity",
+    "question": "与择伐研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 798,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲择伐？"
+  },
+  {
+    "id": 799,
+    "type": "definition",
+    "question": "什么是渐伐？"
+  },
+  {
+    "id": 800,
+    "type": "classification",
+    "question": "渐伐有哪些类型？"
+  },
+  {
+    "id": 801,
+    "type": "method",
+    "question": "如何进行渐伐？"
+  },
+  {
+    "id": 802,
+    "type": "comparison",
+    "question": "渐伐与水源涵养林有什么区别？"
+  },
+  {
+    "id": 803,
+    "type": "entity",
+    "question": "与渐伐研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 804,
+    "type": "other",
+    "question": "请简述渐伐的要点。"
+  },
+  {
+    "id": 805,
+    "type": "definition",
+    "question": "什么是轮伐期？"
+  },
+  {
+    "id": 806,
+    "type": "classification",
+    "question": "轮伐期有哪些类型？"
+  },
+  {
+    "id": 807,
+    "type": "method",
+    "question": "如何进行轮伐期？"
+  },
+  {
+    "id": 808,
+    "type": "comparison",
+    "question": "轮伐期与农田防护林有什么区别？"
+  },
+  {
+    "id": 809,
+    "type": "entity",
+    "question": "与轮伐期研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 810,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲轮伐期？"
+  },
+  {
+    "id": 811,
+    "type": "definition",
+    "question": "什么是采伐方式？"
+  },
+  {
+    "id": 812,
+    "type": "classification",
+    "question": "采伐方式有哪些类型？"
+  },
+  {
+    "id": 813,
+    "type": "method",
+    "question": "如何进行采伐方式？"
+  },
+  {
+    "id": 814,
+    "type": "comparison",
+    "question": "采伐方式与护林防火有什么区别？"
+  },
+  {
+    "id": 815,
+    "type": "entity",
+    "question": "与采伐方式研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 816,
+    "type": "other",
+    "question": "请简述采伐方式的要点。"
+  },
+  {
+    "id": 817,
+    "type": "definition",
+    "question": "什么是伐区？"
+  },
+  {
+    "id": 818,
+    "type": "classification",
+    "question": "伐区有哪些类型？"
+  },
+  {
+    "id": 819,
+    "type": "method",
+    "question": "如何进行伐区？"
+  },
+  {
+    "id": 820,
+    "type": "comparison",
+    "question": "伐区与管护措施有什么区别？"
+  },
+  {
+    "id": 821,
+    "type": "entity",
+    "question": "与伐区研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 822,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲伐区？"
+  },
+  {
+    "id": 823,
+    "type": "definition",
+    "question": "什么是透光抚育？"
+  },
+  {
+    "id": 824,
+    "type": "classification",
+    "question": "透光抚育有哪些类型？"
+  },
+  {
+    "id": 825,
+    "type": "method",
+    "question": "如何进行透光抚育？"
+  },
+  {
+    "id": 826,
+    "type": "comparison",
+    "question": "透光抚育与造林作业设计有什么区别？"
+  },
+  {
+    "id": 827,
+    "type": "entity",
+    "question": "与透光抚育研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 828,
+    "type": "other",
+    "question": "请简述透光抚育的要点。"
+  },
+  {
+    "id": 829,
+    "type": "definition",
+    "question": "什么是保留木？"
+  },
+  {
+    "id": 830,
+    "type": "classification",
+    "question": "保留木有哪些类型？"
+  },
+  {
+    "id": 831,
+    "type": "method",
+    "question": "如何进行保留木？"
+  },
+  {
+    "id": 832,
+    "type": "comparison",
+    "question": "保留木与样地调查有什么区别？"
+  },
+  {
+    "id": 833,
+    "type": "entity",
+    "question": "与保留木研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 834,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲保留木？"
+  },
+  {
+    "id": 835,
+    "type": "definition",
+    "question": "什么是目标树？"
+  },
+  {
+    "id": 836,
+    "type": "classification",
+    "question": "目标树有哪些类型？"
+  },
+  {
+    "id": 837,
+    "type": "method",
+    "question": "如何进行目标树？"
+  },
+  {
+    "id": 838,
+    "type": "comparison",
+    "question": "目标树与胸径分布有什么区别？"
+  },
+  {
+    "id": 839,
+    "type": "entity",
+    "question": "与目标树研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 840,
+    "type": "other",
+    "question": "请简述目标树的要点。"
+  },
+  {
+    "id": 841,
+    "type": "definition",
+    "question": "什么是林分改造？"
+  },
+  {
+    "id": 842,
+    "type": "classification",
+    "question": "林分改造有哪些类型？"
+  },
+  {
+    "id": 843,
+    "type": "method",
+    "question": "如何进行林分改造？"
+  },
+  {
+    "id": 844,
+    "type": "comparison",
+    "question": "林分改造与胸径有什么区别？"
+  },
+  {
+    "id": 845,
+    "type": "entity",
+    "question": "与林分改造研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 846,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲林分改造？"
+  },
+  {
+    "id": 847,
+    "type": "definition",
+    "question": "什么是林分结构？"
+  },
+  {
+    "id": 848,
+    "type": "classification",
+    "question": "林分结构有哪些类型？"
+  },
+  {
+    "id": 849,
+    "type": "method",
+    "question": "如何进行林分结构？"
+  },
+  {
+    "id": 850,
+    "type": "comparison",
+    "question": "林分结构与树高有什么区别？"
+  },
+  {
+    "id": 851,
+    "type": "entity",
+    "question": "与林分结构研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 852,
+    "type": "other",
+    "question": "请简述林分结构的要点。"
+  },
+  {
+    "id": 853,
+    "type": "definition",
+    "question": "什么是郁闭度？"
+  },
+  {
+    "id": 854,
+    "type": "classification",
+    "question": "郁闭度有哪些类型？"
+  },
+  {
+    "id": 855,
+    "type": "method",
+    "question": "如何进行郁闭度？"
+  },
+  {
+    "id": 856,
+    "type": "comparison",
+    "question": "郁闭度与蓄积量有什么区别？"
+  },
+  {
+    "id": 857,
+    "type": "entity",
+    "question": "与郁闭度研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 858,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲郁闭度？"
+  },
+  {
+    "id": 859,
+    "type": "definition",
+    "question": "什么是郁闭后抚育？"
+  },
+  {
+    "id": 860,
+    "type": "classification",
+    "question": "郁闭后抚育有哪些类型？"
+  },
+  {
+    "id": 861,
+    "type": "method",
+    "question": "如何进行郁闭后抚育？"
+  },
+  {
+    "id": 862,
+    "type": "comparison",
+    "question": "郁闭后抚育与立木有什么区别？"
+  },
+  {
+    "id": 863,
+    "type": "entity",
+    "question": "与郁闭后抚育研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 864,
+    "type": "other",
+    "question": "请简述郁闭后抚育的要点。"
+  },
+  {
+    "id": 865,
+    "type": "definition",
+    "question": "什么是竞争木？"
+  },
+  {
+    "id": 866,
+    "type": "classification",
+    "question": "竞争木有哪些类型？"
+  },
+  {
+    "id": 867,
+    "type": "method",
+    "question": "如何进行竞争木？"
+  },
+  {
+    "id": 868,
+    "type": "comparison",
+    "question": "竞争木与林分有什么区别？"
+  },
+  {
+    "id": 869,
+    "type": "entity",
+    "question": "与竞争木研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 870,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲竞争木？"
+  },
+  {
+    "id": 871,
+    "type": "definition",
+    "question": "什么是促进木？"
+  },
+  {
+    "id": 872,
+    "type": "classification",
+    "question": "促进木有哪些类型？"
+  },
+  {
+    "id": 873,
+    "type": "method",
+    "question": "如何进行促进木？"
+  },
+  {
+    "id": 874,
+    "type": "comparison",
+    "question": "促进木与风折风险有什么区别？"
+  },
+  {
+    "id": 875,
+    "type": "entity",
+    "question": "与促进木研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 876,
+    "type": "other",
+    "question": "请简述促进木的要点。"
+  },
+  {
+    "id": 877,
+    "type": "definition",
+    "question": "什么是经营强度？"
+  },
+  {
+    "id": 878,
+    "type": "classification",
+    "question": "经营强度有哪些类型？"
+  },
+  {
+    "id": 879,
+    "type": "method",
+    "question": "如何进行经营强度？"
+  },
+  {
+    "id": 880,
+    "type": "comparison",
+    "question": "经营强度与林地稳定性有什么区别？"
+  },
+  {
+    "id": 881,
+    "type": "entity",
+    "question": "与经营强度研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 882,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲经营强度？"
+  },
+  {
+    "id": 883,
+    "type": "definition",
+    "question": "什么是伐后管理？"
+  },
+  {
+    "id": 884,
+    "type": "classification",
+    "question": "伐后管理有哪些类型？"
+  },
+  {
+    "id": 885,
+    "type": "method",
+    "question": "如何进行伐后管理？"
+  },
+  {
+    "id": 886,
+    "type": "comparison",
+    "question": "伐后管理与森林培育有什么区别？"
+  },
+  {
+    "id": 887,
+    "type": "entity",
+    "question": "与伐后管理研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 888,
+    "type": "other",
+    "question": "请简述伐后管理的要点。"
+  },
+  {
+    "id": 889,
+    "type": "definition",
+    "question": "什么是幼龄林？"
+  },
+  {
+    "id": 890,
+    "type": "classification",
+    "question": "幼龄林有哪些类型？"
+  },
+  {
+    "id": 891,
+    "type": "method",
+    "question": "如何进行幼龄林？"
+  },
+  {
+    "id": 892,
+    "type": "comparison",
+    "question": "幼龄林与营造林有什么区别？"
+  },
+  {
+    "id": 893,
+    "type": "entity",
+    "question": "与幼龄林研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 894,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲幼龄林？"
+  },
+  {
+    "id": 895,
+    "type": "definition",
+    "question": "什么是森林经营？"
+  },
+  {
+    "id": 896,
+    "type": "classification",
+    "question": "森林经营有哪些类型？"
+  },
+  {
+    "id": 897,
+    "type": "method",
+    "question": "如何进行森林经营？"
+  },
+  {
+    "id": 898,
+    "type": "comparison",
+    "question": "森林经营与森林保护有什么区别？"
+  },
+  {
+    "id": 899,
+    "type": "entity",
+    "question": "与森林经营研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 900,
+    "type": "other",
+    "question": "请简述森林经营的要点。"
+  },
+  {
+    "id": 901,
+    "type": "definition",
+    "question": "什么是森林经营方案？"
+  },
+  {
+    "id": 902,
+    "type": "classification",
+    "question": "森林经营方案有哪些类型？"
+  },
+  {
+    "id": 903,
+    "type": "method",
+    "question": "如何进行森林经营方案？"
+  },
+  {
+    "id": 904,
+    "type": "comparison",
+    "question": "森林经营方案与经营目标有什么区别？"
+  },
+  {
+    "id": 905,
+    "type": "entity",
+    "question": "与森林经营方案研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 906,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲森林经营方案？"
+  },
+  {
+    "id": 907,
+    "type": "definition",
+    "question": "什么是近自然经营？"
+  },
+  {
+    "id": 908,
+    "type": "classification",
+    "question": "近自然经营有哪些类型？"
+  },
+  {
+    "id": 909,
+    "type": "method",
+    "question": "如何进行近自然经营？"
+  },
+  {
+    "id": 910,
+    "type": "comparison",
+    "question": "近自然经营与经营措施有什么区别？"
+  },
+  {
+    "id": 911,
+    "type": "entity",
+    "question": "与近自然经营研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 912,
+    "type": "other",
+    "question": "请简述近自然经营的要点。"
+  },
+  {
+    "id": 913,
+    "type": "definition",
+    "question": "什么是森林抚育经营？"
+  },
+  {
+    "id": 914,
+    "type": "classification",
+    "question": "森林抚育经营有哪些类型？"
+  },
+  {
+    "id": 915,
+    "type": "method",
+    "question": "如何进行森林抚育经营？"
+  },
+  {
+    "id": 916,
+    "type": "comparison",
+    "question": "森林抚育经营与集约经营有什么区别？"
+  },
+  {
+    "id": 917,
+    "type": "entity",
+    "question": "与森林抚育经营研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 918,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲森林抚育经营？"
+  },
+  {
+    "id": 919,
+    "type": "definition",
+    "question": "什么是经营方案？"
+  },
+  {
+    "id": 920,
+    "type": "classification",
+    "question": "经营方案有哪些类型？"
+  },
+  {
+    "id": 921,
+    "type": "method",
+    "question": "如何进行经营方案？"
+  },
+  {
+    "id": 922,
+    "type": "comparison",
+    "question": "经营方案与生态经营有什么区别？"
+  },
+  {
+    "id": 923,
+    "type": "entity",
+    "question": "与经营方案研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 924,
+    "type": "other",
+    "question": "请简述经营方案的要点。"
+  },
+  {
+    "id": 925,
+    "type": "definition",
+    "question": "什么是防护林？"
+  },
+  {
+    "id": 926,
+    "type": "classification",
+    "question": "防护林有哪些类型？"
+  },
+  {
+    "id": 927,
+    "type": "method",
+    "question": "如何进行防护林？"
+  },
+  {
+    "id": 928,
+    "type": "comparison",
+    "question": "防护林与施肥有什么区别？"
+  },
+  {
+    "id": 929,
+    "type": "entity",
+    "question": "与防护林研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 930,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲防护林？"
+  },
+  {
+    "id": 931,
+    "type": "definition",
+    "question": "什么是水土保持林？"
+  },
+  {
+    "id": 932,
+    "type": "classification",
+    "question": "水土保持林有哪些类型？"
+  },
+  {
+    "id": 933,
+    "type": "method",
+    "question": "如何进行水土保持林？"
+  },
+  {
+    "id": 934,
+    "type": "comparison",
+    "question": "水土保持林与基肥有什么区别？"
+  },
+  {
+    "id": 935,
+    "type": "entity",
+    "question": "与水土保持林研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 936,
+    "type": "other",
+    "question": "请简述水土保持林的要点。"
+  },
+  {
+    "id": 937,
+    "type": "definition",
+    "question": "什么是水源涵养林？"
+  },
+  {
+    "id": 938,
+    "type": "classification",
+    "question": "水源涵养林有哪些类型？"
+  },
+  {
+    "id": 939,
+    "type": "method",
+    "question": "如何进行水源涵养林？"
+  },
+  {
+    "id": 940,
+    "type": "comparison",
+    "question": "水源涵养林与追肥有什么区别？"
+  },
+  {
+    "id": 941,
+    "type": "entity",
+    "question": "与水源涵养林研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 942,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲水源涵养林？"
+  },
+  {
+    "id": 943,
+    "type": "definition",
+    "question": "什么是农田防护林？"
+  },
+  {
+    "id": 944,
+    "type": "classification",
+    "question": "农田防护林有哪些类型？"
+  },
+  {
+    "id": 945,
+    "type": "method",
+    "question": "如何进行农田防护林？"
+  },
+  {
+    "id": 946,
+    "type": "comparison",
+    "question": "农田防护林与灌溉有什么区别？"
+  },
+  {
+    "id": 947,
+    "type": "entity",
+    "question": "与农田防护林研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 948,
+    "type": "other",
+    "question": "请简述农田防护林的要点。"
+  },
+  {
+    "id": 949,
+    "type": "definition",
+    "question": "什么是护林防火？"
+  },
+  {
+    "id": 950,
+    "type": "classification",
+    "question": "护林防火有哪些类型？"
+  },
+  {
+    "id": 951,
+    "type": "method",
+    "question": "如何进行护林防火？"
+  },
+  {
+    "id": 952,
+    "type": "comparison",
+    "question": "护林防火与排水有什么区别？"
+  },
+  {
+    "id": 953,
+    "type": "entity",
+    "question": "与护林防火研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 954,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲护林防火？"
+  },
+  {
+    "id": 955,
+    "type": "definition",
+    "question": "什么是管护措施？"
+  },
+  {
+    "id": 956,
+    "type": "classification",
+    "question": "管护措施有哪些类型？"
+  },
+  {
+    "id": 957,
+    "type": "method",
+    "question": "如何进行管护措施？"
+  },
+  {
+    "id": 958,
+    "type": "comparison",
+    "question": "管护措施与土壤改良有什么区别？"
+  },
+  {
+    "id": 959,
+    "type": "entity",
+    "question": "与管护措施研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 960,
+    "type": "other",
+    "question": "请简述管护措施的要点。"
+  },
+  {
+    "id": 961,
+    "type": "definition",
+    "question": "什么是造林作业设计？"
+  },
+  {
+    "id": 962,
+    "type": "classification",
+    "question": "造林作业设计有哪些类型？"
+  },
+  {
+    "id": 963,
+    "type": "method",
+    "question": "如何进行造林作业设计？"
+  },
+  {
+    "id": 964,
+    "type": "comparison",
+    "question": "造林作业设计与土壤养分有什么区别？"
+  },
+  {
+    "id": 965,
+    "type": "entity",
+    "question": "与造林作业设计研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 966,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲造林作业设计？"
+  },
+  {
+    "id": 967,
+    "type": "definition",
+    "question": "什么是样地调查？"
+  },
+  {
+    "id": 968,
+    "type": "classification",
+    "question": "样地调查有哪些类型？"
+  },
+  {
+    "id": 969,
+    "type": "method",
+    "question": "如何进行样地调查？"
+  },
+  {
+    "id": 970,
+    "type": "comparison",
+    "question": "样地调查与土壤质量有什么区别？"
+  },
+  {
+    "id": 971,
+    "type": "entity",
+    "question": "与样地调查研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 972,
+    "type": "other",
+    "question": "请简述样地调查的要点。"
+  },
+  {
+    "id": 973,
+    "type": "definition",
+    "question": "什么是胸径分布？"
+  },
+  {
+    "id": 974,
+    "type": "classification",
+    "question": "胸径分布有哪些类型？"
+  },
+  {
+    "id": 975,
+    "type": "method",
+    "question": "如何进行胸径分布？"
+  },
+  {
+    "id": 976,
+    "type": "comparison",
+    "question": "胸径分布与土壤管理有什么区别？"
+  },
+  {
+    "id": 977,
+    "type": "entity",
+    "question": "与胸径分布研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 978,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲胸径分布？"
+  },
+  {
+    "id": 979,
+    "type": "definition",
+    "question": "什么是胸径？"
+  },
+  {
+    "id": 980,
+    "type": "classification",
+    "question": "胸径有哪些类型？"
+  },
+  {
+    "id": 981,
+    "type": "method",
+    "question": "如何进行胸径？"
+  },
+  {
+    "id": 982,
+    "type": "comparison",
+    "question": "胸径与土壤修复有什么区别？"
+  },
+  {
+    "id": 983,
+    "type": "entity",
+    "question": "与胸径研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 984,
+    "type": "other",
+    "question": "请简述胸径的要点。"
+  },
+  {
+    "id": 985,
+    "type": "definition",
+    "question": "什么是树高？"
+  },
+  {
+    "id": 986,
+    "type": "classification",
+    "question": "树高有哪些类型？"
+  },
+  {
+    "id": 987,
+    "type": "method",
+    "question": "如何进行树高？"
+  },
+  {
+    "id": 988,
+    "type": "comparison",
+    "question": "树高与除草有什么区别？"
+  },
+  {
+    "id": 989,
+    "type": "entity",
+    "question": "与树高研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 990,
+    "type": "other",
+    "question": "教材中哪一章/哪一节讲树高？"
+  },
+  {
+    "id": 991,
+    "type": "definition",
+    "question": "什么是蓄积量？"
+  },
+  {
+    "id": 992,
+    "type": "classification",
+    "question": "蓄积量有哪些类型？"
+  },
+  {
+    "id": 993,
+    "type": "method",
+    "question": "如何进行蓄积量？"
+  },
+  {
+    "id": 994,
+    "type": "comparison",
+    "question": "蓄积量与松土有什么区别？"
+  },
+  {
+    "id": 995,
+    "type": "entity",
+    "question": "与蓄积量研究相关的代表人物有哪些？"
+  },
+  {
+    "id": 996,
+    "type": "other",
+    "question": "请简述蓄积量的要点。"
+  },
+  {
+    "id": 997,
+    "type": "definition",
+    "question": "什么是立木？"
+  },
+  {
+    "id": 998,
+    "type": "classification",
+    "question": "立木有哪些类型？"
+  },
+  {
+    "id": 999,
+    "type": "method",
+    "question": "如何进行立木？"
+  },
+  {
+    "id": 1000,
+    "type": "comparison",
+    "question": "立木与中耕有什么区别？"
+  }
+]

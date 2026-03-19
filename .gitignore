@@ -110,3 +110,6 @@ temp/
 .webdev/
 
 *.tar.gz
+
+# Benchmark artifacts
+tools/benchmark/results/
