@@ -55,6 +55,7 @@ type SearchProfile = {
   coreTerms: string[];
   broadTerms: string[];
   scoringTerms: string[];
+  anchorTerms: string[];
   queryMode: "definition" | "classification" | "method" | "general";
 };
 
@@ -477,6 +478,7 @@ async function emergencyLikeFallbackSearch(
       const contentScore = scoreChunk(row.content, scoringTerms, question, row.chapter ?? undefined, {
         stats,
         intentTerms: profile.intentTerms,
+        anchorTerms: profile.anchorTerms,
         queryMode: profile.queryMode,
       });
       const definitionBoost = hasDefinitionSignal(row.content) ? 1.8 : 0;
@@ -849,6 +851,21 @@ const DOMAIN_VOCAB = Array.from(
 
 const DOMAIN_VOCAB_KEYS = new Set(DOMAIN_VOCAB.map((term) => normalizeForComparison(term)));
 const QUESTION_INTENT_KEYS = new Set(QUESTION_INTENT_WORDS.map((term) => normalizeForComparison(term)));
+const ANCHOR_STOPWORDS = new Set([
+  ...Array.from(QUESTION_STOP_WORDS),
+  "做到",
+  "做",
+  "有关",
+  "相关",
+  "合理",
+  "主要",
+  "一般",
+  "是否",
+  "怎么做",
+  "如何做",
+  "请回答",
+  "详述",
+]);
 
 const SYNONYM_REVERSE_MAP = new Map<string, string[]>();
 for (const [key, syns] of Object.entries(SYNONYM_MAP)) {
@@ -896,6 +913,20 @@ function detectQuestionMode(question: string): SearchProfile["queryMode"] {
   return "general";
 }
 
+function buildAnchorTerms(question: string, questionLang: "zh" | "en", candidates: string[]): string[] {
+  const normalizedQuestion = normalizeForComparison(question);
+  const anchors = uniqueSortedTerms(candidates).filter((term) => {
+    const key = normalizeForComparison(term);
+    if (!key || key.length < (questionLang === "en" ? 4 : 2)) return false;
+    if (QUESTION_INTENT_KEYS.has(key)) return false;
+    if (ANCHOR_STOPWORDS.has(term) || ANCHOR_STOPWORDS.has(key)) return false;
+    if (questionLang === "zh" && /(什么|如何|怎么|怎样|哪些|有哪|做到|有关|相关)/.test(term)) return false;
+    if (questionLang === "en" && /\b(what|how|which|list|define|method|step|type)\b/i.test(term)) return false;
+    return normalizedQuestion.includes(key);
+  });
+  return anchors.slice(0, questionLang === "en" ? 3 : 4);
+}
+
 function buildSearchProfile(question: string, questionLang: "zh" | "en"): SearchProfile {
   const normalizedQuestion = normalizeForLookup(question);
   const strippedQuestion = stripQuestionWords(normalizedQuestion).trim();
@@ -935,6 +966,12 @@ function buildSearchProfile(question: string, questionLang: "zh" | "en"): Search
     ...intentTerms,
     ...broadTerms,
   ]).slice(0, scoringLimit);
+  const anchorTerms = buildAnchorTerms(question, questionLang, [
+    ...exactPhrases,
+    ...coreTerms,
+    ...candidateTerms,
+    strippedQuestion,
+  ]);
 
   return {
     cleanedQuestion: strippedQuestion,
@@ -943,6 +980,7 @@ function buildSearchProfile(question: string, questionLang: "zh" | "en"): Search
     coreTerms,
     broadTerms,
     scoringTerms,
+    anchorTerms,
     queryMode,
   };
 }
@@ -1097,6 +1135,7 @@ function scoreChunk(
   options?: {
     stats?: TermStats;
     intentTerms?: string[];
+    anchorTerms?: string[];
     queryMode?: SearchProfile["queryMode"];
   }
 ): number {
@@ -1107,6 +1146,7 @@ function scoreChunk(
   const cleanedQuestion = normalizeForComparison(stripQuestionWords(originalQuestion));
   const stats = options?.stats;
   const intentTerms = options?.intentTerms ?? [];
+  const anchorTerms = options?.anchorTerms ?? [];
   const queryMode = options?.queryMode ?? "general";
   const coreKeywords = keywords.filter((kw) => {
     const normalized = normalizeForComparison(kw);
@@ -1200,11 +1240,29 @@ function scoreChunk(
     leadBonus += 0.8;
   }
 
+  let anchorBonus = 0;
+  let anchorHit = 0;
+  for (const anchor of anchorTerms) {
+    const key = normalizeForComparison(anchor);
+    if (!key) continue;
+    const contentHit = compactContent.includes(key);
+    const chapterHit = compactChapter.includes(key);
+    if (contentHit || chapterHit) {
+      anchorHit++;
+      anchorBonus += Math.min(6.5, key.length * 0.92);
+      if (compactContent.slice(0, 160).includes(key)) anchorBonus += 1.4;
+      if (chapterHit) anchorBonus += 0.8;
+    }
+  }
+  if (queryMode !== "general" && anchorTerms.length > 0 && anchorHit === 0) {
+    anchorBonus -= 2.8;
+  }
+
   const repetitionPenalty = computeRepetitionPenalty(content);
   const tfPenalty = maxTf > 5 ? Math.max(0.82, 1 - (maxTf - 5) * 0.03) : 1;
   const baseScore = bm25Score * (0.6 + 0.4 * coverage);
 
-  return (baseScore + phraseBonus + chapterBonus + structureBonus + leadBonus) * repetitionPenalty * tfPenalty;
+  return (baseScore + phraseBonus + chapterBonus + structureBonus + leadBonus + anchorBonus) * repetitionPenalty * tfPenalty;
 }
 
 function computeRepetitionPenalty(content: string): number {
@@ -1591,6 +1649,7 @@ export async function semanticSearch(
         score:
           scoreChunk(row.content, route.terms, question, row.chapter ?? undefined, {
             intentTerms: profile.intentTerms,
+            anchorTerms: profile.anchorTerms,
             queryMode: profile.queryMode,
           }) * (isNoisyChunk(row) ? 0.35 : 1),
       }))
@@ -1653,6 +1712,7 @@ export async function semanticSearch(
     candidate.keywordScore = scoreChunk(candidate.content, profile.scoringTerms, question, candidate.chapter ?? undefined, {
       stats,
       intentTerms: profile.intentTerms,
+      anchorTerms: profile.anchorTerms,
       queryMode: profile.queryMode,
     });
   }
@@ -1687,6 +1747,7 @@ export async function semanticSearch(
     candidate.keywordScore = scoreChunk(candidate.content, profile.scoringTerms, question, candidate.chapter ?? undefined, {
       stats,
       intentTerms: profile.intentTerms,
+      anchorTerms: profile.anchorTerms,
       queryMode: profile.queryMode,
     });
   }

@@ -512,6 +512,8 @@ ${buildAnswerBlueprint(analysis, questionLang)}
 - 直接列与问题最相关的条目，第一句必须直接进入答案，不要写导语。
 - 仅在确实缺失且用户明确追问缺失内容时，用1句短注说明，不要扩展解释过程。
 ${analysis.conciseDefinition ? "- 这是简洁定义题：只用2-4句话回答定义本身，禁止历史背景/分类/目的等延伸。" : ""}
+${analysis.intent === "method" ? "- 格式硬性要求：必须使用 `## 核心结论` + `## 具体做法` 两个二级标题；“具体做法”下用编号列表逐条写。" : ""}
+${analysis.intent === "classification" ? "- 格式硬性要求：必须使用 `## 类型总览` + `## 逐项说明` 两个二级标题；“逐项说明”下用编号列表逐条写。" : ""}
 
 【教材内容片段（共 ${chunks.length} 条）】
 ${chunkTexts}
@@ -600,7 +602,7 @@ function focusResultsByChapter(
   analysis: QuestionAnalysis
 ): SearchResult[] {
   if (searchResults.length <= 6) return searchResults;
-  if (analysis.expectsEnumeration || analysis.requestDetail) return searchResults;
+  if (analysis.requestDetail) return searchResults;
 
   const focusTerms = pickFocusTerms(question, questionLang, analysis);
   if (focusTerms.length === 0) return searchResults;
@@ -819,33 +821,37 @@ async function callLLM(
   }
   const sourceLimit = pickSourceLimit(questionLang, analysis);
   const materialTitles = Array.from(new Set(effectiveResults.map((r) => r.materialTitle)));
-  const extractive =
-    analysis.conciseAnswer
-      ? buildExtractiveAnswer(question, effectiveResults, questionLang, analysis)
-      : buildEnumerativeExtractiveAnswer(question, effectiveResults, questionLang, analysis);
-  if (extractive) {
-    const conciseResults = effectiveResults.filter((r) => extractive.usedChunkIds.includes(r.chunkId));
-    const sources = buildSources(conciseResults, true, keywords, sourceLimit);
-    return {
-      answer: extractive.answer,
-      sources,
-      modelUsed: "extractive",
-      foundInMaterials: true,
-      confidence: 0.9,
-    };
-  }
 
   const systemPrompt = buildSystemPrompt(materialTitles, questionLang, materialLang, analysis);
   const userMessage = buildUserPrompt(question, effectiveResults, questionLang, analysis);
 
-  const llmResponse = await invokeLLMWithConfig(
-    [{ role: "user", content: userMessage }],
-    systemPrompt,
-    {
-      temperature: analysis.conciseAnswer ? 0 : undefined,
-      maxTokens: analysis.conciseAnswer ? 420 : undefined,
+  let llmResponse: { content: string; model: string };
+  try {
+    llmResponse = await invokeLLMWithConfig(
+      [{ role: "user", content: userMessage }],
+      systemPrompt,
+      {
+        temperature: analysis.conciseAnswer ? 0 : undefined,
+        maxTokens: analysis.conciseAnswer ? 420 : undefined,
+      }
+    );
+  } catch {
+    const extractiveFallback =
+      buildExtractiveAnswer(question, effectiveResults, questionLang, analysis) ??
+      buildEnumerativeExtractiveAnswer(question, effectiveResults, questionLang, analysis);
+    if (extractiveFallback) {
+      const conciseResults = effectiveResults.filter((r) => extractiveFallback.usedChunkIds.includes(r.chunkId));
+      const sources = buildSources(conciseResults, true, keywords, sourceLimit);
+      return {
+        answer: enforceReadableStructure(extractiveFallback.answer, analysis, questionLang),
+        sources,
+        modelUsed: "extractive-fallback",
+        foundInMaterials: true,
+        confidence: 0.62,
+      };
     }
-  );
+    throw new Error("LLM invoke failed and no extractive fallback available");
+  }
 
   let answer = stripCitationMarkers(llmResponse.content);
 
@@ -859,6 +865,7 @@ async function callLLM(
     answer = enforceConciseDefinition(answer, questionLang);
   }
   answer = removeAnswerBoilerplate(answer, questionLang, analysis);
+  answer = enforceReadableStructure(answer, analysis, questionLang);
 
   const localReview = assessAnswerLocally(answer, effectiveResults, analysis, questionLang);
   const grounding = assessGrounding(answer, effectiveResults, questionLang);
@@ -904,7 +911,11 @@ async function callLLM(
         const regenParsed = parseLLMOutput(regenerated.content);
         const regenAnswer = stripCitationMarkers(regenParsed ? regenParsed.answer : regenerated.content);
         if (regenAnswer.replace(/\s+/g, "").length >= answer.replace(/\s+/g, "").length * 0.8) {
-          answer = removeAnswerBoilerplate(regenAnswer, questionLang, analysis);
+          answer = enforceReadableStructure(
+            removeAnswerBoilerplate(regenAnswer, questionLang, analysis),
+            analysis,
+            questionLang
+          );
         }
       } catch {
         // 重写失败时保留原答案
@@ -917,6 +928,7 @@ async function callLLM(
     answer = appendDegradationNote(answer, finalReview.downgradeNote);
   }
   answer = removeAnswerBoilerplate(answer, questionLang, analysis);
+  answer = enforceReadableStructure(answer, analysis, questionLang);
 
   // 判断是否在教材中找到了内容
   const notFoundPhrases = ["未涉及", "not cover", "没有相关", "未找到", "not found"];
@@ -1421,6 +1433,54 @@ function removeAnswerBoilerplate(
   }
 
   return cleaned;
+}
+
+function enforceReadableStructure(
+  answer: string,
+  analysis: QuestionAnalysis,
+  questionLang: "zh" | "en"
+): string {
+  if (analysis.conciseAnswer) return answer.trim();
+  const trimmed = answer.trim();
+  if (!trimmed) return trimmed;
+
+  const lines = trimmed.split("\n");
+  const hasHeading = lines.some((line) => /^#{1,3}\s+/.test(line.trim()));
+  const bulletLikeCount = lines.filter((line) => /^\s*[-*•]\s+/.test(line)).length;
+  const numberedCount = lines.filter((line) => /^\s*\d+[.)、．]\s+/.test(line)).length;
+
+  if (hasHeading) return trimmed;
+  if (bulletLikeCount < 3 && numberedCount < 3) return trimmed;
+
+  const titleMapZh: Record<string, string> = {
+    classification: "## 关键清单",
+    method: "## 实施要点",
+    condition: "## 关键条件",
+    advantage: "## 要点汇总",
+  };
+  const titleMapEn: Record<string, string> = {
+    classification: "## Key Items",
+    method: "## Practical Steps",
+    condition: "## Key Requirements",
+    advantage: "## Key Points",
+  };
+  const title =
+    questionLang === "en"
+      ? (titleMapEn[analysis.intent] ?? "## Key Points")
+      : (titleMapZh[analysis.intent] ?? "## 关键要点");
+
+  let idx = 1;
+  const normalizedLines = lines.map((line) => {
+    if (/^\s*[-*•]\s+/.test(line)) {
+      return `${idx++}. ${line.replace(/^\s*[-*•]\s+/, "")}`;
+    }
+    if (/^\s*\d+[.)、．]\s+/.test(line)) {
+      return `${idx++}. ${line.replace(/^\s*\d+[.)、．]\s+/, "")}`;
+    }
+    return line;
+  });
+
+  return `${title}\n\n${normalizedLines.join("\n")}`.replace(/\n{3,}/g, "\n\n").trim();
 }
 
 function buildSources(
@@ -2171,7 +2231,9 @@ function buildEnumerativeExtractiveAnswer(
   questionLang: "zh" | "en",
   analysis: QuestionAnalysis
 ): { answer: string; usedChunkIds: number[] } | null {
-  if (!analysis.expectsEnumeration || analysis.requestDetail) return null;
+  const enableEnumExtractive = process.env.ENABLE_ENUM_EXTRACTIVE === "true";
+  if (!enableEnumExtractive) return null;
+  if (!analysis.expectsEnumeration || analysis.requestDetail || analysis.intent === "method") return null;
   if (searchResults.length === 0) return null;
 
   const keywords = (questionLang === "en" ? extractKeywordsEn(question) : extractKeywords(question))
@@ -2358,20 +2420,35 @@ export async function generateAnswerStream(
     }
 
     const keywords = questionLanguage === "en" ? extractKeywordsEn(req.question) : extractKeywords(req.question);
-    const extractive =
-      questionAnalysis.conciseAnswer
-        ? buildExtractiveAnswer(req.question, effectiveResults, questionLanguage, questionAnalysis)
-        : buildEnumerativeExtractiveAnswer(req.question, effectiveResults, questionLanguage, questionAnalysis);
-    if (extractive) {
-      const conciseResults = effectiveResults.filter((r) => extractive.usedChunkIds.includes(r.chunkId));
+
+    const materialTitles = Array.from(new Set(effectiveResults.map((r) => r.materialTitle)));
+    const systemPrompt = buildSystemPrompt(materialTitles, questionLanguage, questionLanguage, questionAnalysis);
+    const userMessage = buildUserPrompt(req.question, effectiveResults, questionLanguage, questionAnalysis);
+    const sources = buildSources(effectiveResults, true, keywords, sourceLimit);
+
+    // V2: 先生成完整答案并完成质量评估，再流式输出给用户
+    // 避免用户看到一个答案后又被替换成另一个答案
+    let llmResponse: { content: string; model: string };
+    try {
+      llmResponse = await invokeLLMWithConfig(
+        [{ role: "user", content: userMessage }],
+        systemPrompt
+      );
+    } catch {
+      const extractiveFallback =
+        buildExtractiveAnswer(req.question, effectiveResults, questionLanguage, questionAnalysis) ??
+        buildEnumerativeExtractiveAnswer(req.question, effectiveResults, questionLanguage, questionAnalysis);
+      if (!extractiveFallback) throw new Error("LLM invoke failed and no fallback answer");
+
+      const conciseResults = effectiveResults.filter((r) => extractiveFallback.usedChunkIds.includes(r.chunkId));
       const sources = buildSources(conciseResults, true, keywords, sourceLimit);
-      const answer = extractive.answer;
+      const fullAnswer = enforceReadableStructure(extractiveFallback.answer, questionAnalysis, questionLanguage);
       const responseTimeMs = Date.now() - startTime;
       const queryId = await createQuery({
         question: req.question,
-        answer,
+        answer: fullAnswer,
         sources,
-        modelUsed: "extractive",
+        modelUsed: "extractive-fallback",
         responseTimeMs,
         visitorIp: req.visitorIp,
         visitorCity: req.visitorCity,
@@ -2382,29 +2459,17 @@ export async function generateAnswerStream(
       });
       onMeta({
         sources,
-        modelUsed: "extractive",
+        modelUsed: "extractive-fallback",
         foundInMaterials: true,
-        confidence: 0.9,
+        confidence: 0.62,
         questionLanguage,
         queryId,
         responseTimeMs,
       });
-      onToken(answer);
-      onDone(answer);
+      onToken(fullAnswer);
+      onDone(fullAnswer);
       return;
     }
-
-    const materialTitles = Array.from(new Set(effectiveResults.map((r) => r.materialTitle)));
-    const systemPrompt = buildSystemPrompt(materialTitles, questionLanguage, questionLanguage, questionAnalysis);
-    const userMessage = buildUserPrompt(req.question, effectiveResults, questionLanguage, questionAnalysis);
-    const sources = buildSources(effectiveResults, true, keywords, sourceLimit);
-
-    // V2: 先生成完整答案并完成质量评估，再流式输出给用户
-    // 避免用户看到一个答案后又被替换成另一个答案
-    const llmResponse = await invokeLLMWithConfig(
-      [{ role: "user", content: userMessage }],
-      systemPrompt
-    );
     const model = llmResponse.model;
 
     let fullAnswer = stripCitationMarkers(llmResponse.content);
@@ -2412,6 +2477,7 @@ export async function generateAnswerStream(
       fullAnswer = enforceConciseDefinition(fullAnswer, questionLanguage);
     }
     fullAnswer = removeAnswerBoilerplate(fullAnswer, questionLanguage, questionAnalysis);
+    fullAnswer = enforceReadableStructure(fullAnswer, questionAnalysis, questionLanguage);
 
     // 统一质量管线（与 sync 模式一致）
     const localReview = assessAnswerLocally(fullAnswer, effectiveResults, questionAnalysis, questionLanguage);
@@ -2446,7 +2512,11 @@ export async function generateAnswerStream(
           const regenParsed = parseLLMOutput(regenerated.content);
           const regenAnswer = stripCitationMarkers(regenParsed ? regenParsed.answer : regenerated.content);
           if (regenAnswer.replace(/\s+/g, "").length >= fullAnswer.replace(/\s+/g, "").length * 0.8) {
-            fullAnswer = removeAnswerBoilerplate(regenAnswer, questionLanguage, questionAnalysis);
+            fullAnswer = enforceReadableStructure(
+              removeAnswerBoilerplate(regenAnswer, questionLanguage, questionAnalysis),
+              questionAnalysis,
+              questionLanguage
+            );
           }
         } catch {
           // 重写失败时保留原答案
@@ -2462,6 +2532,7 @@ export async function generateAnswerStream(
       fullAnswer = appendDegradationNote(fullAnswer, finalReview.downgradeNote);
     }
     fullAnswer = removeAnswerBoilerplate(fullAnswer, questionLanguage, questionAnalysis);
+    fullAnswer = enforceReadableStructure(fullAnswer, questionAnalysis, questionLanguage);
 
     const responseTimeMs = Date.now() - startTime;
 
