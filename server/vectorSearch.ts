@@ -1239,6 +1239,8 @@ export async function semanticSearch(
   const strictTerms = uniqueSortedTerms(profile.coreTerms.slice(0, 5));
   const phraseTerms = uniqueSortedTerms([...profile.exactPhrases, ...profile.intentTerms]).slice(0, 8);
   const broadTerms = profile.broadTerms.slice(0, 18);
+  console.log(`[HybridSearch] question="${question}", lang=${questionLang}, langFilter=${languageFilter}, useEmb=${useEmbedding}`);
+  console.log(`[HybridSearch] strictTerms=[${strictTerms.join(',')}], phraseTerms=[${phraseTerms.join(',')}], broadTerms=[${broadTerms.join(',')}]`);
   const routePlan: Array<{
     route: RouteName;
     terms: string[];
@@ -1296,6 +1298,8 @@ export async function semanticSearch(
   }
   if (embeddingResults.length > 0) {
     console.log(`[HybridSearch] Embedding search returned ${embeddingResults.length} candidates (top score: ${embeddingResults[0].similarity.toFixed(3)})`);
+  } else {
+    console.log(`[HybridSearch] Embedding search returned 0 candidates (useEmbedding=${useEmbedding})`);
   }
 
   for (const { route, rows: routeRows } of routeResults) {
@@ -1315,6 +1319,8 @@ export async function semanticSearch(
       candidate.recallScore += route.weight / (index + 1.5);
     });
   }
+
+  console.log(`[HybridSearch] After keyword routes: candidateMap.size=${candidateMap.size}, embeddingResults=${embeddingResults.length}`);
 
   // V2: 将 Embedding-only 候选（关键词未命中的）补入候选集
   // 需要从 DB 回查这些 chunk 的 content/chapter 等详情
@@ -1346,7 +1352,12 @@ export async function semanticSearch(
     }
   }
 
-  if (candidateMap.size === 0) return [];
+  console.log(`[HybridSearch] After embedding-only merge: candidateMap.size=${candidateMap.size}, embeddingOnlyIds=${embeddingOnlyIds.length}`);
+
+  if (candidateMap.size === 0) {
+    console.log(`[HybridSearch] candidateMap is empty, returning []`);
+    return [];
+  }
 
   let candidates = Array.from(candidateMap.values());
   let stats = countTermStats(candidates, profile.scoringTerms);
@@ -1421,8 +1432,13 @@ export async function semanticSearch(
   }
 
   candidates.sort((a, b) => b.finalScore - a.finalScore);
+  if (candidates.length > 0) {
+    const top3 = candidates.slice(0, 3);
+    console.log(`[HybridSearch] Before diversity: ${candidates.length} candidates, top3 finalScores=[${top3.map(c => c.finalScore.toFixed(4)).join(', ')}], embScores=[${top3.map(c => (embeddingScoreMap.get(c.id) ?? 0).toFixed(3)).join(', ')}]`);
+  }
   const topResults = applyDiversitySelection(candidates, topK).filter((candidate) => candidate.finalScore > 0);
 
+  console.log(`[HybridSearch] Final: ${topResults.length} results after diversity+filter (topK=${topK})`);
   if (topResults.length === 0) return [];
 
   const matIds = Array.from(new Set(topResults.map((c) => c.materialId)));

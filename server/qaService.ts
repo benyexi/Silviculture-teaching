@@ -1879,6 +1879,7 @@ export async function generateAnswerStream(
   const questionAnalysis = detectQuestionIntent(req.question, questionLanguage);
   const activeConfig = await getActiveLlmConfig();
   const useRAG = activeConfig?.useRAG ?? false;
+  console.log(`[QA] question="${req.question}", lang=${questionLanguage}, useRAG=${useRAG}, hasConfig=${!!activeConfig}`);
 
   // 检查缓存
   const cached = getCachedAnswer(req.question);
@@ -1920,6 +1921,10 @@ export async function generateAnswerStream(
     } else {
       searchResults = await semanticSearch(req.question, undefined, pickTopK("zh", questionAnalysis), "zh", useRAG);
     }
+    console.log(`[QA] searchResults.length=${searchResults.length}, conciseDefinition=${questionAnalysis.conciseDefinition}`);
+    if (searchResults.length > 0) {
+      console.log(`[QA] top result: similarity=${searchResults[0].similarity.toFixed(4)}, content=${searchResults[0].content.slice(0, 80)}`);
+    }
     let effectiveResults = questionAnalysis.conciseDefinition
       ? [...searchResults]
       : focusResultsByChapter(req.question, searchResults, questionLanguage, questionAnalysis);
@@ -1932,6 +1937,7 @@ export async function generateAnswerStream(
       );
     }
     const sourceLimit = pickSourceLimit(questionLanguage, questionAnalysis);
+    console.log(`[QA] effectiveResults.length=${effectiveResults.length} (after focus/enrich)`);
 
     if (effectiveResults.length === 0) {
       const answer = questionLanguage === "en"
