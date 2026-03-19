@@ -291,23 +291,96 @@ async function fetchChunkDetails(
   return map;
 }
 
-type FallbackMergedRow = CandidateRow & {
+type FallbackSearchRow = CandidateRow & {
   materialTitle: string;
   hitCount: number;
-  matchedTerms: Set<string>;
+  matchedTerms: string[];
+  noisePenalty: number;
 };
 
+function isNumericLikeChapter(chapter: string): boolean {
+  const trimmed = chapter.trim();
+  if (!trimmed) return false;
+  if (/^(?:\d+(?:\.\d+){0,6}%?)$/.test(trimmed)) return true;
+  if (/^[\d.%\-]+$/.test(trimmed) && !/[\u4e00-\u9fa5a-z]/i.test(trimmed)) return true;
+  return false;
+}
+
+function hasDefinitionSignal(text: string): boolean {
+  return /(是指|指的是|定义为|定义是|概念|含义|是研究|是一门|是.*?学科|\b(is|means|refers to|defined as|definition|concept)\b)/i.test(text);
+}
+
+function looksLikeCatalogBlock(text: string): boolean {
+  const lines = text
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (lines.length < 5) return false;
+
+  const probe = lines.slice(0, 12);
+  let shortLines = 0;
+  let numberedLines = 0;
+  for (const line of probe) {
+    if (line.length <= 28) shortLines++;
+    if (
+      /^(\d+(?:\.\d+){1,6}|[一二三四五六七八九十]+[、．.)]|\(?\d+[)）.、．]|[A-Za-z][.)])/.test(line)
+    ) {
+      numberedLines++;
+    }
+  }
+
+  return shortLines >= Math.ceil(probe.length * 0.7) && numberedLines >= 3;
+}
+
+function isNoisyChunk(row: CandidateRow): boolean {
+  const content = row.content.trim();
+  if (!content) return true;
+
+  const head = content.slice(0, 96).trim();
+  if (
+    /^(目录|目录页|参考文献|复习思考题|思考题|习题|练习题|附录|编者|编委|前言|preface|acknowledg(e)?ments?|contents?)\b/i.test(
+      head
+    )
+  ) {
+    return true;
+  }
+
+  if (looksLikeCatalogBlock(content)) return true;
+
+  const chapter = (row.chapter || "").trim();
+  if (chapter && isNumericLikeChapter(chapter)) {
+    const informative = content.length >= 120 && hasDefinitionSignal(content);
+    const enumerative = containsEnumerationMarkers(content);
+    if (!informative && !enumerative && content.length < 220) return true;
+  }
+
+  return false;
+}
+
 function buildEmergencyTerms(question: string, questionLang: "zh" | "en"): string[] {
-  const stripped = stripQuestionWords(normalizeForLookup(question)).trim();
-  const kw = questionLang === "en" ? extractKeywordsEn(question) : extractKeywords(question);
-  return uniqueSortedTerms([
-    stripped,
-    ...kw,
-    ...(stripped && stripped.length >= 2 && stripped.length <= 24 ? [stripped] : []),
-  ])
-    .map((t) => t.trim())
-    .filter((t) => normalizeForComparison(t).length >= (questionLang === "en" ? 3 : 2))
-    .slice(0, 8);
+  const stripped = normalizeForLookup(question);
+  const cleanedQuestion =
+    questionLang === "en"
+      ? stripped
+      : stripQuestionWords(stripped)
+          .trim()
+          .replace(/\s+/g, " ");
+  const baseKeywords = questionLang === "en" ? extractKeywordsEn(question) : extractKeywords(question);
+
+  const candidateTerms = uniqueSortedTerms([
+    cleanedQuestion,
+    ...baseKeywords,
+    ...(questionLang === "zh" && cleanedQuestion.length >= 2 && cleanedQuestion.length <= 24 ? [cleanedQuestion] : []),
+  ]);
+
+  return candidateTerms
+    .filter((term) => {
+      const normalized = normalizeForComparison(term);
+      if (!normalized) return false;
+      if (questionLang === "en") return normalized.length >= 3;
+      return normalized.length >= 2 && normalized !== "什么" && normalized !== "哪些";
+    })
+    .slice(0, 10);
 }
 
 async function emergencyLikeFallbackSearch(
@@ -315,60 +388,73 @@ async function emergencyLikeFallbackSearch(
   question: string,
   materialIds: number[] | undefined,
   topK: number,
-  languageFilter: "zh" | "en" | "all"
+  languageFilter: "zh" | "en" | "all",
+  profile: SearchProfile,
+  questionLang: "zh" | "en"
 ): Promise<SearchResult[]> {
-  const questionLang = detectLanguage(question);
-  const profile = buildSearchProfile(question, questionLang);
-  const terms = buildEmergencyTerms(question, questionLang);
-  if (terms.length === 0) return [];
+  const emergencyTerms = buildEmergencyTerms(question, questionLang);
+  if (emergencyTerms.length === 0) return [];
 
-  console.log(`[EmergencyFallback] terms=[${terms.join(',')}], lang=${questionLang}, langFilter=${languageFilter}`);
-
-  // 先按请求语言查；若无结果再退化到 all
   const languagePlan: Array<"zh" | "en" | "all"> =
     languageFilter === "all" ? ["all"] : [languageFilter, "all"];
 
-  const merged = new Map<number, FallbackMergedRow>();
+  const merged = new Map<number, FallbackSearchRow>();
 
   for (const lang of languagePlan) {
-    for (const term of terms) {
-      const escaped = term.replace(/[\\%_]/g, "\\$&");
-      const rows = await db
-        .select({
-          id: materialChunks.id,
-          materialId: materialChunks.materialId,
-          chunkIndex: materialChunks.chunkIndex,
-          content: materialChunks.content,
-          chapter: materialChunks.chapter,
-          pageStart: materialChunks.pageStart,
-          pageEnd: materialChunks.pageEnd,
-          materialTitle: materials.title,
-        })
-        .from(materialChunks)
-        .innerJoin(materials, eq(materialChunks.materialId, materials.id))
-        .where(and(...buildBaseFilters(materialIds, lang), like(materialChunks.content, `%${escaped}%`)))
-        .limit(Math.max(60, topK * 20));
+    const filters = buildBaseFilters(materialIds, lang);
+    const termClauses = emergencyTerms.map((term) => buildTermCondition(term));
+    const termClause = termClauses.length === 1 ? termClauses[0] : or(...termClauses);
 
-      for (const row of rows) {
-        const existing = merged.get(row.id);
-        if (existing) {
-          existing.hitCount += 1;
-          existing.matchedTerms.add(term);
-          continue;
+    const rows = await db
+      .select({
+        id: materialChunks.id,
+        materialId: materialChunks.materialId,
+        chunkIndex: materialChunks.chunkIndex,
+        content: materialChunks.content,
+        chapter: materialChunks.chapter,
+        pageStart: materialChunks.pageStart,
+        pageEnd: materialChunks.pageEnd,
+        materialTitle: materials.title,
+      })
+      .from(materialChunks)
+      .innerJoin(materials, eq(materialChunks.materialId, materials.id))
+      .where(and(...filters, termClause))
+      .limit(Math.max(120, topK * 24));
+
+    for (const row of rows) {
+      const noisy = isNoisyChunk(row);
+      const weakNoisy = noisy && !hasDefinitionSignal(row.content) && row.content.length < 180;
+      if (weakNoisy) continue;
+
+      const existing = merged.get(row.id);
+      if (existing) {
+        existing.hitCount += 1;
+        existing.noisePenalty = Math.min(existing.noisePenalty, noisy ? 0.74 : 1);
+        const normalizedText = normalizeForComparison(`${row.chapter || ""}\n${row.content}`);
+        for (const term of emergencyTerms) {
+          const key = normalizeForComparison(term);
+          if (key && normalizedText.includes(key) && !existing.matchedTerms.includes(term)) {
+            existing.matchedTerms.push(term);
+          }
         }
-        merged.set(row.id, {
-          id: row.id,
-          materialId: row.materialId,
-          chunkIndex: row.chunkIndex,
-          content: row.content,
-          chapter: row.chapter,
-          pageStart: row.pageStart,
-          pageEnd: row.pageEnd,
-          materialTitle: row.materialTitle,
-          hitCount: 1,
-          matchedTerms: new Set([term]),
-        });
+        continue;
       }
+
+      const normalizedText = normalizeForComparison(`${row.chapter || ""}\n${row.content}`);
+      const matchedTerms = emergencyTerms.filter((term) => normalizedText.includes(normalizeForComparison(term)));
+      merged.set(row.id, {
+        id: row.id,
+        materialId: row.materialId,
+        chunkIndex: row.chunkIndex,
+        content: row.content,
+        chapter: row.chapter,
+        pageStart: row.pageStart,
+        pageEnd: row.pageEnd,
+        materialTitle: row.materialTitle,
+        hitCount: 1,
+        matchedTerms,
+        noisePenalty: noisy ? 0.74 : 1,
+      });
     }
 
     if (merged.size > 0) break;
@@ -376,25 +462,33 @@ async function emergencyLikeFallbackSearch(
 
   if (merged.size === 0) return [];
 
-  const mergedRows = Array.from(merged.values());
-  const scoringTerms = profile.scoringTerms.length > 0 ? profile.scoringTerms : terms;
-  const stats = countTermStats(mergedRows, scoringTerms);
+  const fallbackRows = Array.from(merged.values());
+  const scoringTerms = profile.scoringTerms.length > 0 ? profile.scoringTerms : emergencyTerms;
+  const stats = countTermStats(fallbackRows, scoringTerms);
 
-  const scored = mergedRows
+  const scored = fallbackRows
     .map((row) => {
-      const textScore = scoreChunk(row.content, scoringTerms, question, row.chapter ?? undefined, {
+      const normalizedText = normalizeForComparison(`${row.chapter || ""}\n${row.content}`);
+      const matchedCount = emergencyTerms.reduce(
+        (acc, term) => acc + (normalizedText.includes(normalizeForComparison(term)) ? 1 : 0),
+        0
+      );
+      const contentScore = scoreChunk(row.content, scoringTerms, question, row.chapter ?? undefined, {
         stats,
         intentTerms: profile.intentTerms,
       });
-      const fallbackBoost = row.hitCount * 1.1 + row.matchedTerms.size * 1.5;
-      return { row, score: textScore + fallbackBoost };
+      const definitionBoost = hasDefinitionSignal(row.content) ? 1.8 : 0;
+      const chapterBoost = row.chapter && !isNumericLikeChapter(row.chapter) ? 0.4 : 0;
+      const termBoost = matchedCount * 1.15 + row.hitCount * 0.35 + row.matchedTerms.length * 0.35;
+      return {
+        row,
+        score: (contentScore + definitionBoost + chapterBoost + termBoost) * row.noisePenalty,
+      };
     })
-    .filter((x) => x.score > 0)
+    .filter((item) => item.score > 0)
     .sort((a, b) => b.score - a.score);
 
   if (scored.length === 0) return [];
-
-  console.log(`[EmergencyFallback] Returning ${Math.min(scored.length, topK)} results (from ${merged.size} candidates)`);
 
   return scored.slice(0, Math.max(1, topK)).map(({ row, score }) => ({
     chunkId: row.id,
@@ -1354,11 +1448,12 @@ export async function semanticSearch(
 
   const questionLang = detectLanguage(question);
   const profile = buildSearchProfile(question, questionLang);
+  const emergencyTerms = buildEmergencyTerms(question, questionLang);
   const strictTerms = uniqueSortedTerms(profile.coreTerms.slice(0, 5));
   const phraseTerms = uniqueSortedTerms([...profile.exactPhrases, ...profile.intentTerms]).slice(0, 8);
   const broadTerms = profile.broadTerms.slice(0, 18);
   console.log(`[HybridSearch] question="${question}", lang=${questionLang}, langFilter=${languageFilter}, useEmb=${useEmbedding}`);
-  console.log(`[HybridSearch] strictTerms=[${strictTerms.join(',')}], phraseTerms=[${phraseTerms.join(',')}], broadTerms=[${broadTerms.join(',')}]`);
+  console.log(`[HybridSearch] strictTerms=[${strictTerms.join(',')}], phraseTerms=[${phraseTerms.join(',')}], broadTerms=[${broadTerms.join(',')}], emergencyTerms=[${emergencyTerms.join(',')}]`);
   const routePlan: Array<{
     route: RouteName;
     terms: string[];
@@ -1367,19 +1462,29 @@ export async function semanticSearch(
   }> = [
     {
       route: "strict",
-      terms: strictTerms.length > 0 ? strictTerms : phraseTerms.slice(0, 3),
+      terms:
+        strictTerms.length > 0
+          ? strictTerms
+          : phraseTerms.length > 0
+            ? phraseTerms.slice(0, 3)
+            : emergencyTerms.slice(0, 3),
       limit: SEARCH_CONFIG.strictLimit,
       weight: SEARCH_CONFIG.strictWeight,
     },
     {
       route: "phrase",
-      terms: phraseTerms.length > 0 ? phraseTerms : broadTerms.slice(0, 6),
+      terms:
+        phraseTerms.length > 0
+          ? phraseTerms
+          : broadTerms.length > 0
+            ? broadTerms.slice(0, 6)
+            : emergencyTerms.slice(0, 6),
       limit: SEARCH_CONFIG.phraseLimit,
       weight: SEARCH_CONFIG.phraseWeight,
     },
     {
       route: "broad",
-      terms: broadTerms,
+      terms: broadTerms.length > 0 ? broadTerms : emergencyTerms.slice(0, 8),
       limit: SEARCH_CONFIG.broadLimit,
       weight: SEARCH_CONFIG.broadWeight,
     },
@@ -1424,9 +1529,10 @@ export async function semanticSearch(
     const rankedRows = routeRows
       .map((row) => ({
         row,
-        score: scoreChunk(row.content, route.terms, question, row.chapter ?? undefined, {
-          intentTerms: profile.intentTerms,
-        }),
+        score:
+          scoreChunk(row.content, route.terms, question, row.chapter ?? undefined, {
+            intentTerms: profile.intentTerms,
+          }) * (isNoisyChunk(row) ? 0.35 : 1),
       }))
       .filter((item) => item.score > 0)
       .sort((a, b) => b.score - a.score);
@@ -1452,6 +1558,9 @@ export async function semanticSearch(
       if (candidateMap.has(er.chunkId)) continue;
       const detail = detailMap.get(er.chunkId);
       if (!detail) continue;
+      if (isNoisyChunk(detail) && !hasDefinitionSignal(detail.content) && detail.content.length < 180) {
+        continue;
+      }
       const state: CandidateState = {
         id: detail.id,
         materialId: detail.materialId,
@@ -1474,7 +1583,7 @@ export async function semanticSearch(
 
   if (candidateMap.size === 0) {
     console.warn(`[HybridSearch] candidateMap is empty, using emergency LIKE fallback`);
-    return emergencyLikeFallbackSearch(db, question, materialIds, topK, languageFilter);
+    return emergencyLikeFallbackSearch(db, question, materialIds, topK, languageFilter, profile, questionLang);
   }
 
   let candidates = Array.from(candidateMap.values());
@@ -1558,8 +1667,8 @@ export async function semanticSearch(
 
   console.log(`[HybridSearch] Final: ${topResults.length} results after diversity+filter (topK=${topK})`);
   if (topResults.length === 0) {
-    console.warn(`[HybridSearch] topResults is empty after ranking, using emergency LIKE fallback`);
-    return emergencyLikeFallbackSearch(db, question, materialIds, topK, languageFilter);
+    console.warn(`[HybridSearch] topResults empty after ranking, using emergency LIKE fallback`);
+    return emergencyLikeFallbackSearch(db, question, materialIds, topK, languageFilter, profile, questionLang);
   }
 
   const matIds = Array.from(new Set(topResults.map((c) => c.materialId)));
@@ -1568,13 +1677,15 @@ export async function semanticSearch(
     .from(materials)
     .where(inArray(materials.id, matIds));
 
-  const matMap = new Map(matDetails.map(m => [m.id, m.title]));
+  const matMap = new Map<number, string>(
+    matDetails.map((m) => [m.id as number, String(m.title)] as [number, string])
+  );
 
   return topResults.map(r => ({
     chunkId: r.id,
     chunkIndex: r.chunkIndex,
     materialId: r.materialId,
-    materialTitle: matMap.get(r.materialId) || "未知教材",
+    materialTitle: matMap.get(r.materialId) ?? "未知教材",
     chapter: r.chapter,
     pageStart: r.pageStart,
     pageEnd: r.pageEnd,
