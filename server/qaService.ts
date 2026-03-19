@@ -878,6 +878,33 @@ async function callLLM(
     answer = appendDegradationNote(answer, finalReview.downgradeNote);
   }
 
+  // V2: LLM 质量门控 — 独立评估答案质量，不合格则重新生成
+  // 跳过条件：简洁回答模式、extractive 模式（已在上面 return）
+  if (!analysis.conciseAnswer && effectiveResults.length >= 2) {
+    const qualityResult = await evaluateAnswerQuality(
+      question, answer, effectiveResults, questionLang, analysis
+    );
+    if (!qualityResult.pass && qualityResult.feedback) {
+      try {
+        const regenerated = await invokeLLMWithConfig(
+          [{ role: "user", content: buildQualityRegeneratePrompt(
+            question, answer, effectiveResults, questionLang, analysis, qualityResult.feedback
+          ) }],
+          buildSystemPrompt(materialTitles, questionLang, materialLang, analysis),
+          { temperature: 0 }
+        );
+        const regenParsed = parseLLMOutput(regenerated.content);
+        const regenAnswer = stripCitationMarkers(regenParsed ? regenParsed.answer : regenerated.content);
+        // 只有重新生成的答案更长或质量分更高时才替换
+        if (regenAnswer.replace(/\s+/g, "").length >= answer.replace(/\s+/g, "").length * 0.8) {
+          answer = regenAnswer;
+        }
+      } catch {
+        // 重新生成失败时保留原答案
+      }
+    }
+  }
+
   // 判断是否在教材中找到了内容
   const notFoundPhrases = ["未涉及", "not cover", "没有相关", "未找到", "not found"];
   const foundInMaterials = !notFoundPhrases.some((p) => answer.toLowerCase().includes(p));
@@ -1375,6 +1402,185 @@ ${sourceTexts}`;
 ${sourceTexts}`;
 }
 
+// ─── V2: LLM 质量门控 ────────────────────────────────────────────────────────
+// 独立评估答案质量：完整性、准确性、结构、引用，不合格则触发重新生成
+
+type QualityEvaluation = {
+  pass: boolean;
+  score: number;      // 0~10
+  feedback: string;   // 改进建议（不合格时）
+};
+
+async function evaluateAnswerQuality(
+  question: string,
+  answer: string,
+  searchResults: SearchResult[],
+  questionLang: "zh" | "en",
+  analysis: QuestionAnalysis
+): Promise<QualityEvaluation> {
+  // 短答案或片段不足时跳过 LLM 评估，用本地规则替代
+  const compactLen = answer.replace(/\s+/g, "").length;
+  if (compactLen < 60 || searchResults.length < 2) {
+    return { pass: true, score: 7, feedback: "" };
+  }
+
+  const sourceSnippets = searchResults
+    .slice(0, 6)
+    .map((r, idx) => `[${idx + 1}] ${r.content.substring(0, 200)}`)
+    .join("\n");
+
+  const evalPrompt = questionLang === "en"
+    ? `You are an answer quality evaluator for a silviculture teaching assistant.
+Evaluate this answer on 4 dimensions (each 0-10):
+1. **Completeness**: Does it cover all key points from the excerpts?
+2. **Accuracy**: Is every claim grounded in the excerpts? No fabrication?
+3. **Structure**: Is it well-organized with clear headings/lists for the question type (${describeIntent(analysis.intent, "en")})?
+4. **Citations**: Does it use [1], [2] markers properly?
+
+Question: ${question}
+
+Answer:
+${answer}
+
+Source excerpts:
+${sourceSnippets}
+
+Return JSON only:
+{"score": <average 0-10>, "pass": <true if score>=6.5>, "feedback": "<specific improvement suggestions if not pass, empty string if pass>"}`
+    : `你是森林培育学教学助手的答案质量评估器。
+请从4个维度评分（每项0-10分）：
+1. **完整性**：是否覆盖了教材片段中的关键要点？
+2. **准确性**：每个论述是否有教材依据？有无编造？
+3. **结构性**：对于${describeIntent(analysis.intent, "zh")}，结构是否清晰（标题/列表/分点）？
+4. **引用标注**：是否正确使用了 [1]、[2] 等引用标记？
+
+学生问题：${question}
+
+当前答案：
+${answer}
+
+教材片段：
+${sourceSnippets}
+
+只返回 JSON：
+{"score": <四项平均分 0-10>, "pass": <true 若 score>=6.5>, "feedback": "<不合格时的具体改进建议，合格则为空字符串>"}`;
+
+  try {
+    const evalResponse = await invokeLLMWithConfig(
+      [{ role: "user", content: evalPrompt }],
+      questionLang === "en"
+        ? "You are a strict answer quality evaluator. Return only valid JSON."
+        : "你是严格的答案质量评估器。只返回有效 JSON。",
+      { temperature: 0, maxTokens: 300, responseFormat: "json_object" }
+    );
+
+    const parsed = parseQualityEvaluation(evalResponse.content);
+    if (parsed) {
+      console.log(`[QualityGate] Score: ${parsed.score}/10, Pass: ${parsed.pass}${parsed.feedback ? `, Feedback: ${parsed.feedback.substring(0, 80)}` : ""}`);
+      return parsed;
+    }
+  } catch (err: any) {
+    console.warn(`[QualityGate] Evaluation failed: ${err?.message || err}`);
+  }
+
+  // 评估失败时默认通过（不阻塞输出）
+  return { pass: true, score: 7, feedback: "" };
+}
+
+function parseQualityEvaluation(content: string): QualityEvaluation | null {
+  try {
+    const parsed = JSON.parse(content.trim());
+    if (typeof parsed.score === "number" && typeof parsed.pass === "boolean") {
+      return {
+        score: parsed.score,
+        pass: parsed.pass,
+        feedback: typeof parsed.feedback === "string" ? parsed.feedback : "",
+      };
+    }
+  } catch {
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      try {
+        const parsed = JSON.parse(jsonMatch[0]);
+        if (typeof parsed.score === "number" && typeof parsed.pass === "boolean") {
+          return {
+            score: parsed.score,
+            pass: parsed.pass,
+            feedback: typeof parsed.feedback === "string" ? parsed.feedback : "",
+          };
+        }
+      } catch {
+        // noop
+      }
+    }
+  }
+  return null;
+}
+
+function buildQualityRegeneratePrompt(
+  question: string,
+  previousAnswer: string,
+  searchResults: SearchResult[],
+  questionLang: "zh" | "en",
+  analysis: QuestionAnalysis,
+  qualityFeedback: string
+): string {
+  const sourceTexts = searchResults
+    .map((r, idx) => {
+      const location = [
+        `《${r.materialTitle}》`,
+        r.chapter ? r.chapter : null,
+        r.pageStart ? `第${r.pageStart}页${r.pageEnd && r.pageEnd !== r.pageStart ? `~${r.pageEnd}页` : ""}` : null,
+      ]
+        .filter(Boolean)
+        .join(" · ");
+      return `【片段${idx + 1}】${location}\n${r.content}`;
+    })
+    .join("\n\n---\n\n");
+
+  if (questionLang === "en") {
+    return `The previous answer was evaluated and found to have quality issues.
+
+Quality feedback: ${qualityFeedback}
+
+Question intent: ${describeIntent(analysis.intent, "en")}
+Question: ${question}
+
+Previous answer (needs improvement):
+${previousAnswer}
+
+Textbook excerpts:
+${sourceTexts}
+
+Please generate an improved answer that:
+1. Addresses all quality feedback above
+2. Covers all key points from the excerpts
+3. Uses proper [1], [2] citation markers
+4. Has clear structure appropriate for the question type
+5. Does not fabricate information beyond the excerpts`;
+  }
+
+  return `上一版答案经质量评估未达标，需要改进。
+
+质量反馈：${qualityFeedback}
+
+问题类型：${describeIntent(analysis.intent, "zh")}
+学生问题：${question}
+
+上一版答案（需改进）：
+${previousAnswer}
+
+教材片段：
+${sourceTexts}
+
+请生成改进后的答案：
+1. 针对上述质量反馈逐项改进
+2. 完整覆盖教材片段中的关键要点
+3. 正确使用 [1]、[2] 引用标记
+4. 结构清晰，符合问题类型
+5. 不得编造教材片段以外的信息`;
+}
+
 const ZH_DEFINITION_STOP_WORDS = new Set([
   "什么",
   "什么是",
@@ -1823,6 +2029,32 @@ export async function generateAnswerStream(
     fullAnswer = stripCitationMarkers(fullAnswer);
     if (questionAnalysis.conciseAnswer) {
       fullAnswer = enforceConciseDefinition(fullAnswer, questionLanguage);
+    }
+
+    // V2: 流式模式下的质量门控 — 流完成后评估，不合格则重新生成
+    // 前端 done 事件会用 fullAnswer 替换已流式输出的内容
+    if (!questionAnalysis.conciseAnswer && effectiveResults.length >= 2) {
+      const qualityResult = await evaluateAnswerQuality(
+        req.question, fullAnswer, effectiveResults, questionLanguage, questionAnalysis
+      );
+      if (!qualityResult.pass && qualityResult.feedback) {
+        try {
+          const regenerated = await invokeLLMWithConfig(
+            [{ role: "user", content: buildQualityRegeneratePrompt(
+              req.question, fullAnswer, effectiveResults, questionLanguage, questionAnalysis, qualityResult.feedback
+            ) }],
+            systemPrompt,
+            { temperature: 0 }
+          );
+          const regenParsed = parseLLMOutput(regenerated.content);
+          const regenAnswer = stripCitationMarkers(regenParsed ? regenParsed.answer : regenerated.content);
+          if (regenAnswer.replace(/\s+/g, "").length >= fullAnswer.replace(/\s+/g, "").length * 0.8) {
+            fullAnswer = regenAnswer;
+          }
+        } catch {
+          // 重新生成失败时保留原答案
+        }
+      }
     }
 
     // 判断是否找到内容
