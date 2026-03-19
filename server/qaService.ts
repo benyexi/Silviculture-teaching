@@ -834,75 +834,60 @@ async function callLLM(
   }
 
   const localReview = assessAnswerLocally(answer, effectiveResults, analysis, questionLang);
+  const grounding = assessGrounding(answer, effectiveResults, questionLang);
 
-  // V2: 合并审校+重写为一次 LLM 调用（原来 review + revision = 2 次，现在最多 1 次）
-  // 跳过条件：简洁回答模式、本地审校已通过、或答案已足够充实（>200字且有结构化条目）
+  // V2: 统一质量管线（最多 1 次额外 LLM 调用，替代原来的多级串行调用）
+  // 决策逻辑：
+  //   1. 本地审校通过 + grounding通过 → 直接输出
+  //   2. 有质量问题 → 一次性 LLM 质量评估+重写（合并了审校修正、grounding重写、质量门控）
+  //   3. 简洁回答模式 → 跳过 LLM 审校
   const compactLen = answer.replace(/\s+/g, "").length;
   const structuredItems = countStructuredItems(answer);
-  const skipLLMReview = analysis.conciseAnswer || localReview.complete ||
-    (compactLen > 200 && structuredItems >= 3);
+  const skipLLMReview = analysis.conciseAnswer || (localReview.complete && grounding.grounded) ||
+    (compactLen > 200 && structuredItems >= 3 && grounding.grounded);
 
-  if (!skipLLMReview && localReview.shouldRetry) {
-    try {
-      const reviewAndFixResponse = await invokeLLMWithConfig(
-        [{ role: "user", content: buildReviewAndFixPrompt(question, answer, effectiveResults, questionLang, analysis, localReview.issues) }],
-        buildSystemPrompt(materialTitles, questionLang, materialLang, analysis)
-      );
-      const fixedParsed = parseLLMOutput(reviewAndFixResponse.content);
-      answer = stripCitationMarkers(fixedParsed ? fixedParsed.answer : reviewAndFixResponse.content);
-    } catch {
-      // 审校修正失败时保留原答案
+  if (!skipLLMReview && (localReview.shouldRetry || !grounding.grounded)) {
+    // 收集所有问题，一次性交给 LLM 评估+修正
+    const allIssues = [...localReview.issues];
+    if (!grounding.grounded) {
+      allIssues.push(questionLang === "en"
+        ? `Answer contains claims not grounded in excerpts (grounding score: ${grounding.score.toFixed(2)}). Rewrite using only excerpt content.`
+        : `答案包含教材片段中没有依据的内容（接地分: ${grounding.score.toFixed(2)}），需要严格基于片段重写。`);
     }
-  }
 
-  const finalReview = assessAnswerLocally(answer, effectiveResults, analysis, questionLang);
-  const grounding = assessGrounding(answer, effectiveResults, questionLang);
-  if (!grounding.grounded) {
-    try {
-      const groundedRewrite = await invokeLLMWithConfig(
-        [{ role: "user", content: buildGroundedRewritePrompt(question, effectiveResults, questionLang, analysis) }],
-        questionLang === "en"
-          ? "You are a strict extractive tutor. Use only the provided excerpts."
-          : "你是严格的教材抽取式助手，只能使用给定片段原意回答。",
-        { temperature: 0, maxTokens: analysis.conciseAnswer ? 320 : 1200 }
-      );
-      answer = stripCitationMarkers(groundedRewrite.content);
-      if (analysis.conciseAnswer) {
-        answer = enforceConciseDefinition(answer, questionLang);
-      }
-    } catch {
-      // fallback to existing answer
-    }
-  }
-  if (!finalReview.complete) {
-    answer = appendDegradationNote(answer, finalReview.downgradeNote);
-  }
-
-  // V2: LLM 质量门控 — 独立评估答案质量，不合格则重新生成
-  // 跳过条件：简洁回答模式、extractive 模式（已在上面 return）
-  if (!analysis.conciseAnswer && effectiveResults.length >= 2) {
+    // 先做 LLM 质量评估（判断是否真的需要重写）
     const qualityResult = await evaluateAnswerQuality(
       question, answer, effectiveResults, questionLang, analysis
     );
-    if (!qualityResult.pass && qualityResult.feedback) {
+
+    if (!qualityResult.pass || !grounding.grounded) {
+      const combinedFeedback = [
+        ...allIssues,
+        ...(qualityResult.feedback ? [qualityResult.feedback] : []),
+      ].join("; ");
+
       try {
         const regenerated = await invokeLLMWithConfig(
           [{ role: "user", content: buildQualityRegeneratePrompt(
-            question, answer, effectiveResults, questionLang, analysis, qualityResult.feedback
+            question, answer, effectiveResults, questionLang, analysis, combinedFeedback
           ) }],
           buildSystemPrompt(materialTitles, questionLang, materialLang, analysis),
           { temperature: 0 }
         );
         const regenParsed = parseLLMOutput(regenerated.content);
         const regenAnswer = stripCitationMarkers(regenParsed ? regenParsed.answer : regenerated.content);
-        // 只有重新生成的答案更长或质量分更高时才替换
         if (regenAnswer.replace(/\s+/g, "").length >= answer.replace(/\s+/g, "").length * 0.8) {
           answer = regenAnswer;
         }
       } catch {
-        // 重新生成失败时保留原答案
+        // 重写失败时保留原答案
       }
     }
+  }
+
+  const finalReview = assessAnswerLocally(answer, effectiveResults, analysis, questionLang);
+  if (!finalReview.complete) {
+    answer = appendDegradationNote(answer, finalReview.downgradeNote);
   }
 
   // 判断是否在教材中找到了内容
@@ -2031,17 +2016,33 @@ export async function generateAnswerStream(
       fullAnswer = enforceConciseDefinition(fullAnswer, questionLanguage);
     }
 
-    // V2: 流式模式下的质量门控 — 流完成后评估，不合格则重新生成
+    // V2: 流式模式下的统一质量管线（与 sync 模式一致）
     // 前端 done 事件会用 fullAnswer 替换已流式输出的内容
-    if (!questionAnalysis.conciseAnswer && effectiveResults.length >= 2) {
+    const localReview = assessAnswerLocally(fullAnswer, effectiveResults, questionAnalysis, questionLanguage);
+    const grounding = assessGrounding(fullAnswer, effectiveResults, questionLanguage);
+
+    const compactLen = fullAnswer.replace(/\s+/g, "").length;
+    const structuredItems = countStructuredItems(fullAnswer);
+    const skipStreamReview = questionAnalysis.conciseAnswer ||
+      (localReview.complete && grounding.grounded) ||
+      (compactLen > 200 && structuredItems >= 3 && grounding.grounded);
+
+    if (!skipStreamReview && (localReview.shouldRetry || !grounding.grounded) && effectiveResults.length >= 2) {
+      const allIssues = [...localReview.issues];
+      if (!grounding.grounded) {
+        allIssues.push(questionLanguage === "en"
+          ? `Answer contains ungrounded claims (score: ${grounding.score.toFixed(2)}). Rewrite using only excerpts.`
+          : `答案包含无依据内容（接地分: ${grounding.score.toFixed(2)}），需严格基于片段重写。`);
+      }
       const qualityResult = await evaluateAnswerQuality(
         req.question, fullAnswer, effectiveResults, questionLanguage, questionAnalysis
       );
-      if (!qualityResult.pass && qualityResult.feedback) {
+      if (!qualityResult.pass || !grounding.grounded) {
+        const combinedFeedback = [...allIssues, ...(qualityResult.feedback ? [qualityResult.feedback] : [])].join("; ");
         try {
           const regenerated = await invokeLLMWithConfig(
             [{ role: "user", content: buildQualityRegeneratePrompt(
-              req.question, fullAnswer, effectiveResults, questionLanguage, questionAnalysis, qualityResult.feedback
+              req.question, fullAnswer, effectiveResults, questionLanguage, questionAnalysis, combinedFeedback
             ) }],
             systemPrompt,
             { temperature: 0 }
@@ -2052,7 +2053,7 @@ export async function generateAnswerStream(
             fullAnswer = regenAnswer;
           }
         } catch {
-          // 重新生成失败时保留原答案
+          // 重写失败时保留原答案
         }
       }
     }
