@@ -819,9 +819,10 @@ async function callLLM(
   }
   const sourceLimit = pickSourceLimit(questionLang, analysis);
   const materialTitles = Array.from(new Set(effectiveResults.map((r) => r.materialTitle)));
-  const extractive = analysis.conciseAnswer
-    ? buildExtractiveAnswer(question, effectiveResults, questionLang, analysis)
-    : null;
+  const extractive =
+    analysis.conciseAnswer
+      ? buildExtractiveAnswer(question, effectiveResults, questionLang, analysis)
+      : buildEnumerativeExtractiveAnswer(question, effectiveResults, questionLang, analysis);
   if (extractive) {
     const conciseResults = effectiveResults.filter((r) => extractive.usedChunkIds.includes(r.chunkId));
     const sources = buildSources(conciseResults, true, keywords, sourceLimit);
@@ -2136,6 +2137,91 @@ function buildExtractiveAnswer(
   };
 }
 
+function buildEnumerativeExtractiveAnswer(
+  question: string,
+  searchResults: SearchResult[],
+  questionLang: "zh" | "en",
+  analysis: QuestionAnalysis
+): { answer: string; usedChunkIds: number[] } | null {
+  if (!analysis.expectsEnumeration || analysis.requestDetail) return null;
+  if (searchResults.length === 0) return null;
+
+  const keywords = (questionLang === "en" ? extractKeywordsEn(question) : extractKeywords(question))
+    .filter((k) => k.length >= 2)
+    .slice(0, 10);
+  const queryNorm = normalizeQuestion(question);
+  const splitter = questionLang === "en" ? /[.!?\n]/ : /[。！？\n]/;
+  const cuePattern = questionLang === "en"
+    ? /\b(include|including|types|methods|steps|indicators?|requirements?|conditions?|forms?)\b/i
+    : /(包括|主要有|可分为|分为|指标|类型|方法|步骤|条件|要求|表现形式|功能|作用)/;
+  const metaPattern = questionLang === "en"
+    ? /\b(textbook|chapter|this answer|not directly listed|inferred)\b/i
+    : /(教材|本章|本节|本回答|未直接|推断|梳理|框架)/;
+
+  const picked: Array<{ sentence: string; score: number; chunkId: number }> = [];
+
+  for (const row of searchResults.slice(0, Math.max(6, pickTopK(questionLang, analysis)))) {
+    const sentences = row.content
+      .split(splitter)
+      .map((s) => s.replace(/\s+/g, " ").trim())
+      .filter(Boolean)
+      .filter((s) => s.length >= (questionLang === "en" ? 16 : 8));
+
+    for (const sentence of sentences) {
+      const sNorm = normalizeQuestion(sentence);
+      let score = 0;
+      if (queryNorm && sNorm.includes(queryNorm)) score += 3.5;
+      for (const kw of keywords) {
+        const key = normalizeQuestion(kw);
+        if (!key) continue;
+        if (sNorm.includes(key)) score += Math.min(2.8, key.length * 0.45);
+      }
+      if (cuePattern.test(sentence)) score += 2.2;
+      if (metaPattern.test(sentence)) score -= 2.6;
+      if (sentence.length > (questionLang === "en" ? 220 : 140)) score -= 1.2;
+      if (/[:：]/.test(sentence)) score += 0.7;
+
+      if (score >= 3.0) {
+        picked.push({ sentence, score, chunkId: row.chunkId });
+      }
+    }
+  }
+
+  if (picked.length === 0) return null;
+
+  picked.sort((a, b) => b.score - a.score);
+  const dedup: Array<{ sentence: string; chunkId: number }> = [];
+  const used = new Set<number>();
+  const seen = new Set<string>();
+  const maxItems = questionLang === "en" ? 6 : 7;
+
+  for (const item of picked) {
+    const key = normalizeQuestion(item.sentence).slice(0, 100);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    dedup.push({ sentence: item.sentence, chunkId: item.chunkId });
+    used.add(item.chunkId);
+    if (dedup.length >= maxItems) break;
+  }
+
+  if (dedup.length < 3) return null;
+
+  const lines = dedup.map((item) => {
+    const t = truncateSentenceSmart(item.sentence, questionLang, questionLang === "en" ? 180 : 96);
+    if (questionLang === "en") return `- ${t}${/[.!?…]$/.test(t) ? "" : "."}`;
+    return `- ${t}${/[。！？…]$/.test(t) ? "" : "。"}`;
+  });
+
+  const prefix = questionLang === "en"
+    ? `Excerpt-grounded list for "${question.trim()}":`
+    : `教材中与“${question.trim()}”直接相关的要点：`;
+
+  return {
+    answer: `${prefix}\n${lines.join("\n")}`,
+    usedChunkIds: Array.from(used),
+  };
+}
+
 // ─── 流式答案生成 ─────────────────────────────────────────────────────────────
 
 export type StreamMeta = {
@@ -2248,9 +2334,10 @@ export async function generateAnswerStream(
     }
 
     const keywords = questionLanguage === "en" ? extractKeywordsEn(req.question) : extractKeywords(req.question);
-    const extractive = questionAnalysis.conciseAnswer
-      ? buildExtractiveAnswer(req.question, effectiveResults, questionLanguage, questionAnalysis)
-      : null;
+    const extractive =
+      questionAnalysis.conciseAnswer
+        ? buildExtractiveAnswer(req.question, effectiveResults, questionLanguage, questionAnalysis)
+        : buildEnumerativeExtractiveAnswer(req.question, effectiveResults, questionLanguage, questionAnalysis);
     if (extractive) {
       const conciseResults = effectiveResults.filter((r) => extractive.usedChunkIds.includes(r.chunkId));
       const sources = buildSources(conciseResults, true, keywords, sourceLimit);
