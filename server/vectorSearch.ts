@@ -1417,7 +1417,8 @@ export async function semanticSearch(
   materialIds?: number[],
   topK: number = 8,
   languageFilter: "zh" | "en" | "all" = "all",
-  useEmbedding: boolean = true
+  useEmbedding: boolean = true,
+  allowLanguageFallback: boolean = true
 ): Promise<SearchResult[]> {
   const db = await getDb();
   if (!db) throw new Error("数据库不可用");
@@ -1553,6 +1554,9 @@ export async function semanticSearch(
   }
 
   if (candidateMap.size === 0) {
+    if (languageFilter !== "all" && allowLanguageFallback) {
+      return semanticSearch(question, materialIds, topK, "all", useEmbedding, false);
+    }
     return [];
   }
 
@@ -1636,6 +1640,9 @@ export async function semanticSearch(
   const topResults = applyDiversitySelection(candidates, topK).filter((candidate) => candidate.finalScore > 0);
 
   if (topResults.length === 0) {
+    if (languageFilter !== "all" && allowLanguageFallback) {
+      return semanticSearch(question, materialIds, topK, "all", useEmbedding, false);
+    }
     return [];
   }
 
