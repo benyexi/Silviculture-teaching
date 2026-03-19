@@ -1915,13 +1915,18 @@ export async function generateAnswerStream(
 
   try {
     // 检索教材
-    let searchResults: SearchResult[];
-    if (questionLanguage === "en") {
-      searchResults = await semanticSearch(req.question, undefined, pickTopK("en", questionAnalysis), "en", useRAG);
-    } else {
-      searchResults = await semanticSearch(req.question, undefined, pickTopK("zh", questionAnalysis), "zh", useRAG);
+    const langFilter = questionLanguage === "en" ? "en" : "zh";
+    const topK = questionLanguage === "en" ? pickTopK("en", questionAnalysis) : pickTopK("zh", questionAnalysis);
+    let searchResults: SearchResult[] = await semanticSearch(req.question, undefined, topK, langFilter, useRAG);
+    console.log(`[QA] searchResults.length=${searchResults.length}, conciseDefinition=${questionAnalysis.conciseDefinition}, useRAG=${useRAG}`);
+
+    // Fallback: 如果关键词检索未命中，自动尝试 embedding 检索
+    if (searchResults.length === 0 && !useRAG && activeConfig?.embeddingModel) {
+      console.log(`[QA] Keyword search returned 0 results, falling back to embedding search`);
+      searchResults = await semanticSearch(req.question, undefined, topK, langFilter, true);
+      console.log(`[QA] Embedding fallback returned ${searchResults.length} results`);
     }
-    console.log(`[QA] searchResults.length=${searchResults.length}, conciseDefinition=${questionAnalysis.conciseDefinition}`);
+
     if (searchResults.length > 0) {
       console.log(`[QA] top result: similarity=${searchResults[0].similarity.toFixed(4)}, content=${searchResults[0].content.slice(0, 80)}`);
     }
