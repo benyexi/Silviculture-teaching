@@ -116,7 +116,7 @@ type AnswerReview = {
   downgradeNote: string;
 };
 
-function detectQuestionIntent(question: string, questionLang: "zh" | "en"): QuestionAnalysis {
+export function detectQuestionIntent(question: string, questionLang: "zh" | "en"): QuestionAnalysis {
   const q = question.toLowerCase();
   const intents: QuestionIntent[] = [];
 
@@ -896,7 +896,7 @@ async function callLLM(
 }
 
 /** V2: 清理非标准引用格式，但保留正规的 [1] [2] 引用标记 */
-function stripCitationMarkers(text: string): string {
+export function stripCitationMarkers(text: string): string {
   const cleaned = text
     .replace(/\r\n/g, "\n")
     .replace(/\r/g, "\n")
