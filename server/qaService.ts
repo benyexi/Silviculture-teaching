@@ -4,7 +4,7 @@ import {
   extractKeywordsEn,
   type SearchResult,
 } from "./vectorSearch";
-import { invokeLLMWithConfig, invokeLLMStreamWithConfig } from "./llmDriver";
+import { invokeLLMWithConfig } from "./llmDriver";
 import { createQuery, upsertVisitorStat, getActiveLlmConfig } from "./db";
 import { detectLanguage } from "./languageDetect";
 import type { QuerySource } from "../drizzle/schema";
@@ -1990,44 +1990,30 @@ export async function generateAnswerStream(
     const userMessage = buildUserPrompt(req.question, effectiveResults, questionLanguage, questionAnalysis);
     const sources = buildSources(effectiveResults, true, keywords, sourceLimit);
 
-    // 先发送元数据（sources），让前端立刻展示引用来源
-    onMeta({
-      sources,
-      modelUsed: "",
-      foundInMaterials: true,
-      confidence: 0.8,
-      questionLanguage,
-    });
-
-    // 流式调用 LLM
-    const { stream, model } = await invokeLLMStreamWithConfig(
+    // V2: 先生成完整答案并完成质量评估，再流式输出给用户
+    // 避免用户看到一个答案后又被替换成另一个答案
+    const llmResponse = await invokeLLMWithConfig(
       [{ role: "user", content: userMessage }],
       systemPrompt
     );
+    const model = llmResponse.model;
 
-    let fullAnswer = "";
-    for await (const token of stream) {
-      fullAnswer += token;
-      onToken(token);
-    }
-
-    fullAnswer = stripCitationMarkers(fullAnswer);
+    let fullAnswer = stripCitationMarkers(llmResponse.content);
     if (questionAnalysis.conciseAnswer) {
       fullAnswer = enforceConciseDefinition(fullAnswer, questionLanguage);
     }
 
-    // V2: 流式模式下的统一质量管线（与 sync 模式一致）
-    // 前端 done 事件会用 fullAnswer 替换已流式输出的内容
+    // 统一质量管线（与 sync 模式一致）
     const localReview = assessAnswerLocally(fullAnswer, effectiveResults, questionAnalysis, questionLanguage);
     const grounding = assessGrounding(fullAnswer, effectiveResults, questionLanguage);
 
     const compactLen = fullAnswer.replace(/\s+/g, "").length;
     const structuredItems = countStructuredItems(fullAnswer);
-    const skipStreamReview = questionAnalysis.conciseAnswer ||
+    const skipReview = questionAnalysis.conciseAnswer ||
       (localReview.complete && grounding.grounded) ||
       (compactLen > 200 && structuredItems >= 3 && grounding.grounded);
 
-    if (!skipStreamReview && (localReview.shouldRetry || !grounding.grounded) && effectiveResults.length >= 2) {
+    if (!skipReview && (localReview.shouldRetry || !grounding.grounded) && effectiveResults.length >= 2) {
       const allIssues = [...localReview.issues];
       if (!grounding.grounded) {
         allIssues.push(questionLanguage === "en"
@@ -2083,6 +2069,17 @@ export async function generateAnswerStream(
       visitorLng: req.visitorLng,
     });
 
+    // 发送元数据（含 queryId 和 responseTimeMs）
+    onMeta({
+      sources,
+      modelUsed: model,
+      foundInMaterials: true,
+      confidence: foundInMaterials ? (finalReview.complete ? 0.82 : 0.68) : 0.1,
+      questionLanguage,
+      queryId,
+      responseTimeMs,
+    });
+
     // 缓存
     if (foundInMaterials) {
       setCachedAnswer(req.question, {
@@ -2103,6 +2100,8 @@ export async function generateAnswerStream(
     const countryDist = req.visitorCountry ? { [req.visitorCountry]: 1 } : {};
     upsertVisitorStat(today, cityDist, countryDist).catch(console.error);
 
+    // 质量验证完成后，将最终答案一次性输出给用户
+    onToken(fullAnswer);
     onDone(fullAnswer);
   } catch (err: any) {
     onError(err?.message || String(err));
