@@ -7,10 +7,12 @@ import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
-import { runMigrations } from "../db";
+import { runMigrations, getDb, getActiveLlmConfig } from "../db";
 import { ENV } from "./env";
 import { generateAnswerStream } from "../qaService";
 import { getGeoInfo, extractIp } from "../geoip";
+import { materials, materialChunks } from "../../drizzle/schema";
+import { eq, like, and, count as drizzleCount } from "drizzle-orm";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -53,6 +55,110 @@ async function startServer() {
   server.keepAliveTimeout = 120_000;
   app.get("/healthz", (_req, res) => {
     res.status(200).json({ status: "ok" });
+  });
+
+  // ─── 诊断端点：排查搜索问题 ──────────────────────────────────────
+  app.get("/api/debug/search-diag", async (_req, res) => {
+    try {
+      const db = await getDb();
+      if (!db) {
+        res.json({ error: "Database not available", DATABASE_URL_SET: !!process.env.DATABASE_URL });
+        return;
+      }
+
+      // 1. 检查 materials 表
+      const allMaterials = await db.select({
+        id: materials.id,
+        title: materials.title,
+        status: materials.status,
+        language: materials.language,
+        totalChunks: materials.totalChunks,
+      }).from(materials);
+
+      // 2. 检查 material_chunks 表总数
+      const [chunkTotal] = await db.select({ count: drizzleCount() }).from(materialChunks);
+
+      // 3. 检查 published 材料的 chunks 数
+      const publishedMats = allMaterials.filter(m => m.status === "published");
+      const publishedMatIds = publishedMats.map(m => m.id);
+
+      let publishedChunkCount = 0;
+      let sampleChunk: any = null;
+      let likeTestResults: { term: string; count: number }[] = [];
+
+      if (publishedMatIds.length > 0) {
+        // 查 published 材料的 chunks
+        for (const matId of publishedMatIds) {
+          const [cnt] = await db.select({ count: drizzleCount() })
+            .from(materialChunks)
+            .where(eq(materialChunks.materialId, matId));
+          publishedChunkCount += cnt.count;
+        }
+
+        // 取一个 sample chunk
+        const samples = await db.select({
+          id: materialChunks.id,
+          materialId: materialChunks.materialId,
+          chunkIndex: materialChunks.chunkIndex,
+          content: materialChunks.content,
+          chapter: materialChunks.chapter,
+          vectorId: materialChunks.vectorId,
+        }).from(materialChunks)
+          .where(eq(materialChunks.materialId, publishedMatIds[0]))
+          .limit(3);
+        sampleChunk = samples.map(s => ({
+          id: s.id,
+          materialId: s.materialId,
+          chunkIndex: s.chunkIndex,
+          contentLength: s.content?.length ?? 0,
+          contentPreview: s.content?.slice(0, 200) ?? "(null)",
+          chapter: s.chapter,
+          vectorId: s.vectorId,
+        }));
+
+        // 4. 测试 LIKE 查询 — 模拟关键词搜索
+        const testTerms = ["森林", "培育", "密度", "林分", "造林"];
+        for (const term of testTerms) {
+          const [cnt] = await db.select({ count: drizzleCount() })
+            .from(materialChunks)
+            .innerJoin(materials, eq(materialChunks.materialId, materials.id))
+            .where(and(
+              eq(materials.status, "published"),
+              eq(materials.language, "zh"),
+              like(materialChunks.content, `%${term}%`)
+            ));
+          likeTestResults.push({ term, count: cnt.count });
+        }
+      }
+
+      // 5. LLM 配置
+      const config = await getActiveLlmConfig();
+
+      res.json({
+        database: "connected",
+        materials: allMaterials.map(m => ({
+          id: m.id,
+          title: m.title,
+          status: m.status,
+          language: m.language,
+          totalChunks: m.totalChunks,
+        })),
+        totalChunks: chunkTotal.count,
+        publishedChunkCount,
+        sampleChunks: sampleChunk,
+        likeSearchTest: likeTestResults,
+        llmConfig: config ? {
+          id: config.id,
+          name: config.name,
+          useRAG: config.useRAG,
+          isActive: config.isActive,
+          embeddingModel: config.embeddingModel || "(not set)",
+          provider: config.provider,
+        } : null,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message, stack: err.stack });
+    }
   });
 
   // Auth routes (local login)
