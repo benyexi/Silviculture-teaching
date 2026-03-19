@@ -357,7 +357,8 @@ Answering protocol:
 5. Use Markdown only. Do not wrap the final answer in JSON or code fences.
 6. CITATION REQUIRED: For every factual claim, add an inline citation marker like [1], [2] matching the excerpt number. Example: "Silviculture covers the full cultivation cycle [1] including thinning operations [3]."
 7. Never add background history or external knowledge not supported by excerpts.
-8. Do not add meta commentary like "the textbook clearly states", "completeness note", or process explanations.`;
+8. Do not add meta commentary like "the textbook clearly states", "completeness note", or process explanations.
+9. Do not output exclusion paragraphs such as "X is not covered / not listed" unless the user explicitly asks what is missing.`;
   }
 
   const materialNote =
@@ -377,7 +378,8 @@ ${materialNote}
 6. 直接输出 Markdown，不要包裹在 JSON 或代码块中。
 7. 引用标注：每个事实性陈述后必须添加引用标记 [1]、[2]，对应片段编号。例如："森林培育涵盖从种子到成林的全过程[1]，包括间伐经营[3]。"
 8. 严禁扩展教材外知识，不要凭常识或通用知识补充。
-9. 禁止写过程性废话或自我说明，如"教材明确将…""完整性说明""本回答完全限定于…"。直接给答案内容。`;
+9. 禁止写过程性废话或自我说明，如"教材明确将…""完整性说明""本回答完全限定于…"。直接给答案内容。
+10. 禁止输出大段"未涉及项排除说明"（例如逐条解释哪些概念不在教材里），除非用户明确问"哪些没有提到"。`;
 }
 
 export function buildSystemPrompt(
@@ -508,7 +510,7 @@ ${buildAnswerBlueprint(analysis, questionLang)}
 - 每个事实性陈述后必须标注来源片段编号，如 [1]、[2]。
 - 如果是分类/方法/步骤/比较题，必须把教材中明确出现的项目全部列出。
 - 直接列与问题最相关的条目，可选1句总述，不要求概述段。
-- 仅在确实缺失时，用1句短注说明，不要扩展解释过程。
+- 仅在确实缺失且用户明确追问缺失内容时，用1句短注说明，不要扩展解释过程。
 ${analysis.conciseDefinition ? "- 这是简洁定义题：只用2-4句话回答定义本身，禁止历史背景/分类/目的等延伸。" : ""}
 
 【教材内容片段（共 ${chunks.length} 条）】
@@ -598,6 +600,7 @@ function focusResultsByChapter(
   analysis: QuestionAnalysis
 ): SearchResult[] {
   if (searchResults.length <= 6) return searchResults;
+  if (analysis.expectsEnumeration || analysis.requestDetail) return searchResults;
 
   const focusTerms = pickFocusTerms(question, questionLang, analysis);
   if (focusTerms.length === 0) return searchResults;
@@ -656,7 +659,14 @@ function focusResultsByChapter(
     (coverageRatio >= 0.4 && dominance >= 1.1) ||
     (hasStrongChapterSignal && best.rows.length >= 3 && dominance >= 1.05);
 
-  if (!shouldFocus) return sorted;
+  // 仅在单章节优势非常明显时才收缩，避免跨章节条目题丢失要点
+  const strictShouldFocus =
+    shouldFocus &&
+    coverageRatio >= 0.58 &&
+    dominance >= 1.28 &&
+    best.rows.length >= 4;
+
+  if (!strictShouldFocus) return sorted;
 
   const keepTarget = Math.max(4, Math.min(sorted.length, pickTopK(questionLang, analysis)));
   const focused = best.rows
@@ -902,7 +912,7 @@ async function callLLM(
   }
 
   const finalReview = assessAnswerLocally(answer, effectiveResults, analysis, questionLang);
-  if (!finalReview.complete) {
+  if (!finalReview.complete && shouldAppendDowngradeNote(answer, analysis)) {
     answer = appendDegradationNote(answer, finalReview.downgradeNote);
   }
   answer = removeAnswerBoilerplate(answer, questionLang, analysis);
@@ -1293,6 +1303,14 @@ function appendDegradationNote(answer: string, note: string): string {
   return `${answer}\n\n> ${note}`;
 }
 
+function shouldAppendDowngradeNote(answer: string, analysis: QuestionAnalysis): boolean {
+  if (analysis.conciseAnswer) return false;
+  const trimmed = answer.trim();
+  if (!trimmed) return false;
+  // 只在明显未覆盖语义时追加短注，避免污染正常答案
+  return /未涉及|未覆盖|未找到|not cover|not found|partially covered/i.test(trimmed);
+}
+
 function removeAnswerBoilerplate(
   answer: string,
   questionLang: "zh" | "en",
@@ -1305,22 +1323,31 @@ function removeAnswerBoilerplate(
     /^#+\s*[一二三四五六七八九十]+[、.．]?\s*完整性说明\s*$/i,
     /^(?:[一二三四五六七八九十]+[、.．])\s*概述\s*$/,
     /^(?:[一二三四五六七八九十]+[、.．])\s*完整性说明\s*$/,
+    /^教材中明确提到/,
+    /^教材中明确提及/,
     /^教材明确将/,
     /^教材未设专节/,
+    /^全部直接源自/,
+    /^未作任何扩展或推断/,
     /^教材中唯一出现且可直接提取/,
     /^教材仅明确列出/,
     /^教材未涉及“/,
     /^未使用“/,
     /^未将“/,
+    /^该内容在.*始终与/,
+    /^属同一.*维度/,
+    /^并非单独列项/,
     /^因此，本回答/,
     /^以上仅列出教材明确出现/,
     /^无任何召回遗漏/,
     /^无任何外部补充/,
     /^仅整理已明确出现的内容/,
+    /^仅列出教材明确提及的项目/,
   ];
   const enDropPatterns = [
     /^#+\s*overview\s*$/i,
     /^#+\s*completeness\s*note\s*$/i,
+    /^the textbook explicitly/i,
     /^the excerpts clearly/i,
     /^this answer is strictly limited to/i,
     /^only items explicitly mentioned/i,
@@ -2320,7 +2347,7 @@ export async function generateAnswerStream(
     const notFoundPhrases = ["未涉及", "not cover", "没有相关", "未找到", "not found"];
     const foundInMaterials = !notFoundPhrases.some((p) => fullAnswer.toLowerCase().includes(p));
     const finalReview = assessAnswerLocally(fullAnswer, effectiveResults, questionAnalysis, questionLanguage);
-    if (!finalReview.complete) {
+    if (!finalReview.complete && shouldAppendDowngradeNote(fullAnswer, questionAnalysis)) {
       fullAnswer = appendDegradationNote(fullAnswer, finalReview.downgradeNote);
     }
     fullAnswer = removeAnswerBoilerplate(fullAnswer, questionLanguage, questionAnalysis);
