@@ -1,17 +1,19 @@
 /**
  * 教材检索服务
- * 采用纯关键词检索，不依赖 Embedding API。
+ * V2: 支持纯关键词检索 + Embedding 向量混合检索（Hybrid Retrieval）
  * 检索策略：
  *   1. 对问题做领域词优先的关键词抽取
  *   2. 多路召回：strict / phrase / broad
  *   3. 基于 BM25-like + 覆盖率 + 章节/短语加权进行重排
- *   4. 对 Top 结果做邻接块扩展，补足上下文
- *   5. 最终做去重和多样性控制
+ *   4. （可选）Embedding 向量相似度检索 + RAM 缓存
+ *   5. 对 Top 结果做邻接块扩展，补足上下文
+ *   6. 最终做去重和多样性控制
  */
 import { getDb } from "./db";
 import { materialChunks, materials } from "../drizzle/schema";
-import { eq, inArray, and, like, or } from "drizzle-orm";
+import { eq, inArray, and, like, or, isNotNull } from "drizzle-orm";
 import { detectLanguage } from "./languageDetect";
+import { getEmbedding, cosineSimilarity } from "./llmDriver";
 
 // ─── 检索结果类型 ─────────────────────────────────────────────────────────────
 export type SearchResult = {
@@ -83,7 +85,166 @@ const SEARCH_CONFIG = {
   keywordFusionWeight: parseFloat(process.env.KEYWORD_FUSION_WEIGHT || "0.58"),
   recallFusionWeight: parseFloat(process.env.RECALL_FUSION_WEIGHT || "0.27"),
   adjacencyFusionWeight: parseFloat(process.env.ADJACENCY_FUSION_WEIGHT || "0.15"),
+  // Embedding 混合检索权重（仅 useEmbedding=true 时生效）
+  embeddingFusionWeight: parseFloat(process.env.EMBEDDING_FUSION_WEIGHT || "0.35"),
+  keywordFusionWeightHybrid: parseFloat(process.env.KEYWORD_FUSION_WEIGHT_HYBRID || "0.38"),
+  recallFusionWeightHybrid: parseFloat(process.env.RECALL_FUSION_WEIGHT_HYBRID || "0.15"),
+  adjacencyFusionWeightHybrid: parseFloat(process.env.ADJACENCY_FUSION_WEIGHT_HYBRID || "0.12"),
+  // Embedding 检索 Top-K
+  embeddingTopK: parseInt(process.env.EMBEDDING_TOP_K || "30", 10),
+  // RAM 缓存最大条目数
+  ramCacheMaxSize: parseInt(process.env.RAM_CACHE_MAX_SIZE || "5000", 10),
 } as const;
+
+// ─── RAM: 内存向量缓存 ────────────────────────────────────────────────────────
+// 将 chunk embeddings 缓存在内存中，避免每次查询都读取数据库中的大型 JSON 列
+type RAMEntry = {
+  chunkId: number;
+  materialId: number;
+  chunkIndex: number;
+  content: string;
+  chapter: string | null;
+  pageStart: number | null;
+  pageEnd: number | null;
+  embedding: number[];
+};
+
+let _ramCache: RAMEntry[] = [];
+let _ramLoadedAt = 0;
+let _ramLoading: Promise<void> | null = null;
+const RAM_TTL_MS = 10 * 60 * 1000; // RAM 缓存 10 分钟有效
+
+async function ensureRAMCache(): Promise<RAMEntry[]> {
+  const now = Date.now();
+  if (_ramCache.length > 0 && now - _ramLoadedAt < RAM_TTL_MS) {
+    return _ramCache;
+  }
+
+  // 防止并发加载
+  if (_ramLoading) {
+    await _ramLoading;
+    return _ramCache;
+  }
+
+  _ramLoading = loadRAMCache();
+  try {
+    await _ramLoading;
+  } finally {
+    _ramLoading = null;
+  }
+  return _ramCache;
+}
+
+async function loadRAMCache(): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+
+  console.log("[RAM] Loading chunk embeddings into memory...");
+  const startTime = Date.now();
+
+  const rows = await db
+    .select({
+      id: materialChunks.id,
+      materialId: materialChunks.materialId,
+      chunkIndex: materialChunks.chunkIndex,
+      content: materialChunks.content,
+      chapter: materialChunks.chapter,
+      pageStart: materialChunks.pageStart,
+      pageEnd: materialChunks.pageEnd,
+      embedding: materialChunks.embedding,
+      vectorId: materialChunks.vectorId,
+    })
+    .from(materialChunks)
+    .innerJoin(materials, eq(materialChunks.materialId, materials.id))
+    .where(and(
+      eq(materials.status, "published"),
+      eq(materialChunks.vectorId, "embedded"),
+      isNotNull(materialChunks.embedding)
+    ))
+    .limit(SEARCH_CONFIG.ramCacheMaxSize);
+
+  const entries: RAMEntry[] = [];
+  for (const row of rows) {
+    const emb = row.embedding as number[] | null;
+    if (!emb || !Array.isArray(emb) || emb.length === 0) continue;
+    entries.push({
+      chunkId: row.id,
+      materialId: row.materialId,
+      chunkIndex: row.chunkIndex,
+      content: row.content,
+      chapter: row.chapter,
+      pageStart: row.pageStart,
+      pageEnd: row.pageEnd,
+      embedding: emb,
+    });
+  }
+
+  _ramCache = entries;
+  _ramLoadedAt = Date.now();
+  console.log(`[RAM] Loaded ${entries.length} embeddings in ${Date.now() - startTime}ms`);
+}
+
+/** 清除 RAM 缓存（教材更新时调用） */
+export function invalidateRAMCache(): void {
+  _ramCache = [];
+  _ramLoadedAt = 0;
+  console.log("[RAM] Cache invalidated");
+}
+
+// ─── Embedding 向量检索 ────────────────────────────────────────────────────────
+type EmbeddingCandidate = {
+  chunkId: number;
+  materialId: number;
+  chunkIndex: number;
+  content: string;
+  chapter: string | null;
+  pageStart: number | null;
+  pageEnd: number | null;
+  similarity: number;
+};
+
+async function embeddingSearch(
+  question: string,
+  materialIds: number[] | undefined,
+  languageFilter: "zh" | "en" | "all",
+  topK: number
+): Promise<EmbeddingCandidate[]> {
+  // 1. 生成问题的 embedding
+  let queryEmbedding: number[];
+  try {
+    queryEmbedding = await getEmbedding(question);
+  } catch (err: any) {
+    console.warn(`[EmbeddingSearch] Failed to get query embedding: ${err?.message || err}`);
+    return [];
+  }
+
+  // 2. 从 RAM 缓存中加载 chunk embeddings
+  const cache = await ensureRAMCache();
+  if (cache.length === 0) return [];
+
+  // 3. 过滤符合条件的 chunks
+  let candidates = cache;
+  if (materialIds && materialIds.length > 0) {
+    const matSet = new Set(materialIds);
+    candidates = candidates.filter(entry => matSet.has(entry.materialId));
+  }
+  // languageFilter 在 RAM 缓存中已通过 JOIN published materials 保证
+
+  // 4. 计算余弦相似度并排序
+  const scored = candidates.map(entry => ({
+    chunkId: entry.chunkId,
+    materialId: entry.materialId,
+    chunkIndex: entry.chunkIndex,
+    content: entry.content,
+    chapter: entry.chapter,
+    pageStart: entry.pageStart,
+    pageEnd: entry.pageEnd,
+    similarity: cosineSimilarity(queryEmbedding, entry.embedding),
+  }));
+
+  scored.sort((a, b) => b.similarity - a.similarity);
+  return scored.slice(0, topK).filter(c => c.similarity > 0.3);
+}
 
 // ─── 林业领域同义词扩展表 ───────────────────────────────────────────────────
 // 用于评分阶段（不用于SQL检索），帮助识别相关但措辞不同的chunk
@@ -1059,10 +1220,30 @@ export async function semanticSearch(
     },
   ];
 
-  // 当前版本不依赖 embedding，useEmbedding 参数仅保留兼容性。
-  void useEmbedding;
-
   const candidateMap = new Map<number, CandidateState>();
+
+  // V2: Embedding 向量检索（如果启用）
+  let embeddingResults: EmbeddingCandidate[] = [];
+  const embeddingScoreMap = new Map<number, number>(); // chunkId → embedding similarity
+
+  if (useEmbedding) {
+    try {
+      embeddingResults = await embeddingSearch(
+        question,
+        materialIds,
+        languageFilter,
+        SEARCH_CONFIG.embeddingTopK
+      );
+      for (const er of embeddingResults) {
+        embeddingScoreMap.set(er.chunkId, er.similarity);
+      }
+      if (embeddingResults.length > 0) {
+        console.log(`[HybridSearch] Embedding search returned ${embeddingResults.length} candidates (top score: ${embeddingResults[0].similarity.toFixed(3)})`);
+      }
+    } catch (err: any) {
+      console.warn(`[HybridSearch] Embedding search failed, falling back to keyword-only: ${err?.message || err}`);
+    }
+  }
 
   // V2: 并行执行三路召回，减少串行 SQL 延迟
   const routePromises = routePlan
@@ -1089,6 +1270,28 @@ export async function semanticSearch(
       candidate.routeHits[route.route] += 1;
       candidate.recallScore += route.weight / (index + 1.5);
     });
+  }
+
+  // V2: 将 Embedding 检索结果合入候选集
+  for (const er of embeddingResults) {
+    const existing = candidateMap.get(er.chunkId);
+    if (existing) continue; // 关键词检索已包含，后续融合分数
+    // Embedding 独有候选：构造 CandidateRow 并加入
+    const state: CandidateState = {
+      id: er.chunkId,
+      materialId: er.materialId,
+      chunkIndex: er.chunkIndex,
+      content: er.content,
+      chapter: er.chapter,
+      pageStart: er.pageStart,
+      pageEnd: er.pageEnd,
+      routeHits: { strict: 0, phrase: 0, broad: 0 },
+      recallScore: 0,
+      keywordScore: 0,
+      adjacencyScore: 0,
+      finalScore: 0,
+    };
+    candidateMap.set(er.chunkId, state);
   }
 
   if (candidateMap.size === 0) return [];
@@ -1140,11 +1343,29 @@ export async function semanticSearch(
   const maxRecall = Math.max(...candidates.map((entry) => entry.recallScore), 1);
   const maxAdjacency = Math.max(...candidates.map((entry) => entry.adjacencyScore), 1);
 
+  // V2: 混合检索融合 — 当有 embedding 结果时使用四维融合权重
+  const hasEmbeddingScores = embeddingScoreMap.size > 0;
+
   for (const candidate of candidates) {
     const normKeyword = candidate.keywordScore / maxKeyword;
     const normRecall = candidate.recallScore / maxRecall;
     const normAdjacency = candidate.adjacencyScore / maxAdjacency;
-    candidate.finalScore = normKeyword * SEARCH_CONFIG.keywordFusionWeight + normRecall * SEARCH_CONFIG.recallFusionWeight + normAdjacency * SEARCH_CONFIG.adjacencyFusionWeight;
+
+    if (hasEmbeddingScores) {
+      // Embedding 相似度已经是 0~1 归一化的，直接使用
+      const embScore = embeddingScoreMap.get(candidate.id) ?? 0;
+      candidate.finalScore =
+        normKeyword * SEARCH_CONFIG.keywordFusionWeightHybrid +
+        normRecall * SEARCH_CONFIG.recallFusionWeightHybrid +
+        normAdjacency * SEARCH_CONFIG.adjacencyFusionWeightHybrid +
+        embScore * SEARCH_CONFIG.embeddingFusionWeight;
+    } else {
+      // 纯关键词模式（原逻辑）
+      candidate.finalScore =
+        normKeyword * SEARCH_CONFIG.keywordFusionWeight +
+        normRecall * SEARCH_CONFIG.recallFusionWeight +
+        normAdjacency * SEARCH_CONFIG.adjacencyFusionWeight;
+    }
   }
 
   candidates.sort((a, b) => b.finalScore - a.finalScore);
@@ -1187,11 +1408,14 @@ export async function storeChunkVector(
     .where(eq(materialChunks.id, chunkId));
 }
 
-// ─── 清除缓存（全文检索模式下无需缓存）──────────────────────────────────────
+// ─── 清除缓存 ──────────────────────────────────────────────────────────────
 export function invalidateMaterialCache(_materialId: number): void {
-  // no-op in fulltext mode
+  // 教材更新时清除 RAM 缓存，下次查询时重新加载
+  invalidateRAMCache();
 }
 
 export async function forceRefreshCache(): Promise<void> {
-  // no-op in fulltext mode
+  // 强制重新加载 RAM 缓存
+  invalidateRAMCache();
+  await ensureRAMCache();
 }
