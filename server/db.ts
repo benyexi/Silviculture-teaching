@@ -31,6 +31,7 @@ export async function getDb() {
         uri: process.env.DATABASE_URL,
         connectionLimit: 10,
         connectTimeout: 10000,
+        charset: "utf8mb4",
       });
       _db = drizzle(pool);
     } catch (error) {
