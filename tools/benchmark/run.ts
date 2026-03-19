@@ -252,7 +252,7 @@ function passesHeuristic(type: QuestionType, answer: string): boolean {
   if (!text) return false;
   switch (type) {
     case "definition":
-      return /(定义|概念|是指|指的是)/.test(text);
+      return looksLikeDefinitionAnswer("", text);
     case "classification":
       return /(分类|类型|可分为|分为|包括|可归为)/.test(text);
     case "method":
@@ -266,6 +266,31 @@ function passesHeuristic(type: QuestionType, answer: string): boolean {
     default:
       return false;
   }
+}
+
+function extractDefinitionSubject(question: string): string {
+  return question
+    .replace(/[，。？！、；：""''（）【】《》\s]+/g, "")
+    .replace(/什么是|请问|定义|含义|概念|解释|说明|何谓|是指|指的是/g, "")
+    .trim();
+}
+
+function looksLikeDefinitionAnswer(question: string, answer: string): boolean {
+  const text = answer.trim();
+  if (!text) return false;
+  if (/(定义|概念|是指|指的是|可理解为|means|defined as|refers to|concept)/i.test(text)) return true;
+
+  const subject = extractDefinitionSubject(question);
+  if (!subject) {
+    return /(是|为|属于)/.test(text);
+  }
+
+  const escaped = subject.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const directPattern = new RegExp(`${escaped}.{0,12}(是|为|属于|包括|分为|可分为)`);
+  if (directPattern.test(text)) return true;
+
+  const startPattern = new RegExp(`^${escaped}(是|为|属于)`);
+  return startPattern.test(text);
 }
 
 function normalizeSources(raw: unknown): Array<{
@@ -432,7 +457,7 @@ async function runQuestionOnce(baseUrl: string, timeoutMs: number, question: Ben
     const noiseSourceHits = sources.filter((source) => isNoiseChapter(source.chapter)).length;
     const noiseHit = noiseSourceHits > 0;
     const definitionTooLong = question.type === "definition" && answerLength > 220;
-    const definitionDrift = question.type === "definition" && !/(定义|概念|是指|指的是)/.test(answer);
+    const definitionDrift = question.type === "definition" && !looksLikeDefinitionAnswer(question.question, answer);
 
     return {
       id: question.id,

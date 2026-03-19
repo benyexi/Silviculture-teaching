@@ -545,6 +545,10 @@ function normalizeForFocus(text: string): string {
     .replace(/[?,;:!"'()\[\]\s]/g, "");
 }
 
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function pickFocusTerms(
   question: string,
   questionLang: "zh" | "en",
@@ -839,6 +843,16 @@ async function callLLM(
   if (analysis.conciseDefinition) {
     effectiveResults = await enrichDefinitionResults(question, effectiveResults, questionLang, analysis);
     effectiveResults = filterNoisySearchResults(effectiveResults);
+    const definitionTargets = pickDefinitionTargets(question, keywords, questionLang);
+    if (definitionTargets.length > 0) {
+      const targeted = effectiveResults.filter((row) => {
+        const text = `${row.chapter || ""}\n${row.content}`.toLowerCase();
+        return definitionTargets.some((term) => text.includes(term));
+      });
+      if (targeted.length > 0) {
+        effectiveResults = targeted;
+      }
+    }
   }
   const sourceLimit = pickSourceLimit(questionLang, analysis);
   const materialTitles = Array.from(new Set(effectiveResults.map((r) => r.materialTitle)));
@@ -846,26 +860,38 @@ async function callLLM(
     ? buildExtractiveAnswer(question, effectiveResults, questionLang, analysis)
     : null;
   if (analysis.conciseDefinition && !extractive) {
-    const answer = questionLang === "en"
+    const fallbackAnswer = await generateClosestDefinitionFromExcerpts(
+      question,
+      effectiveResults,
+      questionLang,
+      materialLang,
+      analysis
+    );
+    const answer = fallbackAnswer || (questionLang === "en"
       ? "The provided excerpts do not contain a direct definition sentence for this term."
-      : "教材片段中未检索到该术语的直接定义句（如“是指/定义为”）。请尝试补充更具体术语后再问。";
+      : "教材片段中未检索到该术语的直接定义句（如“是指/定义为”）。请尝试补充更具体术语后再问。");
     return {
       answer,
-      sources: [],
-      modelUsed: "extractive",
-      foundInMaterials: false,
-      confidence: 0.2,
+      sources: buildSources(effectiveResults, Boolean(fallbackAnswer), keywords, sourceLimit),
+      modelUsed: "definition-synth",
+      foundInMaterials: Boolean(fallbackAnswer),
+      confidence: fallbackAnswer ? 0.72 : 0.2,
     };
   }
   if (extractive) {
     const conciseResults = effectiveResults.filter((r) => extractive.usedChunkIds.includes(r.chunkId));
     const sources = buildSources(conciseResults, true, keywords, sourceLimit);
+    const strictDefinition = extractive.strictDefinition !== false;
+    const extractiveModel = analysis.conciseDefinition && !strictDefinition ? "extractive-approx" : "extractive";
+    const extractiveConfidence = analysis.conciseDefinition
+      ? (strictDefinition ? 0.9 : 0.74)
+      : 0.9;
     return {
       answer: extractive.answer,
       sources,
-      modelUsed: "extractive",
+      modelUsed: extractiveModel,
       foundInMaterials: true,
-      confidence: 0.9,
+      confidence: extractiveConfidence,
     };
   }
 
@@ -1404,7 +1430,7 @@ function hasDefinitionCue(text: string, questionLang: "zh" | "en"): boolean {
   if (questionLang === "en") {
     return /\b(is|means|refers to|defined as|definition|concept)\b/i.test(text);
   }
-  return /(是指|指的是|定义|概念|含义|是研究|是一门|是.*?学科)/.test(text);
+  return /(是指|指的是|定义为|定义是|含义是|是研究|是一门|是.*?学科|概念是|概念指|是从)/.test(text);
 }
 
 function hasHistoricalCue(text: string, questionLang: "zh" | "en"): boolean {
@@ -1417,8 +1443,16 @@ function hasHistoricalCue(text: string, questionLang: "zh" | "en"): boolean {
 function isDefinitionBoilerplateSentence(text: string, questionLang: "zh" | "en"): boolean {
   const trimmed = text.trim();
   if (!trimmed) return true;
+  const compact = normalizeForFocus(trimmed);
   if (/^(复习思考题|思考题|习题|练习题|目录|参考文献)/.test(trimmed)) return true;
   if (/^\d+(?:\.\d+){1,6}\s*$/.test(trimmed)) return true;
+  if (/(在此再次|通过介绍|变化渊源|名词及其内涵|下文将|如下所述|本书将|本章将)/.test(trimmed)) return true;
+  if (/既然是涉及.*全过程.*学科/.test(trimmed)) return true;
+  if (
+    /由于前一时期用词混乱|用词混乱造成|有关名词及其内涵|变化渊源作一简单介绍|通过介绍也可/.test(compact)
+  ) {
+    return true;
+  }
 
   if (questionLang === "en") {
     return /^(chapter|section)\s+\d+/i.test(trimmed);
@@ -1454,6 +1488,27 @@ function pickDefinitionTargets(question: string, keywords: string[], questionLan
     seen.add(term);
     unique.push(term);
   }
+
+  const primary = cleanedQuestion.trim().toLowerCase();
+  if (!primary) return unique.slice(0, 4);
+
+  if (questionLang === "zh" && primary.length >= 4) {
+    const narrowed = unique.filter((term) => {
+      if (term === primary) return true;
+      // 避免“造林时间”被“造林”等短词稀释，导致定义题跑偏。
+      if (primary.includes(term) && term.length <= primary.length - 1) return false;
+      return true;
+    });
+    const ordered = [primary, ...narrowed.filter((term) => term !== primary)];
+    return ordered.slice(0, 4);
+  }
+
+  if (questionLang === "en" && primary.split(/\s+/).length >= 2) {
+    const narrowed = unique.filter((term) => term === primary || term.length >= 4);
+    const ordered = [primary, ...narrowed.filter((term) => term !== primary)];
+    return ordered.slice(0, 4);
+  }
+
   return unique.slice(0, 4);
 }
 
@@ -1471,10 +1526,35 @@ function prioritizeDefinitionResults(
   const ranked = searchResults
     .map((row) => {
       const text = `${row.chapter || ""}\n${row.content}`;
+      const chapterText = row.chapter || "";
+      const lowerText = text.toLowerCase();
       const targetHits = targets.filter((term) => text.toLowerCase().includes(term)).length;
       const cue = hasDefinitionCue(row.content, questionLang) ? 1 : 0;
+      const directDefinitionHit = targets.some((term) => {
+        const escaped = escapeRegExp(term);
+        if (questionLang === "en") {
+          return new RegExp(`\\b${escaped}\\b.{0,20}\\b(is|means|refers to|defined as)\\b`, "i").test(lowerText);
+        }
+        const prefix = term.endsWith("学") ? escaped : `${escaped}(?!学)`;
+        return new RegExp(`${prefix}.{0,8}(是指|指的是|定义为|定义是|是研究|是一门|是.*?学科)`).test(text);
+      });
+      const chapterDefinitionCue = questionLang === "en"
+        ? /\b(definition|concept|meaning|overview)\b/i.test(chapterText)
+        : /(概念|定义|含义|范畴|总论|概述)/.test(chapterText);
       const history = hasHistoricalCue(text, questionLang) ? 1 : 0;
-      const score = row.similarity * 2.5 + targetHits * 2.6 + cue * 3.8 - history * 1.8;
+      const contextualPenalty = questionLang === "en"
+        ? cue === 0 && /(should|need to|management|operation|practice|treatment|during)/i.test(row.content) ? 1.4 : 0
+        : cue === 0 && /(应|需|需要|可|可以|采用|实施|管理|措施|技术|作业|阶段|条件|处理)/.test(row.content) ? 1.4 : 0;
+      const weakDefinitionPenalty = cue === 0 && targetHits > 0 ? 1.1 : 0;
+      const score =
+        row.similarity * 2.5 +
+        targetHits * 2.6 +
+        cue * 3.8 +
+        (directDefinitionHit ? 4.6 : 0) +
+        (chapterDefinitionCue ? 1.6 : 0) -
+        history * 1.8 -
+        contextualPenalty -
+        weakDefinitionPenalty;
       return { row, score, cue, targetHits };
     })
     .sort((a, b) => b.score - a.score);
@@ -1552,13 +1632,15 @@ async function enrichDefinitionResults(
   if (!subject) return searchResults;
 
   const expandedQuery =
-    questionLang === "en" ? `${subject} definition concept refers to` : `${subject} 定义 概念 是指`;
+    questionLang === "en"
+      ? `${subject} definition concept refers to discipline means`
+      : `${subject} 定义 概念 是指 是研究 学科 含义`;
 
   try {
     const extraResults = await semanticSearch(
       expandedQuery,
       undefined,
-      Math.max(6, pickTopK(questionLang, analysis) + 2),
+      Math.max(18, pickTopK(questionLang, analysis) + 10),
       questionLang,
       false
     );
@@ -1573,7 +1655,8 @@ async function enrichDefinitionResults(
       unique.push(row);
     }
 
-    return unique.slice(0, Math.max(searchResults.length, pickTopK(questionLang, analysis) + 2));
+    const targetPoolSize = Math.max(searchResults.length + 8, pickTopK(questionLang, analysis) + 10, 14);
+    return unique.slice(0, targetPoolSize);
   } catch {
     return searchResults;
   }
@@ -1584,7 +1667,7 @@ function buildExtractiveAnswer(
   searchResults: SearchResult[],
   questionLang: "zh" | "en",
   analysis: QuestionAnalysis
-): { answer: string; usedChunkIds: number[] } | null {
+): { answer: string; usedChunkIds: number[]; strictDefinition?: boolean } | null {
   const queryNorm = normalizeQuestion(question);
   const keywords = (questionLang === "en" ? extractKeywordsEn(question) : extractKeywords(question))
     .filter((k) => k.length >= 2)
@@ -1592,6 +1675,9 @@ function buildExtractiveAnswer(
   const definitionTargets = analysis.conciseDefinition
     ? pickDefinitionTargets(question, keywords, questionLang)
     : [];
+  const definitionSubject = analysis.conciseDefinition
+    ? extractDefinitionSubject(question, questionLang).toLowerCase()
+    : "";
   const conciseEntityTarget = analysis.conciseEntity
     ? normalizeQuestion(
         questionLang === "en"
@@ -1653,14 +1739,63 @@ function buildExtractiveAnswer(
         if (isDefinitionBoilerplateSentence(sentence, questionLang)) continue;
         const sentenceLower = sentence.toLowerCase();
         const targetHit = definitionTargets.some((term) => sentenceLower.includes(term));
+        if (definitionTargets.length > 0 && !targetHit) continue;
+        const isGenericSilvicultureDefinition = questionLang === "zh" &&
+          /森林培育是从林木种子、苗木、造林更新到林木成林、成熟/.test(sentence) &&
+          !/(森林培育学?|森林培育)/.test(definitionSubject);
+        const isGenericSilvicultureDiscipline = questionLang === "zh" &&
+          /森林培育学是研究森林培育/.test(sentence) &&
+          !/森林培育学/.test(definitionSubject);
+        if (isGenericSilvicultureDefinition || isGenericSilvicultureDiscipline) {
+          continue;
+        }
+        const firstTargetPos = definitionTargets.reduce((minPos, term) => {
+          const idx = sentenceLower.indexOf(term);
+          if (idx < 0) return minPos;
+          return Math.min(minPos, idx);
+        }, Number.POSITIVE_INFINITY);
+        const targetAppearsLate = Number.isFinite(firstTargetPos) && firstTargetPos > (questionLang === "en" ? 44 : 24);
+        const startsWithTarget = definitionTargets.some((term) =>
+          questionLang === "zh" && !term.endsWith("学")
+            ? sentenceLower.startsWith(term) && !sentenceLower.startsWith(`${term}学`)
+            : sentenceLower.startsWith(term)
+        );
+        const subjectSuffixMismatch = questionLang === "zh" &&
+          Boolean(definitionSubject) &&
+          !definitionSubject.endsWith("学") &&
+          sentenceLower.startsWith(`${definitionSubject}学`);
+        const directSubjectDefinition = definitionTargets.some((term) => {
+          const escaped = escapeRegExp(term);
+          if (questionLang === "en") {
+            return new RegExp(`\\b${escaped}\\b.{0,20}\\b(is|means|refers to|defined as)\\b`, "i").test(sentenceLower);
+          }
+          const prefix = term.endsWith("学") ? escaped : `${escaped}(?!学)`;
+          return new RegExp(`^${prefix}.{0,8}(是指|指的是|定义为|定义是|是研究|是一门|是.*?学科)`).test(sentence);
+        });
         const cueHit = hasDefinitionCue(sentence, questionLang);
         const definitionalHit = questionLang === "en"
           ? /\b(is|means|refers to|defined as)\b/i.test(sentence)
           : /(?:^|，|。)\s*(?:[^。！？\n]{0,14})(?:是指|指的是|定义为|定义是|是研究|是一种|是一类|是将|是对|是按|是从)/.test(sentence);
+        const contextualSentence = questionLang === "en"
+          ? !cueHit && !definitionalHit && /(should|need to|management|operation|practice|during|under)/i.test(sentence)
+          : !cueHit && !definitionalHit && /(一般|通常|应|需|需要|可|可以|采用|实施|管理|措施|技术|作业|过程|在.*时|对.+?时)/.test(sentence);
+        const enumerativeDefinitionLike = questionLang === "en"
+          ? /(includes|consists of|types? include|can be divided into)/i.test(sentence)
+          : /(有.+(种|类|方式|类型)|包括|分为|可分为|由.+组成)/.test(sentence);
         if (targetHit) score += 6;
+        if (startsWithTarget) score += 3.4;
+        if (directSubjectDefinition) score += 5.4;
         if (cueHit) score += 7;
         if (definitionalHit) score += 5;
         if (targetHit && cueHit) score += 8;
+        if (enumerativeDefinitionLike) score += 1.6;
+        if (contextualSentence) score -= 4.5;
+        if (targetAppearsLate) score -= 5.2;
+        if (subjectSuffixMismatch) score -= 4.8;
+        if (questionLang === "zh" && sentence.length > 120) score -= 2.2;
+        if (questionLang === "zh" && sentence.length > 170) score -= 2.8;
+        if (questionLang === "en" && sentence.length > 260) score -= 2.2;
+        if (questionLang === "en" && sentence.length > 340) score -= 2.8;
         if (hasHistoricalCue(sentence, questionLang)) score -= 4;
         if (!targetHit && !cueHit) score -= 2;
         if (score > 0) {
@@ -1685,12 +1820,21 @@ function buildExtractiveAnswer(
 
   if (analysis.conciseDefinition) {
     const hasStrongDefinitionSentence = scored.some((item) => item.targetHit && (item.cueHit || item.definitionalHit));
-    if (!hasStrongDefinitionSentence) return null;
+    if (!hasStrongDefinitionSentence) {
+      const hasApproxDefinitionSignal = scored.some((item) => item.targetHit || item.cueHit || item.definitionalHit);
+      if (!hasApproxDefinitionSignal) return null;
+    }
   }
 
   scored.sort((a, b) => b.score - a.score);
   const used = new Set<number>();
-  const picked: Array<{ sentence: string; chunkId: number }> = [];
+  const picked: Array<{
+    sentence: string;
+    chunkId: number;
+    targetHit: boolean;
+    cueHit: boolean;
+    definitionalHit: boolean;
+  }> = [];
   const seen = new Set<string>();
   const maxItems = analysis.conciseDefinition ? 2 : analysis.conciseEntity ? 2 : analysis.conciseAnswer ? 3 : 5;
 
@@ -1698,31 +1842,194 @@ function buildExtractiveAnswer(
     const key = normalizeQuestion(item.sentence).slice(0, 120);
     if (!key || seen.has(key)) continue;
     seen.add(key);
-    picked.push({ sentence: item.sentence, chunkId: item.chunkId });
+    picked.push({
+      sentence: item.sentence,
+      chunkId: item.chunkId,
+      targetHit: item.targetHit,
+      cueHit: item.cueHit,
+      definitionalHit: item.definitionalHit,
+    });
     used.add(item.chunkId);
     if (picked.length >= maxItems) break;
   }
 
   if (picked.length === 0) return null;
 
-  const lines = picked.map((p) => {
-    const trimmed = truncateSentenceSmart(p.sentence, questionLang, questionLang === "en" ? 180 : 90);
-    if (questionLang === "en") return `- ${trimmed}${/[.!?…]$/.test(trimmed) ? "" : "."}`;
-    return `- ${trimmed}${/[。！？…]$/.test(trimmed) ? "" : "。"}`;
+  let pickedSentences = picked;
+  if (analysis.conciseDefinition) {
+    const anchor = picked.find(
+      (item) => item.targetHit && (item.cueHit || item.definitionalHit) && !hasHistoricalCue(item.sentence, questionLang)
+    ) || picked.find((item) => item.targetHit && (item.cueHit || item.definitionalHit)) || picked[0];
+
+    const support = picked.find(
+      (item) =>
+        item !== anchor &&
+        !hasHistoricalCue(item.sentence, questionLang) &&
+        !isDefinitionBoilerplateSentence(item.sentence, questionLang) &&
+        !/(既然|必然|就必然)/.test(item.sentence) &&
+        (item.targetHit || item.cueHit || item.definitionalHit)
+    );
+
+    pickedSentences = support ? [anchor, support] : [anchor];
+  }
+
+  const normalizedSentences = pickedSentences.map((p) =>
+    truncateSentenceSmart(
+      p.sentence,
+      questionLang,
+      analysis.conciseDefinition ? (questionLang === "en" ? 220 : 140) : questionLang === "en" ? 180 : 90
+    )
+      .replace(/，\s*。/g, "。")
+      .replace(/；\s*。/g, "。")
+      .replace(/。\s*。/g, "。")
+      .trim()
+  );
+
+  if (analysis.conciseDefinition) {
+    const hasStrongDefinitionSentence = pickedSentences.some((item) => {
+      const sentenceLower = item.sentence.toLowerCase();
+      const targetHit = definitionTargets.some((term) => sentenceLower.includes(term));
+      const cueHit = hasDefinitionCue(item.sentence, questionLang);
+      const definitionalHit = questionLang === "en"
+        ? /\b(is|means|refers to|defined as)\b/i.test(item.sentence)
+        : /(?:^|，|。)\s*(?:[^。！？\n]{0,14})(?:是指|指的是|定义为|定义是|是研究|是一种|是一类|是将|是对|是按|是从)/.test(item.sentence);
+      return targetHit && (cueHit || definitionalHit);
+    });
+
+    if (!hasStrongDefinitionSentence) {
+      const definitionSubject = extractDefinitionSubject(question, questionLang) || question.trim();
+      const primary = normalizedSentences[0];
+      const support = normalizedSentences.slice(1, 2);
+      const exampleDriven = questionLang === "en"
+        ? /(for example|e\.g\.|case study|experiment|trial|table|figure|\b\d{2,}\b)/i.test(primary)
+        : /(例如|比如|试验|实验|图（表）|图表|案例|实例|研究表明|研究发现|可据此|编制|落叶松|毛白杨|欧美杨|山东|黄泛平原|\d{2,})/.test(primary);
+      const contextualOnly = questionLang === "en"
+        ? !/\b(is|means|refers to|defined as|includes|consists of|can be divided into)\b/i.test(primary) &&
+          /(should|need to|management|operation|practice|during|under)/i.test(primary)
+        : !/(是指|指的是|定义为|定义是|有.+(种|类|方式|类型)|包括|分为|可分为|由.+组成)/.test(primary) &&
+          /(一般|通常|应|需|需要|可|可以|采用|实施|管理|措施|技术|作业|过程|在.+时)/.test(primary);
+      const enumOnlyNoDefinition = questionLang === "en"
+        ? /(types? include|includes|can be divided into|consists of)/i.test(primary) &&
+          !/\b(is|means|refers to|defined as)\b/i.test(primary)
+        : /(有.+(种|类|方式|类型)|包括|分为|可分为|由.+组成)/.test(primary) &&
+          !/(是指|指的是|定义为|定义是)/.test(primary);
+      const supportHasDefinitionCue = support.some((sentence) => hasDefinitionCue(sentence, questionLang));
+
+      if (exampleDriven || contextualOnly || (enumOnlyNoDefinition && !supportHasDefinitionCue)) {
+        // 回退到 LLM 概括：示例型句子通常不适合作为“是什么”的直接定义。
+        return null;
+      }
+
+      if (questionLang === "en") {
+        const main = /[.!?…]$/.test(primary)
+          ? primary
+          : `${primary}.`;
+        const supportText = support
+          .map((sentence) => (/[.!?…]$/.test(sentence) ? sentence : `${sentence}.`))
+          .join(" ");
+        return {
+          answer: (`Based on the textbook excerpts, "${definitionSubject}" can be understood as: ${main}${supportText ? ` ${supportText}` : ""}`)
+            .trim(),
+          usedChunkIds: Array.from(used),
+          strictDefinition: false,
+        };
+      }
+
+      const main = /[。！？…]$/.test(primary)
+        ? primary
+        : `${primary}。`;
+      const supportText = support
+        .map((sentence) => (/[。！？…]$/.test(sentence) ? sentence : `${sentence}。`))
+        .join("");
+
+      return {
+        answer: (`根据教材相关表述，“${definitionSubject}”可理解为：${main}${supportText}`).trim(),
+        usedChunkIds: Array.from(used),
+        strictDefinition: false,
+      };
+    }
+
+    const text = normalizedSentences
+      .map((sentence) => {
+        if (questionLang === "en") return /[.!?…]$/.test(sentence) ? sentence : `${sentence}.`;
+        return /[。！？…]$/.test(sentence) ? sentence : `${sentence}。`;
+      })
+      .join(questionLang === "en" ? " " : "");
+
+    return {
+      answer: text.trim(),
+      usedChunkIds: Array.from(used),
+      strictDefinition: true,
+    };
+  }
+
+  const lines = normalizedSentences.map((sentence) => {
+    if (questionLang === "en") return `- ${/[.!?…]$/.test(sentence) ? sentence : `${sentence}.`}`;
+    return `- ${/[。！？…]$/.test(sentence) ? sentence : `${sentence}。`}`;
   });
 
-  const prefix = analysis.conciseDefinition
-    ? (questionLang === "en"
-      ? `Definition-grounded information about "${question.trim()}":`
-      : `教材中关于“${question.trim()}”的定义性信息：`)
-    : (questionLang === "en"
-      ? `Direct excerpt-grounded information about "${question.trim()}":`
-      : `教材中关于“${question.trim()}”的直接信息：`);
+  const prefix = questionLang === "en"
+    ? `Direct excerpt-grounded information about "${question.trim()}":`
+    : `教材中关于“${question.trim()}”的直接信息：`;
 
   return {
     answer: `${prefix}\n${lines.join("\n")}`.replace(/[ \t]+\n/g, "\n").trim(),
     usedChunkIds: Array.from(used),
+    strictDefinition: true,
   };
+}
+
+async function generateClosestDefinitionFromExcerpts(
+  question: string,
+  searchResults: SearchResult[],
+  questionLang: "zh" | "en",
+  materialLang: "zh" | "en",
+  analysis: QuestionAnalysis
+): Promise<string | null> {
+  if (!analysis.conciseDefinition || searchResults.length === 0) return null;
+
+  const materialTitles = Array.from(new Set(searchResults.map((r) => r.materialTitle)));
+  const systemPrompt = buildSystemPrompt(materialTitles, questionLang, materialLang, analysis);
+  const sourceTexts = searchResults
+    .slice(0, 4)
+    .map((r, idx) => `【片段${idx + 1}】${r.content}`)
+    .join("\n\n");
+
+  const userPrompt = questionLang === "en"
+    ? `The user asks a definition question: "${question}".
+No strict definition sentence (e.g., "is defined as" / "refers to") was found.
+Please provide the closest textbook-grounded definition:
+1. Start with a direct one-sentence definition synthesized from excerpts.
+2. Then give 1-2 concise supporting sentences from excerpts.
+3. No external knowledge. No invented facts.
+4. Keep total answer within 180 words.
+
+Excerpts:
+${sourceTexts}`
+    : `用户问的是定义题：“${question}”。
+当前片段里没有检索到标准定义句（如“是指/定义为”）。
+请基于片段给出“最接近定义”的回答：
+1. 先给出一句直接定义（用教材原意概括，不要外推）；
+2. 再补1-2句教材支持信息；
+3. 只能使用片段信息，不能补充外部知识；
+4. 总长度控制在180字以内。
+
+教材片段：
+${sourceTexts}`;
+
+  try {
+    const response = await invokeLLMWithConfig(
+      [{ role: "user", content: userPrompt }],
+      systemPrompt,
+      { temperature: 0, maxTokens: 320 }
+    );
+    const parsed = parseLLMOutput(response.content);
+    const answer = stripCitationMarkers(parsed ? parsed.answer : response.content);
+    const concise = enforceConciseDefinition(answer, questionLang);
+    return concise.replace(/\*\*/g, "").replace(/\*/g, "").trim();
+  } catch {
+    return null;
+  }
 }
 
 // ─── 流式答案生成 ─────────────────────────────────────────────────────────────
@@ -1828,19 +2135,39 @@ export async function generateAnswerStream(
     }
 
     const keywords = questionLanguage === "en" ? extractKeywordsEn(req.question) : extractKeywords(req.question);
+    if (questionAnalysis.conciseDefinition) {
+      const definitionTargets = pickDefinitionTargets(req.question, keywords, questionLanguage);
+      if (definitionTargets.length > 0) {
+        const targeted = effectiveResults.filter((row) => {
+          const text = `${row.chapter || ""}\n${row.content}`.toLowerCase();
+          return definitionTargets.some((term) => text.includes(term));
+        });
+        if (targeted.length > 0) {
+          effectiveResults = targeted;
+        }
+      }
+    }
     const extractive = questionAnalysis.conciseAnswer
       ? buildExtractiveAnswer(req.question, effectiveResults, questionLanguage, questionAnalysis)
       : null;
     if (questionAnalysis.conciseDefinition && !extractive) {
-      const answer = questionLanguage === "en"
+      const fallbackAnswer = await generateClosestDefinitionFromExcerpts(
+        req.question,
+        effectiveResults,
+        questionLanguage,
+        questionLanguage,
+        questionAnalysis
+      );
+      const answer = fallbackAnswer || (questionLanguage === "en"
         ? "The provided excerpts do not contain a direct definition sentence for this term."
-        : "教材片段中未检索到该术语的直接定义句（如“是指/定义为”）。请尝试补充更具体术语后再问。";
+        : "教材片段中未检索到该术语的直接定义句（如“是指/定义为”）。请尝试补充更具体术语后再问。");
+      const fallbackSources = buildSources(effectiveResults, Boolean(fallbackAnswer), keywords, sourceLimit);
       const responseTimeMs = Date.now() - startTime;
       const queryId = await createQuery({
         question: req.question,
         answer,
-        sources: [],
-        modelUsed: "extractive",
+        sources: fallbackSources,
+        modelUsed: "definition-synth",
         responseTimeMs,
         visitorIp: req.visitorIp,
         visitorCity: req.visitorCity,
@@ -1850,10 +2177,10 @@ export async function generateAnswerStream(
         visitorLng: req.visitorLng,
       });
       onMeta({
-        sources: [],
-        modelUsed: "extractive",
-        foundInMaterials: false,
-        confidence: 0.2,
+        sources: fallbackSources,
+        modelUsed: "definition-synth",
+        foundInMaterials: Boolean(fallbackAnswer),
+        confidence: fallbackAnswer ? 0.72 : 0.2,
         questionLanguage,
         queryId,
         responseTimeMs,
@@ -1866,12 +2193,17 @@ export async function generateAnswerStream(
       const conciseResults = effectiveResults.filter((r) => extractive.usedChunkIds.includes(r.chunkId));
       const sources = buildSources(conciseResults, true, keywords, sourceLimit);
       const answer = extractive.answer;
+      const strictDefinition = extractive.strictDefinition !== false;
+      const extractiveModel = questionAnalysis.conciseDefinition && !strictDefinition ? "extractive-approx" : "extractive";
+      const extractiveConfidence = questionAnalysis.conciseDefinition
+        ? (strictDefinition ? 0.9 : 0.74)
+        : 0.9;
       const responseTimeMs = Date.now() - startTime;
       const queryId = await createQuery({
         question: req.question,
         answer,
         sources,
-        modelUsed: "extractive",
+        modelUsed: extractiveModel,
         responseTimeMs,
         visitorIp: req.visitorIp,
         visitorCity: req.visitorCity,
@@ -1882,9 +2214,9 @@ export async function generateAnswerStream(
       });
       onMeta({
         sources,
-        modelUsed: "extractive",
+        modelUsed: extractiveModel,
         foundInMaterials: true,
-        confidence: 0.9,
+        confidence: extractiveConfidence,
         questionLanguage,
         queryId,
         responseTimeMs,
