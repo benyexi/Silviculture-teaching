@@ -166,9 +166,6 @@ async function loadRAMCache(): Promise<void> {
   const db = await getDb();
   if (!db) return;
 
-  console.log("[RAM] Loading chunk embeddings into memory...");
-  const startTime = Date.now();
-
   // 只加载 embedding 和元数据，不加载 content（节省内存）
   // 同时加载 materials.language 用于后续 languageFilter
   const rows = await db
@@ -203,16 +200,12 @@ async function loadRAMCache(): Promise<void> {
 
   _ramCache = entries;
   _ramLoadedAt = Date.now();
-  const embDim = entries.length > 0 ? entries[0].embedding.length : 0;
-  const estMemMB = ((entries.length * embDim * 8 + entries.length * 64) / 1024 / 1024).toFixed(1);
-  console.log(`[RAM] Loaded ${entries.length} embeddings (dim=${embDim}, ~${estMemMB}MB) in ${Date.now() - startTime}ms`);
 }
 
 /** 清除 RAM 缓存（教材更新时调用） */
 export function invalidateRAMCache(): void {
   _ramCache = [];
   _ramLoadedAt = 0;
-  console.log("[RAM] Cache invalidated");
 }
 
 // ─── Embedding 向量检索 ────────────────────────────────────────────────────────
@@ -292,13 +285,6 @@ async function fetchChunkDetails(
   }
   return map;
 }
-
-type FallbackSearchRow = CandidateRow & {
-  materialTitle: string;
-  hitCount: number;
-  matchedTerms: string[];
-  noisePenalty: number;
-};
 
 function isNumericLikeChapter(chapter: string): boolean {
   const trimmed = chapter.trim();
@@ -383,128 +369,6 @@ function buildEmergencyTerms(question: string, questionLang: "zh" | "en"): strin
       return normalized.length >= 2 && normalized !== "什么" && normalized !== "哪些";
     })
     .slice(0, 10);
-}
-
-async function emergencyLikeFallbackSearch(
-  db: DbConnection,
-  question: string,
-  materialIds: number[] | undefined,
-  topK: number,
-  languageFilter: "zh" | "en" | "all",
-  profile: SearchProfile,
-  questionLang: "zh" | "en"
-): Promise<SearchResult[]> {
-  const emergencyTerms = buildEmergencyTerms(question, questionLang);
-  if (emergencyTerms.length === 0) return [];
-
-  const languagePlan: Array<"zh" | "en" | "all"> =
-    languageFilter === "all" ? ["all"] : [languageFilter, "all"];
-
-  const merged = new Map<number, FallbackSearchRow>();
-
-  for (const lang of languagePlan) {
-    const filters = buildBaseFilters(materialIds, lang);
-    const termClauses = emergencyTerms.map((term) => buildTermCondition(term));
-    const termClause = termClauses.length === 1 ? termClauses[0] : or(...termClauses);
-
-    const rows = await db
-      .select({
-        id: materialChunks.id,
-        materialId: materialChunks.materialId,
-        chunkIndex: materialChunks.chunkIndex,
-        content: materialChunks.content,
-        chapter: materialChunks.chapter,
-        pageStart: materialChunks.pageStart,
-        pageEnd: materialChunks.pageEnd,
-        materialTitle: materials.title,
-      })
-      .from(materialChunks)
-      .innerJoin(materials, eq(materialChunks.materialId, materials.id))
-      .where(and(...filters, termClause))
-      .limit(Math.max(120, topK * 24));
-
-    for (const row of rows) {
-      const noisy = isNoisyChunk(row);
-      const weakNoisy = noisy && !hasDefinitionSignal(row.content) && row.content.length < 180;
-      if (weakNoisy) continue;
-
-      const existing = merged.get(row.id);
-      if (existing) {
-        existing.hitCount += 1;
-        existing.noisePenalty = Math.min(existing.noisePenalty, noisy ? 0.74 : 1);
-        const normalizedText = normalizeForComparison(`${row.chapter || ""}\n${row.content}`);
-        for (const term of emergencyTerms) {
-          const key = normalizeForComparison(term);
-          if (key && normalizedText.includes(key) && !existing.matchedTerms.includes(term)) {
-            existing.matchedTerms.push(term);
-          }
-        }
-        continue;
-      }
-
-      const normalizedText = normalizeForComparison(`${row.chapter || ""}\n${row.content}`);
-      const matchedTerms = emergencyTerms.filter((term) => normalizedText.includes(normalizeForComparison(term)));
-      merged.set(row.id, {
-        id: row.id,
-        materialId: row.materialId,
-        chunkIndex: row.chunkIndex,
-        content: row.content,
-        chapter: row.chapter,
-        pageStart: row.pageStart,
-        pageEnd: row.pageEnd,
-        materialTitle: row.materialTitle,
-        hitCount: 1,
-        matchedTerms,
-        noisePenalty: noisy ? 0.74 : 1,
-      });
-    }
-
-    if (merged.size > 0) break;
-  }
-
-  if (merged.size === 0) return [];
-
-  const fallbackRows = Array.from(merged.values());
-  const scoringTerms = profile.scoringTerms.length > 0 ? profile.scoringTerms : emergencyTerms;
-  const stats = countTermStats(fallbackRows, scoringTerms);
-
-  const scored = fallbackRows
-    .map((row) => {
-      const normalizedText = normalizeForComparison(`${row.chapter || ""}\n${row.content}`);
-      const matchedCount = emergencyTerms.reduce(
-        (acc, term) => acc + (normalizedText.includes(normalizeForComparison(term)) ? 1 : 0),
-        0
-      );
-      const contentScore = scoreChunk(row.content, scoringTerms, question, row.chapter ?? undefined, {
-        stats,
-        intentTerms: profile.intentTerms,
-        anchorTerms: profile.anchorTerms,
-        queryMode: profile.queryMode,
-      });
-      const definitionBoost = hasDefinitionSignal(row.content) ? 1.8 : 0;
-      const chapterBoost = row.chapter && !isNumericLikeChapter(row.chapter) ? 0.4 : 0;
-      const termBoost = matchedCount * 1.15 + row.hitCount * 0.35 + row.matchedTerms.length * 0.35;
-      return {
-        row,
-        score: (contentScore + definitionBoost + chapterBoost + termBoost) * row.noisePenalty,
-      };
-    })
-    .filter((item) => item.score > 0)
-    .sort((a, b) => b.score - a.score);
-
-  if (scored.length === 0) return [];
-
-  return scored.slice(0, Math.max(1, topK)).map(({ row, score }) => ({
-    chunkId: row.id,
-    chunkIndex: row.chunkIndex,
-    materialId: row.materialId,
-    materialTitle: row.materialTitle,
-    chapter: row.chapter,
-    pageStart: row.pageStart,
-    pageEnd: row.pageEnd,
-    content: row.content,
-    similarity: score,
-  }));
 }
 
 // ─── 林业领域同义词扩展表 ───────────────────────────────────────────────────
@@ -1569,8 +1433,6 @@ export async function semanticSearch(
       : profile.queryMode === "classification"
         ? profile.broadTerms.slice(0, 15)
         : profile.broadTerms.slice(0, 18);
-  console.log(`[HybridSearch] question="${question}", lang=${questionLang}, langFilter=${languageFilter}, useEmb=${useEmbedding}`);
-  console.log(`[HybridSearch] strictTerms=[${strictTerms.join(',')}], phraseTerms=[${phraseTerms.join(',')}], broadTerms=[${broadTerms.join(',')}], emergencyTerms=[${emergencyTerms.join(',')}]`);
   const routePlan: Array<{
     route: RouteName;
     terms: string[];
@@ -1636,12 +1498,6 @@ export async function semanticSearch(
   for (const er of embeddingResults) {
     embeddingScoreMap.set(er.chunkId, er.similarity);
   }
-  if (embeddingResults.length > 0) {
-    console.log(`[HybridSearch] Embedding search returned ${embeddingResults.length} candidates (top score: ${embeddingResults[0].similarity.toFixed(3)})`);
-  } else {
-    console.log(`[HybridSearch] Embedding search returned 0 candidates (useEmbedding=${useEmbedding})`);
-  }
-
   for (const { route, rows: routeRows } of routeResults) {
     const rankedRows = routeRows
       .map((row) => ({
@@ -1662,8 +1518,6 @@ export async function semanticSearch(
       candidate.recallScore += route.weight / (index + 1.5);
     });
   }
-
-  console.log(`[HybridSearch] After keyword routes: candidateMap.size=${candidateMap.size}, embeddingResults=${embeddingResults.length}`);
 
   // V2: 将 Embedding-only 候选（关键词未命中的）补入候选集
   // 需要从 DB 回查这些 chunk 的 content/chapter 等详情
@@ -1698,11 +1552,8 @@ export async function semanticSearch(
     }
   }
 
-  console.log(`[HybridSearch] After embedding-only merge: candidateMap.size=${candidateMap.size}, embeddingOnlyIds=${embeddingOnlyIds.length}`);
-
   if (candidateMap.size === 0) {
-    console.warn(`[HybridSearch] candidateMap is empty, using emergency LIKE fallback`);
-    return emergencyLikeFallbackSearch(db, question, materialIds, topK, languageFilter, profile, questionLang);
+    return [];
   }
 
   let candidates = Array.from(candidateMap.values());
@@ -1782,16 +1633,10 @@ export async function semanticSearch(
   }
 
   candidates.sort((a, b) => b.finalScore - a.finalScore);
-  if (candidates.length > 0) {
-    const top3 = candidates.slice(0, 3);
-    console.log(`[HybridSearch] Before diversity: ${candidates.length} candidates, top3 finalScores=[${top3.map(c => c.finalScore.toFixed(4)).join(', ')}], embScores=[${top3.map(c => (embeddingScoreMap.get(c.id) ?? 0).toFixed(3)).join(', ')}]`);
-  }
   const topResults = applyDiversitySelection(candidates, topK).filter((candidate) => candidate.finalScore > 0);
 
-  console.log(`[HybridSearch] Final: ${topResults.length} results after diversity+filter (topK=${topK})`);
   if (topResults.length === 0) {
-    console.warn(`[HybridSearch] topResults empty after ranking, using emergency LIKE fallback`);
-    return emergencyLikeFallbackSearch(db, question, materialIds, topK, languageFilter, profile, questionLang);
+    return [];
   }
 
   const matIds = Array.from(new Set(topResults.map((c) => c.materialId)));

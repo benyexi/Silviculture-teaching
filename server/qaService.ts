@@ -4,7 +4,7 @@ import {
   extractKeywordsEn,
   type SearchResult,
 } from "./vectorSearch";
-import { invokeLLMWithConfig } from "./llmDriver";
+import { invokeLLMWithConfig, invokeLLMStreamWithConfig } from "./llmDriver";
 import { createQuery, upsertVisitorStat, getActiveLlmConfig } from "./db";
 import { detectLanguage } from "./languageDetect";
 import type { QuerySource } from "../drizzle/schema";
@@ -53,7 +53,6 @@ function setCachedAnswer(question: string, data: Omit<CachedAnswer, "cachedAt">)
 /** 教材更新时清空缓存，保证答案基于最新教材 */
 export function clearAnswerCache(): void {
   answerCache.clear();
-  console.log("[Cache] Answer cache cleared");
 }
 
 export type QARequest = {
@@ -1123,6 +1122,48 @@ function isValidAnswerReview(obj: unknown): obj is AnswerReview {
   );
 }
 
+type SourceTextBuildOptions = {
+  limit?: number;
+  maxContentLen?: number;
+  includeLocation?: boolean;
+  separator?: string;
+};
+
+function formatSourceLocation(row: SearchResult): string {
+  return [
+    `《${row.materialTitle}》`,
+    row.chapter ? row.chapter : null,
+    row.pageStart ? `第${row.pageStart}页${row.pageEnd && row.pageEnd !== row.pageStart ? `~${row.pageEnd}页` : ""}` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+function buildSourceTexts(
+  searchResults: SearchResult[],
+  options: SourceTextBuildOptions = {}
+): string {
+  const {
+    limit,
+    maxContentLen,
+    includeLocation = true,
+    separator = "\n\n---\n\n",
+  } = options;
+
+  const rows = typeof limit === "number" ? searchResults.slice(0, Math.max(0, limit)) : searchResults;
+
+  return rows
+    .map((row, idx) => {
+      const location = includeLocation ? formatSourceLocation(row) : "";
+      const content =
+        typeof maxContentLen === "number"
+          ? row.content.substring(0, Math.max(0, maxContentLen))
+          : row.content;
+      return includeLocation ? `【片段${idx + 1}】${location}\n${content}` : `【片段${idx + 1}】\n${content}`;
+    })
+    .join(separator);
+}
+
 function buildAnswerReviewPrompt(
   question: string,
   answer: string,
@@ -1130,19 +1171,7 @@ function buildAnswerReviewPrompt(
   questionLang: "zh" | "en",
   analysis: QuestionAnalysis
 ): string {
-  const sourceTexts = searchResults
-    .map((r, idx) => {
-      const location = [
-        `《${r.materialTitle}》`,
-        r.chapter ? r.chapter : null,
-        r.pageStart ? `第${r.pageStart}页${r.pageEnd && r.pageEnd !== r.pageStart ? `~${r.pageEnd}页` : ""}` : null,
-      ]
-        .filter(Boolean)
-        .join(" · ");
-
-      return `【片段${idx + 1}】${location}\n${r.content.substring(0, 260)}`;
-    })
-    .join("\n\n---\n\n");
+  const sourceTexts = buildSourceTexts(searchResults, { maxContentLen: 260 });
 
   if (questionLang === "en") {
     return `You are reviewing an answer for completeness.
@@ -1192,19 +1221,7 @@ function buildReviewAndFixPrompt(
   analysis: QuestionAnalysis,
   localIssues: string[]
 ): string {
-  const sourceTexts = searchResults
-    .map((r, idx) => {
-      const location = [
-        `《${r.materialTitle}》`,
-        r.chapter ? r.chapter : null,
-        r.pageStart ? `第${r.pageStart}页${r.pageEnd && r.pageEnd !== r.pageStart ? `~${r.pageEnd}页` : ""}` : null,
-      ]
-        .filter(Boolean)
-        .join(" · ");
-
-      return `【片段${idx + 1}】${location}\n${r.content}`;
-    })
-    .join("\n\n---\n\n");
+  const sourceTexts = buildSourceTexts(searchResults);
 
   if (questionLang === "en") {
     return `Review the answer below and output a corrected, complete version directly.
@@ -1257,19 +1274,7 @@ function buildRevisionPrompt(
   analysis: QuestionAnalysis,
   issues: string[]
 ): string {
-  const sourceTexts = searchResults
-    .map((r, idx) => {
-      const location = [
-        `《${r.materialTitle}》`,
-        r.chapter ? r.chapter : null,
-        r.pageStart ? `第${r.pageStart}页${r.pageEnd && r.pageEnd !== r.pageStart ? `~${r.pageEnd}页` : ""}` : null,
-      ]
-        .filter(Boolean)
-        .join(" · ");
-
-      return `【片段${idx + 1}】${location}\n${r.content}`;
-    })
-    .join("\n\n---\n\n");
+  const sourceTexts = buildSourceTexts(searchResults);
 
   if (questionLang === "en") {
     return `Rewrite the answer to be complete and strictly grounded in the excerpts.
@@ -1569,10 +1574,11 @@ function buildGroundedRewritePrompt(
   questionLang: "zh" | "en",
   analysis: QuestionAnalysis
 ): string {
-  const sourceTexts = searchResults
-    .slice(0, analysis.conciseDefinition ? 4 : searchResults.length)
-    .map((r, idx) => `【片段${idx + 1}】${r.content}`)
-    .join("\n\n");
+  const sourceTexts = buildSourceTexts(searchResults, {
+    limit: analysis.conciseDefinition ? 4 : searchResults.length,
+    includeLocation: false,
+    separator: "\n\n",
+  });
   if (questionLang === "en") {
     return `Rewrite the answer using only information that appears in the excerpts below.
 Question: ${question}
@@ -1670,11 +1676,10 @@ ${sourceSnippets}
 
     const parsed = parseQualityEvaluation(evalResponse.content);
     if (parsed) {
-      console.log(`[QualityGate] Score: ${parsed.score}/10, Pass: ${parsed.pass}${parsed.feedback ? `, Feedback: ${parsed.feedback.substring(0, 80)}` : ""}`);
       return parsed;
     }
   } catch (err: any) {
-    console.warn(`[QualityGate] Evaluation failed: ${err?.message || err}`);
+    void err;
   }
 
   // 评估失败时默认通过（不阻塞输出）
@@ -1719,18 +1724,7 @@ function buildQualityRegeneratePrompt(
   analysis: QuestionAnalysis,
   qualityFeedback: string
 ): string {
-  const sourceTexts = searchResults
-    .map((r, idx) => {
-      const location = [
-        `《${r.materialTitle}》`,
-        r.chapter ? r.chapter : null,
-        r.pageStart ? `第${r.pageStart}页${r.pageEnd && r.pageEnd !== r.pageStart ? `~${r.pageEnd}页` : ""}` : null,
-      ]
-        .filter(Boolean)
-        .join(" · ");
-      return `【片段${idx + 1}】${location}\n${r.content}`;
-    })
-    .join("\n\n---\n\n");
+  const sourceTexts = buildSourceTexts(searchResults);
 
   if (questionLang === "en") {
     return `The previous answer was evaluated and found to have quality issues.
@@ -2338,7 +2332,6 @@ export async function generateAnswerStream(
   const questionAnalysis = detectQuestionIntent(req.question, questionLanguage);
   const activeConfig = await getActiveLlmConfig();
   const useRAG = activeConfig?.useRAG ?? false;
-  console.log(`[QA] question="${req.question}", lang=${questionLanguage}, useRAG=${useRAG}, hasConfig=${!!activeConfig}`);
 
   // 检查缓存
   const cached = getCachedAnswer(req.question);
@@ -2373,22 +2366,16 @@ export async function generateAnswerStream(
   }
 
   try {
-    // 检索教材
+    // 1) 检索教材
     const langFilter = questionLanguage === "en" ? "en" : "zh";
     const topK = questionLanguage === "en" ? pickTopK("en", questionAnalysis) : pickTopK("zh", questionAnalysis);
     let searchResults: SearchResult[] = await semanticSearch(req.question, undefined, topK, langFilter, useRAG);
-    console.log(`[QA] searchResults.length=${searchResults.length}, conciseDefinition=${questionAnalysis.conciseDefinition}, useRAG=${useRAG}`);
 
     // Fallback: 如果关键词检索未命中，自动尝试 embedding 检索
     if (searchResults.length === 0 && !useRAG && activeConfig?.embeddingModel) {
-      console.log(`[QA] Keyword search returned 0 results, falling back to embedding search`);
       searchResults = await semanticSearch(req.question, undefined, topK, langFilter, true);
-      console.log(`[QA] Embedding fallback returned ${searchResults.length} results`);
     }
 
-    if (searchResults.length > 0) {
-      console.log(`[QA] top result: similarity=${searchResults[0].similarity.toFixed(4)}, content=${searchResults[0].content.slice(0, 80)}`);
-    }
     let effectiveResults = questionAnalysis.conciseDefinition
       ? [...searchResults]
       : focusResultsByChapter(req.question, searchResults, questionLanguage, questionAnalysis);
@@ -2401,7 +2388,6 @@ export async function generateAnswerStream(
       );
     }
     const sourceLimit = pickSourceLimit(questionLanguage, questionAnalysis);
-    console.log(`[QA] effectiveResults.length=${effectiveResults.length} (after focus/enrich)`);
 
     if (effectiveResults.length === 0) {
       const answer = questionLanguage === "en"
@@ -2419,110 +2405,65 @@ export async function generateAnswerStream(
       return;
     }
 
+    // 2) 构建提示词与来源
     const keywords = questionLanguage === "en" ? extractKeywordsEn(req.question) : extractKeywords(req.question);
-
+    const sources = buildSources(effectiveResults, true, keywords, sourceLimit);
     const materialTitles = Array.from(new Set(effectiveResults.map((r) => r.materialTitle)));
     const systemPrompt = buildSystemPrompt(materialTitles, questionLanguage, questionLanguage, questionAnalysis);
     const userMessage = buildUserPrompt(req.question, effectiveResults, questionLanguage, questionAnalysis);
-    const sources = buildSources(effectiveResults, true, keywords, sourceLimit);
 
-    // V2: 先生成完整答案并完成质量评估，再流式输出给用户
-    // 避免用户看到一个答案后又被替换成另一个答案
-    let llmResponse: { content: string; model: string };
+    // 3) 真流式输出（优先），失败回退非流式
+    let rawAnswer = "";
+    let model = "built-in";
+    let streamedChars = 0;
     try {
-      llmResponse = await invokeLLMWithConfig(
+      const streamed = await invokeLLMStreamWithConfig(
         [{ role: "user", content: userMessage }],
-        systemPrompt
+        systemPrompt,
+        {
+          temperature: questionAnalysis.conciseAnswer ? 0 : undefined,
+          maxTokens: questionAnalysis.conciseAnswer ? 420 : undefined,
+        }
       );
-    } catch {
-      const extractiveFallback =
-        buildExtractiveAnswer(req.question, effectiveResults, questionLanguage, questionAnalysis) ??
-        buildEnumerativeExtractiveAnswer(req.question, effectiveResults, questionLanguage, questionAnalysis);
-      if (!extractiveFallback) throw new Error("LLM invoke failed and no fallback answer");
+      model = streamed.model;
 
-      const conciseResults = effectiveResults.filter((r) => extractiveFallback.usedChunkIds.includes(r.chunkId));
-      const sources = buildSources(conciseResults, true, keywords, sourceLimit);
-      const fullAnswer = enforceReadableStructure(extractiveFallback.answer, questionAnalysis, questionLanguage);
-      const responseTimeMs = Date.now() - startTime;
-      const queryId = await createQuery({
-        question: req.question,
-        answer: fullAnswer,
-        sources,
-        modelUsed: "extractive-fallback",
-        responseTimeMs,
-        visitorIp: req.visitorIp,
-        visitorCity: req.visitorCity,
-        visitorRegion: req.visitorRegion,
-        visitorCountry: req.visitorCountry,
-        visitorLat: req.visitorLat,
-        visitorLng: req.visitorLng,
-      });
       onMeta({
         sources,
-        modelUsed: "extractive-fallback",
+        modelUsed: model,
         foundInMaterials: true,
-        confidence: 0.62,
+        confidence: 0.72,
         questionLanguage,
-        queryId,
-        responseTimeMs,
       });
-      onToken(fullAnswer);
-      onDone(fullAnswer);
-      return;
-    }
-    const model = llmResponse.model;
 
-    let fullAnswer = stripCitationMarkers(llmResponse.content);
+      for await (const delta of streamed.stream) {
+        if (!delta) continue;
+        rawAnswer += delta;
+        streamedChars += delta.length;
+        onToken(delta);
+      }
+    } catch {
+      const fallback = await invokeLLMWithConfig(
+        [{ role: "user", content: userMessage }],
+        systemPrompt,
+        {
+          temperature: questionAnalysis.conciseAnswer ? 0 : undefined,
+          maxTokens: questionAnalysis.conciseAnswer ? 420 : undefined,
+        }
+      );
+      model = fallback.model;
+      rawAnswer = fallback.content;
+    }
+
+    let fullAnswer = stripCitationMarkers(rawAnswer);
+    const parsed = parseLLMOutput(rawAnswer);
+    if (parsed) {
+      fullAnswer = stripCitationMarkers(parsed.answer);
+    }
     if (questionAnalysis.conciseAnswer) {
       fullAnswer = enforceConciseDefinition(fullAnswer, questionLanguage);
     }
     fullAnswer = removeAnswerBoilerplate(fullAnswer, questionLanguage, questionAnalysis);
     fullAnswer = enforceReadableStructure(fullAnswer, questionAnalysis, questionLanguage);
-
-    // 统一质量管线（与 sync 模式一致）
-    const localReview = assessAnswerLocally(fullAnswer, effectiveResults, questionAnalysis, questionLanguage);
-    const grounding = assessGrounding(fullAnswer, effectiveResults, questionLanguage);
-
-    const compactLen = fullAnswer.replace(/\s+/g, "").length;
-    const structuredItems = countStructuredItems(fullAnswer);
-    const skipReview =
-      (localReview.complete && grounding.grounded) ||
-      (compactLen > 200 && structuredItems >= 3 && grounding.grounded);
-
-    if (!skipReview && (localReview.shouldRetry || !grounding.grounded) && effectiveResults.length >= 2) {
-      const allIssues = [...localReview.issues];
-      if (!grounding.grounded) {
-        allIssues.push(questionLanguage === "en"
-          ? `Answer contains ungrounded claims (score: ${grounding.score.toFixed(2)}). Rewrite using only excerpts.`
-          : `答案包含无依据内容（接地分: ${grounding.score.toFixed(2)}），需严格基于片段重写。`);
-      }
-      const qualityResult = await evaluateAnswerQuality(
-        req.question, fullAnswer, effectiveResults, questionLanguage, questionAnalysis
-      );
-      if (!qualityResult.pass || !grounding.grounded) {
-        const combinedFeedback = [...allIssues, ...(qualityResult.feedback ? [qualityResult.feedback] : [])].join("; ");
-        try {
-          const regenerated = await invokeLLMWithConfig(
-            [{ role: "user", content: buildQualityRegeneratePrompt(
-              req.question, fullAnswer, effectiveResults, questionLanguage, questionAnalysis, combinedFeedback
-            ) }],
-            systemPrompt,
-            { temperature: 0 }
-          );
-          const regenParsed = parseLLMOutput(regenerated.content);
-          const regenAnswer = stripCitationMarkers(regenParsed ? regenParsed.answer : regenerated.content);
-          if (regenAnswer.replace(/\s+/g, "").length >= fullAnswer.replace(/\s+/g, "").length * 0.8) {
-            fullAnswer = enforceReadableStructure(
-              removeAnswerBoilerplate(regenAnswer, questionLanguage, questionAnalysis),
-              questionAnalysis,
-              questionLanguage
-            );
-          }
-        } catch {
-          // 重写失败时保留原答案
-        }
-      }
-    }
 
     // 判断是否找到内容
     const notFoundPhrases = ["未涉及", "not cover", "没有相关", "未找到", "not found"];
@@ -2553,10 +2494,10 @@ export async function generateAnswerStream(
 
     // 发送元数据（含 queryId 和 responseTimeMs）
     onMeta({
-      sources,
+      sources: foundInMaterials ? sources : [],
       modelUsed: model,
-      foundInMaterials: true,
-      confidence: foundInMaterials ? (finalReview.complete ? 0.82 : 0.68) : 0.1,
+      foundInMaterials,
+      confidence: foundInMaterials ? (finalReview.complete ? 0.82 : 0.66) : 0.1,
       questionLanguage,
       queryId,
       responseTimeMs,
@@ -2582,8 +2523,10 @@ export async function generateAnswerStream(
     const countryDist = req.visitorCountry ? { [req.visitorCountry]: 1 } : {};
     upsertVisitorStat(today, cityDist, countryDist).catch(console.error);
 
-    // 质量验证完成后，将最终答案一次性输出给用户
-    onToken(fullAnswer);
+    // 非流式回退时补发正文
+    if (streamedChars === 0) {
+      onToken(fullAnswer);
+    }
     onDone(fullAnswer);
   } catch (err: any) {
     onError(err?.message || String(err));
