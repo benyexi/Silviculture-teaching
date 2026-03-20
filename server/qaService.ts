@@ -115,6 +115,11 @@ type AnswerReview = {
   downgradeNote: string;
 };
 
+const TOKEN_SAVER_MODE = process.env.TOKEN_SAVER_MODE !== "false";
+const ENABLE_LLM_QUALITY_REVIEW = process.env.ENABLE_LLM_QUALITY_REVIEW !== "false";
+const ENABLE_LLM_REWRITE = process.env.ENABLE_LLM_REWRITE !== "false";
+const ENABLE_AUX_EN_ANSWER = process.env.ENABLE_AUX_EN_ANSWER === "true";
+
 export function detectQuestionIntent(question: string, questionLang: "zh" | "en"): QuestionAnalysis {
   const q = question.toLowerCase();
   const intents: QuestionIntent[] = [];
@@ -709,6 +714,47 @@ function pickTopK(questionLang: "zh" | "en", analysis: QuestionAnalysis, forAuxE
   return questionLang === "en" ? 6 : 8;
 }
 
+function pickPromptChunkBudget(questionLang: "zh" | "en", analysis: QuestionAnalysis): number {
+  if (analysis.conciseAnswer) return questionLang === "en" ? 3 : 4;
+  if (analysis.requestDetail) return TOKEN_SAVER_MODE ? (questionLang === "en" ? 6 : 7) : (questionLang === "en" ? 8 : 10);
+  if (analysis.expectsFullCoverage) return TOKEN_SAVER_MODE ? (questionLang === "en" ? 5 : 6) : (questionLang === "en" ? 7 : 8);
+  return TOKEN_SAVER_MODE ? (questionLang === "en" ? 4 : 5) : (questionLang === "en" ? 6 : 7);
+}
+
+function pickPromptChunkCharLimit(questionLang: "zh" | "en", analysis: QuestionAnalysis): number {
+  if (analysis.conciseAnswer) return questionLang === "en" ? 520 : 420;
+  if (analysis.requestDetail) return TOKEN_SAVER_MODE ? (questionLang === "en" ? 760 : 640) : (questionLang === "en" ? 980 : 860);
+  if (analysis.expectsFullCoverage) return TOKEN_SAVER_MODE ? (questionLang === "en" ? 680 : 560) : (questionLang === "en" ? 840 : 720);
+  return TOKEN_SAVER_MODE ? (questionLang === "en" ? 620 : 520) : (questionLang === "en" ? 760 : 640);
+}
+
+function truncatePromptContent(content: string, maxLen: number): string {
+  if (content.length <= maxLen) return content;
+  return `${content.slice(0, Math.max(0, maxLen)).trim()}\n……`;
+}
+
+function preparePromptChunks(
+  chunks: SearchResult[],
+  questionLang: "zh" | "en",
+  analysis: QuestionAnalysis
+): SearchResult[] {
+  const maxChunks = pickPromptChunkBudget(questionLang, analysis);
+  const maxChars = pickPromptChunkCharLimit(questionLang, analysis);
+  return chunks
+    .slice(0, Math.max(1, maxChunks))
+    .map((row) => ({
+      ...row,
+      content: truncatePromptContent(row.content, maxChars),
+    }));
+}
+
+function pickMainMaxTokens(questionLang: "zh" | "en", analysis: QuestionAnalysis): number {
+  if (analysis.conciseAnswer) return questionLang === "en" ? 280 : 320;
+  if (analysis.requestDetail) return TOKEN_SAVER_MODE ? (questionLang === "en" ? 680 : 820) : (questionLang === "en" ? 900 : 1100);
+  if (analysis.expectsFullCoverage) return TOKEN_SAVER_MODE ? (questionLang === "en" ? 560 : 700) : (questionLang === "en" ? 760 : 920);
+  return TOKEN_SAVER_MODE ? (questionLang === "en" ? 460 : 620) : (questionLang === "en" ? 640 : 780);
+}
+
 export async function generateAnswer(req: QARequest): Promise<QAResponse> {
   const startTime = Date.now();
   const questionLanguage = detectLanguage(req.question);
@@ -736,14 +782,15 @@ export async function generateAnswer(req: QARequest): Promise<QAResponse> {
       const enResults = await semanticSearch(req.question, undefined, pickTopK("en", questionAnalysis), "en", useRAG);
       mainResult = await callLLM(req.question, enResults, "en", "en", questionAnalysis);
     } else {
-      const [zhResults, enResults] = await Promise.all([
-        semanticSearch(req.question, undefined, pickTopK("zh", questionAnalysis), "zh", useRAG),
-        semanticSearch(req.question, undefined, pickTopK("en", questionAnalysis, true), "en", useRAG),
-      ]);
+      const zhResultsPromise = semanticSearch(req.question, undefined, pickTopK("zh", questionAnalysis), "zh", useRAG);
+      const enResultsPromise = ENABLE_AUX_EN_ANSWER
+        ? semanticSearch(req.question, undefined, pickTopK("en", questionAnalysis, true), "en", useRAG)
+        : Promise.resolve([] as SearchResult[]);
+      const [zhResults, enResults] = await Promise.all([zhResultsPromise, enResultsPromise]);
 
       mainResult = await callLLM(req.question, zhResults, "zh", "zh", questionAnalysis);
 
-      if (enResults.length > 0) {
+      if (ENABLE_AUX_EN_ANSWER && enResults.length > 0) {
         const enResult = await callLLM(req.question, enResults, "zh", "en", questionAnalysis);
         if (enResult.foundInMaterials) {
           enAnswer = enResult.answer;
@@ -818,11 +865,13 @@ async function callLLM(
   if (analysis.conciseDefinition) {
     effectiveResults = await enrichDefinitionResults(question, effectiveResults, questionLang, analysis);
   }
+  const promptChunks = preparePromptChunks(effectiveResults, questionLang, analysis);
+  const reviewChunks = promptChunks.length > 0 ? promptChunks : effectiveResults;
   const sourceLimit = pickSourceLimit(questionLang, analysis);
   const materialTitles = Array.from(new Set(effectiveResults.map((r) => r.materialTitle)));
 
   const systemPrompt = buildSystemPrompt(materialTitles, questionLang, materialLang, analysis);
-  const userMessage = buildUserPrompt(question, effectiveResults, questionLang, analysis);
+  const userMessage = buildUserPrompt(question, reviewChunks, questionLang, analysis);
 
   let llmResponse: { content: string; model: string };
   try {
@@ -831,15 +880,15 @@ async function callLLM(
       systemPrompt,
       {
         temperature: analysis.conciseAnswer ? 0 : undefined,
-        maxTokens: analysis.conciseAnswer ? 420 : undefined,
+        maxTokens: pickMainMaxTokens(questionLang, analysis),
       }
     );
   } catch {
     const extractiveFallback =
-      buildExtractiveAnswer(question, effectiveResults, questionLang, analysis) ??
-      buildEnumerativeExtractiveAnswer(question, effectiveResults, questionLang, analysis);
+      buildExtractiveAnswer(question, reviewChunks, questionLang, analysis) ??
+      buildEnumerativeExtractiveAnswer(question, reviewChunks, questionLang, analysis);
     if (extractiveFallback) {
-      const conciseResults = effectiveResults.filter((r) => extractiveFallback.usedChunkIds.includes(r.chunkId));
+      const conciseResults = reviewChunks.filter((r) => extractiveFallback.usedChunkIds.includes(r.chunkId));
       const sources = buildSources(conciseResults, true, keywords, sourceLimit);
       return {
         answer: enforceReadableStructure(extractiveFallback.answer, analysis, questionLang),
@@ -866,8 +915,8 @@ async function callLLM(
   answer = removeAnswerBoilerplate(answer, questionLang, analysis);
   answer = enforceReadableStructure(answer, analysis, questionLang);
 
-  const localReview = assessAnswerLocally(answer, effectiveResults, analysis, questionLang);
-  const grounding = assessGrounding(answer, effectiveResults, questionLang);
+  const localReview = assessAnswerLocally(answer, reviewChunks, analysis, questionLang);
+  const grounding = assessGrounding(answer, reviewChunks, questionLang);
 
   // V2: 统一质量管线（最多 1 次额外 LLM 调用，替代原来的多级串行调用）
   // 决策逻辑：
@@ -878,8 +927,18 @@ async function callLLM(
   const structuredItems = countStructuredItems(answer);
   const skipLLMReview = (localReview.complete && grounding.grounded) ||
     (compactLen > 200 && structuredItems >= 3 && grounding.grounded);
+  const severeGroundingIssue = !grounding.grounded && grounding.score < (TOKEN_SAVER_MODE ? 0.5 : 0.62);
+  const structureSensitiveIntent =
+    analysis.expectsEnumeration || analysis.intent === "method" || analysis.intent === "comparison";
+  const shouldRunQualityEval =
+    ENABLE_LLM_QUALITY_REVIEW &&
+    !skipLLMReview &&
+    (
+      severeGroundingIssue ||
+      (localReview.shouldRetry && structureSensitiveIntent && compactLen < (TOKEN_SAVER_MODE ? 1200 : 1600))
+    );
 
-  if (!skipLLMReview && (localReview.shouldRetry || !grounding.grounded)) {
+  if (shouldRunQualityEval) {
     // 收集所有问题，一次性交给 LLM 评估+修正
     const allIssues = [...localReview.issues];
     if (!grounding.grounded) {
@@ -890,10 +949,17 @@ async function callLLM(
 
     // 先做 LLM 质量评估（判断是否真的需要重写）
     const qualityResult = await evaluateAnswerQuality(
-      question, answer, effectiveResults, questionLang, analysis
+      question, answer, reviewChunks, questionLang, analysis
     );
 
-    if (!qualityResult.pass || !grounding.grounded) {
+    const shouldRewrite =
+      ENABLE_LLM_REWRITE &&
+      (
+        severeGroundingIssue ||
+        (!qualityResult.pass && qualityResult.score < (TOKEN_SAVER_MODE ? 5.9 : 6.5))
+      );
+
+    if (shouldRewrite) {
       const combinedFeedback = [
         ...allIssues,
         ...(qualityResult.feedback ? [qualityResult.feedback] : []),
@@ -902,10 +968,10 @@ async function callLLM(
       try {
         const regenerated = await invokeLLMWithConfig(
           [{ role: "user", content: buildQualityRegeneratePrompt(
-            question, answer, effectiveResults, questionLang, analysis, combinedFeedback
+            question, answer, reviewChunks, questionLang, analysis, combinedFeedback
           ) }],
           buildSystemPrompt(materialTitles, questionLang, materialLang, analysis),
-          { temperature: 0 }
+          { temperature: 0, maxTokens: pickMainMaxTokens(questionLang, analysis) }
         );
         const regenParsed = parseLLMOutput(regenerated.content);
         const regenAnswer = stripCitationMarkers(regenParsed ? regenParsed.answer : regenerated.content);
@@ -922,7 +988,7 @@ async function callLLM(
     }
   }
 
-  const finalReview = assessAnswerLocally(answer, effectiveResults, analysis, questionLang);
+  const finalReview = assessAnswerLocally(answer, reviewChunks, analysis, questionLang);
   if (!finalReview.complete && shouldAppendDowngradeNote(answer, analysis)) {
     answer = appendDegradationNote(answer, finalReview.downgradeNote);
   }
@@ -933,7 +999,7 @@ async function callLLM(
   const notFoundPhrases = ["未涉及", "not cover", "没有相关", "未找到", "not found"];
   const foundInMaterials = !notFoundPhrases.some((p) => answer.toLowerCase().includes(p));
 
-  const sources = buildSources(effectiveResults, foundInMaterials, keywords, sourceLimit);
+  const sources = buildSources(reviewChunks, foundInMaterials, keywords, sourceLimit);
 
   const confidence = finalReview.complete ? 0.82 : localReview.shouldRetry ? 0.58 : 0.68;
 
@@ -1624,9 +1690,11 @@ async function evaluateAnswerQuality(
     return { pass: true, score: 7, feedback: "" };
   }
 
+  const evalSnippetLimit = TOKEN_SAVER_MODE ? 4 : 6;
+  const evalSnippetChars = TOKEN_SAVER_MODE ? 140 : 200;
   const sourceSnippets = searchResults
-    .slice(0, 6)
-    .map((r, idx) => `[${idx + 1}] ${r.content.substring(0, 200)}`)
+    .slice(0, evalSnippetLimit)
+    .map((r, idx) => `[${idx + 1}] ${r.content.substring(0, evalSnippetChars)}`)
     .join("\n");
 
   const evalPrompt = questionLang === "en"
@@ -1724,7 +1792,10 @@ function buildQualityRegeneratePrompt(
   analysis: QuestionAnalysis,
   qualityFeedback: string
 ): string {
-  const sourceTexts = buildSourceTexts(searchResults);
+  const sourceTexts = buildSourceTexts(searchResults, {
+    limit: TOKEN_SAVER_MODE ? 6 : 8,
+    maxContentLen: TOKEN_SAVER_MODE ? 320 : 520,
+  });
 
   if (questionLang === "en") {
     return `The previous answer was evaluated and found to have quality issues.
