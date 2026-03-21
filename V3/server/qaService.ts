@@ -178,8 +178,8 @@ export function detectQuestionIntent(question: string, questionLang: "zh" | "en"
   // V2: 新增"条件/要求"意图
   if (
     questionLang === "zh"
-      ? /(条件|要求|前提|必须|需要满足|需要具备|要满足|应具备)/.test(q)
-      : /(conditions?|requirements?|prerequisites?|must|criteria)/.test(q)
+      ? /(条件|要求|前提|必须|需要满足|需要具备|要满足|应具备|何时|什么时候|时机|时间|时期|季节)/.test(q)
+      : /(conditions?|requirements?|prerequisites?|must|criteria|when|timing|time to|best time|season)/.test(q)
   ) {
     intents.push("condition");
   }
@@ -218,8 +218,12 @@ export function detectQuestionIntent(question: string, questionLang: "zh" | "en"
   if (shortEntityDefinition && !intents.includes("definition")) {
     intents.unshift("definition");
   }
+  const hasTimingCue =
+    questionLang === "zh"
+      ? /(何时|什么时候|时机|时间|时期|季节)/.test(q)
+      : /\b(when|timing|time to|best time|season|timely)\b/.test(q);
   const conciseEntity = isVeryShort && !requestDetail && intents.length === 1 && intents[0] === "other";
-  const intent = intents[0];
+  const intent = hasTimingCue && intents.includes("condition") ? "condition" : intents[0];
   const conciseDefinition = !requestDetail && (intent === "definition" || shortEntityDefinition);
 
   return {
@@ -268,7 +272,7 @@ function buildAnswerBlueprint(analysis: QuestionAnalysis, questionLang: "zh" | "
       case "comparison":
         return `1. Objects being compared\n2. Side-by-side comparison table\n3. Key differences and conclusion`;
       case "condition":
-        return `1. Directly list all conditions/requirements mentioned in the excerpts\n2. Brief explanation of each item`;
+        return `1. Directly list all conditions/requirements or timing windows mentioned in the excerpts\n2. Brief explanation of each item`;
       case "advantage":
         return `1. Directly list all advantages/disadvantages mentioned in the excerpts\n2. Brief explanation of each item`;
       case "definition":
@@ -291,7 +295,7 @@ function buildAnswerBlueprint(analysis: QuestionAnalysis, questionLang: "zh" | "
     case "comparison":
       return `1. 说明比较对象\n2. 用对比表或分点对比列出差异\n3. 给出结论`;
     case "condition":
-      return `1. 直接列出教材中的条件/要求\n2. 逐项简要说明`;
+      return `1. 直接列出教材中的条件/要求或时间时机\n2. 逐项简要说明`;
     case "advantage":
       return `1. 直接列出教材中的优点/优势/缺点\n2. 逐项简要说明`;
     case "definition":
@@ -358,6 +362,14 @@ A:
 3. **方法三**：...[3]`;
 }
 
+function buildFewShotBlock(questionLang: "zh" | "en", analysis: QuestionAnalysis): string {
+  if (!TOKEN_SAVER_MODE) return buildFewShot(questionLang, analysis);
+  if (analysis.conciseDefinition || analysis.expectsEnumeration || analysis.intent === "comparison") {
+    return buildFewShot(questionLang, analysis);
+  }
+  return "";
+}
+
 function buildSystemHeader(
   questionLang: "zh" | "en",
   materialLang: "zh" | "en",
@@ -374,7 +386,7 @@ ${materialNote}
 Answering protocol:
 1. First identify the intent: ${describeIntent(analysis.intent, "en")}.
 2. If the question is about classifications, methods, steps, or comparisons, enumerate all items explicitly mentioned in the excerpts.
-3. Do not stop at a summary sentence when the question asks for types, methods, steps, or differences.
+3. Do not stop at a summary sentence when the question asks for types, methods, steps, conditions, timing, or differences.
 4. If the excerpts only cover part of the topic, say so plainly and do not invent missing items.
 5. Use Markdown only. Do not wrap the final answer in JSON or code fences.
 6. CITATION REQUIRED: For every factual claim, add an inline citation marker like [1], [2] matching the excerpt number. Example: "Silviculture covers the full cultivation cycle [1] including thinning operations [3]."
@@ -393,7 +405,7 @@ ${materialNote}
 
 回答协议：
 1. 先识别问题意图：${describeIntent(analysis.intent, "zh")}。
-2. 如果问题是分类、方法、步骤或比较题，必须完整列出教材中明确出现的项目，不得只给总述。
+2. 如果问题是分类、方法、步骤、条件/时机或比较题，必须完整列出教材中明确出现的项目，不得只给总述。
 3. 分类题先给"总览 + 完整清单 + 逐项说明"；方法/步骤题先给"总览 + 完整清单 + 逐项说明"；比较题先给"对比表/分点对比 + 结论"。
 4. 如果教材只覆盖部分内容，要明确说明"教材只明确提到以下项目"，不要补外部知识。
 5. 回答前先在内部检查一次：是否覆盖所有相关片段、是否存在漏项、是否还带有教材外补充。检查不过就重写。
@@ -431,7 +443,7 @@ Requirements:
 
 ${analysis.conciseDefinition ? "8. This is a concise definition question. Answer in 2-4 sentences only; do not add history, classification, purpose, development, or other extensions." : ""}
 
-${buildFewShot(questionLang, analysis)}`;
+${buildFewShotBlock(questionLang, analysis)}`;
   }
 
   if (materialLang === "en") {
@@ -470,7 +482,7 @@ ${titleList}
 7. 内联引用标注：每个事实性陈述后必须添加 [1]、[2]、[3] 等标记，对应其来自的片段编号。每个关键陈述至少有一个引用标记。例如：造林密度取决于立地条件[2]和树种特性[4]。
 ${analysis.conciseDefinition ? `\n8. 当前是简洁定义题，仅回答定义本身（2-4句），不得扩展到历史、分类、目的、发展、问题等延伸内容。` : ""}
 
-${buildFewShot(questionLang, analysis)}`;
+${buildFewShotBlock(questionLang, analysis)}`;
 }
 
 export function buildUserPrompt(
@@ -511,6 +523,7 @@ Completion constraints (Strict Grounding Mode):
 - If the question asks for types, methods, steps, or comparisons, list every item explicitly mentioned in the excerpts.
 - Do not stop at a summary sentence.
 - If the excerpts only cover part of the topic, say so briefly and directly.
+- ${analysis.intent === "condition" ? "Use `## Timing / requirements` and provide a numbered list." : "Use short structured sections only when needed."}
 ${analysis.conciseDefinition ? "- This is a concise definition question. Use 2-4 sentences only and stop after the core definition." : ""}
 
 Textbook excerpts (${chunks.length}):
@@ -734,17 +747,17 @@ function pickTopK(questionLang: "zh" | "en", analysis: QuestionAnalysis, forAuxE
 }
 
 function pickPromptChunkBudget(questionLang: "zh" | "en", analysis: QuestionAnalysis): number {
-  if (analysis.conciseAnswer) return questionLang === "en" ? 3 : 4;
-  if (analysis.requestDetail) return TOKEN_SAVER_MODE ? (questionLang === "en" ? 6 : 7) : (questionLang === "en" ? 8 : 10);
-  if (analysis.expectsFullCoverage) return TOKEN_SAVER_MODE ? (questionLang === "en" ? 5 : 6) : (questionLang === "en" ? 7 : 8);
-  return TOKEN_SAVER_MODE ? (questionLang === "en" ? 4 : 5) : (questionLang === "en" ? 6 : 7);
+  if (analysis.conciseAnswer) return questionLang === "en" ? 2 : 3;
+  if (analysis.requestDetail) return TOKEN_SAVER_MODE ? (questionLang === "en" ? 4 : 6) : (questionLang === "en" ? 6 : 9);
+  if (analysis.expectsFullCoverage) return TOKEN_SAVER_MODE ? (questionLang === "en" ? 4 : 5) : (questionLang === "en" ? 6 : 7);
+  return TOKEN_SAVER_MODE ? (questionLang === "en" ? 3 : 4) : (questionLang === "en" ? 5 : 6);
 }
 
 function pickPromptChunkCharLimit(questionLang: "zh" | "en", analysis: QuestionAnalysis): number {
-  if (analysis.conciseAnswer) return questionLang === "en" ? 520 : 420;
-  if (analysis.requestDetail) return TOKEN_SAVER_MODE ? (questionLang === "en" ? 760 : 640) : (questionLang === "en" ? 980 : 860);
-  if (analysis.expectsFullCoverage) return TOKEN_SAVER_MODE ? (questionLang === "en" ? 680 : 560) : (questionLang === "en" ? 840 : 720);
-  return TOKEN_SAVER_MODE ? (questionLang === "en" ? 620 : 520) : (questionLang === "en" ? 760 : 640);
+  if (analysis.conciseAnswer) return questionLang === "en" ? 380 : 320;
+  if (analysis.requestDetail) return TOKEN_SAVER_MODE ? (questionLang === "en" ? 560 : 560) : (questionLang === "en" ? 780 : 780);
+  if (analysis.expectsFullCoverage) return TOKEN_SAVER_MODE ? (questionLang === "en" ? 500 : 500) : (questionLang === "en" ? 680 : 680);
+  return TOKEN_SAVER_MODE ? (questionLang === "en" ? 420 : 420) : (questionLang === "en" ? 600 : 560);
 }
 
 function truncatePromptContent(content: string, maxLen: number): string {
@@ -768,10 +781,10 @@ function preparePromptChunks(
 }
 
 function pickMainMaxTokens(questionLang: "zh" | "en", analysis: QuestionAnalysis): number {
-  if (analysis.conciseAnswer) return questionLang === "en" ? 280 : 320;
-  if (analysis.requestDetail) return TOKEN_SAVER_MODE ? (questionLang === "en" ? 680 : 820) : (questionLang === "en" ? 900 : 1100);
-  if (analysis.expectsFullCoverage) return TOKEN_SAVER_MODE ? (questionLang === "en" ? 560 : 700) : (questionLang === "en" ? 760 : 920);
-  return TOKEN_SAVER_MODE ? (questionLang === "en" ? 460 : 620) : (questionLang === "en" ? 640 : 780);
+  if (analysis.conciseAnswer) return questionLang === "en" ? 220 : 260;
+  if (analysis.requestDetail) return TOKEN_SAVER_MODE ? (questionLang === "en" ? 520 : 720) : (questionLang === "en" ? 760 : 980);
+  if (analysis.expectsFullCoverage) return TOKEN_SAVER_MODE ? (questionLang === "en" ? 430 : 620) : (questionLang === "en" ? 640 : 820);
+  return TOKEN_SAVER_MODE ? (questionLang === "en" ? 340 : 500) : (questionLang === "en" ? 520 : 680);
 }
 
 export async function generateAnswer(req: QARequest): Promise<QAResponse> {
@@ -925,7 +938,29 @@ async function callLLM(
         confidence: 0.62,
       };
     }
-    throw new Error("LLM invoke failed and no extractive fallback available");
+    const minimalFallback = buildMinimalGroundedFallback(question, reviewChunks, questionLang, analysis);
+    if (minimalFallback) {
+      const conciseResults = reviewChunks.filter((r) => minimalFallback.usedChunkIds.includes(r.chunkId));
+      const sources = buildSources(conciseResults, true, keywords, sourceLimit);
+      return {
+        answer: enforceReadableStructure(minimalFallback.answer, analysis, questionLang),
+        sources,
+        modelUsed: "grounded-lite-fallback",
+        foundInMaterials: true,
+        confidence: 0.52,
+      };
+    }
+
+    return {
+      answer:
+        questionLang === "en"
+          ? "The retrieved textbook excerpts are insufficient for a reliable answer right now."
+          : "当前检索到的教材片段不足以给出可靠答案。",
+      sources: [],
+      modelUsed: "fallback-empty",
+      foundInMaterials: false,
+      confidence: 0.12,
+    };
   }
 
   let answer = stripCitationMarkers(llmResponse.content);
@@ -957,12 +992,20 @@ async function callLLM(
   const severeGroundingIssue = !grounding.grounded && grounding.score < (TOKEN_SAVER_MODE ? 0.5 : 0.62);
   const structureSensitiveIntent =
     analysis.expectsEnumeration || analysis.intent === "method" || analysis.intent === "comparison";
+  const englishFastPath =
+    TOKEN_SAVER_MODE &&
+    questionLang === "en" &&
+    grounding.grounded &&
+    compactLen >= 180 &&
+    !analysis.expectsEnumeration &&
+    !analysis.requestDetail;
   const shouldRunQualityEval =
     ENABLE_LLM_QUALITY_REVIEW &&
+    !englishFastPath &&
     !skipLLMReview &&
     (
       severeGroundingIssue ||
-      (localReview.shouldRetry && structureSensitiveIntent && compactLen < (TOKEN_SAVER_MODE ? 1200 : 1600))
+      (localReview.shouldRetry && structureSensitiveIntent && compactLen < (TOKEN_SAVER_MODE ? (questionLang === "en" ? 900 : 1200) : 1600))
     );
 
   if (shouldRunQualityEval) {
@@ -983,7 +1026,7 @@ async function callLLM(
       ENABLE_LLM_REWRITE &&
       (
         severeGroundingIssue ||
-        (!qualityResult.pass && qualityResult.score < (TOKEN_SAVER_MODE ? 5.9 : 6.5))
+        (!qualityResult.pass && qualityResult.score < (TOKEN_SAVER_MODE ? (questionLang === "en" ? 5.6 : 5.9) : 6.5))
       );
 
     if (shouldRewrite) {
@@ -1161,7 +1204,11 @@ function assessAnswerLocally(
     issues.push("比较题缺少对比表或分点对比");
   }
 
-  if (analysis.expectsFullCoverage && !hasCoveragePhrase) {
+  if (analysis.intent === "condition" && !/(条件|要求|前提|时机|时间|时期|when|timing|season|requirement|prerequisite)/i.test(answer)) {
+    issues.push("条件/时机题缺少条件性表达");
+  }
+
+  if (analysis.expectsFullCoverage && !hasCoveragePhrase && !(questionLang === "en" && compactAnswer.length >= 180)) {
     issues.push("缺少完整性提示或清单式表达");
   }
 
@@ -1717,8 +1764,8 @@ async function evaluateAnswerQuality(
     return { pass: true, score: 7, feedback: "" };
   }
 
-  const evalSnippetLimit = TOKEN_SAVER_MODE ? 4 : 6;
-  const evalSnippetChars = TOKEN_SAVER_MODE ? 140 : 200;
+  const evalSnippetLimit = TOKEN_SAVER_MODE ? (questionLang === "en" ? 3 : 4) : 6;
+  const evalSnippetChars = TOKEN_SAVER_MODE ? (questionLang === "en" ? 120 : 140) : 200;
   const sourceSnippets = searchResults
     .slice(0, evalSnippetLimit)
     .map((r, idx) => `[${idx + 1}] ${r.content.substring(0, evalSnippetChars)}`)
@@ -1766,7 +1813,7 @@ ${sourceSnippets}
       questionLang === "en"
         ? "You are a strict answer quality evaluator. Return only valid JSON."
         : "你是严格的答案质量评估器。只返回有效 JSON。",
-      { temperature: 0, maxTokens: 300, responseFormat: "json_object" }
+      { temperature: 0, maxTokens: TOKEN_SAVER_MODE ? (questionLang === "en" ? 220 : 260) : 300, responseFormat: "json_object" }
     );
 
     const parsed = parseQualityEvaluation(evalResponse.content);
@@ -1820,8 +1867,8 @@ function buildQualityRegeneratePrompt(
   qualityFeedback: string
 ): string {
   const sourceTexts = buildSourceTexts(searchResults, {
-    limit: TOKEN_SAVER_MODE ? 6 : 8,
-    maxContentLen: TOKEN_SAVER_MODE ? 320 : 520,
+    limit: TOKEN_SAVER_MODE ? (questionLang === "en" ? 4 : 6) : 8,
+    maxContentLen: TOKEN_SAVER_MODE ? (questionLang === "en" ? 220 : 320) : 520,
   });
 
   if (questionLang === "en") {
@@ -2318,13 +2365,80 @@ function buildExtractiveAnswer(
   };
 }
 
+function buildMinimalGroundedFallback(
+  question: string,
+  searchResults: SearchResult[],
+  questionLang: "zh" | "en",
+  analysis: QuestionAnalysis
+): { answer: string; usedChunkIds: number[] } | null {
+  if (searchResults.length === 0) return null;
+
+  const keywords = (questionLang === "en" ? extractKeywordsEn(question) : extractKeywords(question)).slice(0, 8);
+  const maxCandidates = analysis.conciseAnswer ? 2 : analysis.expectsEnumeration ? 4 : 3;
+  const candidates: Array<{ text: string; chunkId: number }> = [];
+  const seen = new Set<string>();
+
+  for (const chunk of searchResults.slice(0, Math.max(3, maxCandidates + 1))) {
+    let sentence = extractHighlightSentence(chunk.content, keywords)
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!sentence) continue;
+    if (sentence.length < (questionLang === "en" ? 18 : 8)) continue;
+    if (analysis.conciseDefinition && !hasWeakDefinitionStructure(sentence, questionLang) && !hasDefinitionCue(sentence, questionLang)) {
+      continue;
+    }
+
+    sentence = truncateSentenceSmart(sentence, questionLang, questionLang === "en" ? 170 : 96);
+    const key = normalizeQuestion(sentence).slice(0, 120);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    candidates.push({ text: sentence, chunkId: chunk.chunkId });
+    if (candidates.length >= maxCandidates) break;
+  }
+
+  if (candidates.length === 0) return null;
+
+  const citationMap = new Map<number, number>();
+  const usedChunkIds: number[] = [];
+  for (const item of candidates) {
+    if (!citationMap.has(item.chunkId)) {
+      citationMap.set(item.chunkId, citationMap.size + 1);
+      usedChunkIds.push(item.chunkId);
+    }
+  }
+
+  if (analysis.conciseDefinition) {
+    const text = candidates
+      .slice(0, 2)
+      .map((item) => {
+        const cite = citationMap.get(item.chunkId)!;
+        const ending = questionLang === "en" ? /[.!?…]$/.test(item.text) : /[。！？…]$/.test(item.text);
+        return `${item.text}${ending ? "" : questionLang === "en" ? "." : "。"} [${cite}]`;
+      })
+      .join(questionLang === "en" ? " " : "\n");
+    return { answer: text.trim(), usedChunkIds };
+  }
+
+  const lines = candidates.map((item, idx) => {
+    const cite = citationMap.get(item.chunkId)!;
+    const ending = questionLang === "en" ? /[.!?…]$/.test(item.text) : /[。！？…]$/.test(item.text);
+    const content = `${item.text}${ending ? "" : questionLang === "en" ? "." : "。"} [${cite}]`;
+    return analysis.expectsEnumeration ? `${idx + 1}. ${content}` : `- ${content}`;
+  });
+
+  return {
+    answer: lines.join("\n"),
+    usedChunkIds,
+  };
+}
+
 function buildEnumerativeExtractiveAnswer(
   question: string,
   searchResults: SearchResult[],
   questionLang: "zh" | "en",
   analysis: QuestionAnalysis
 ): { answer: string; usedChunkIds: number[] } | null {
-  const enableEnumExtractive = process.env.ENABLE_ENUM_EXTRACTIVE === "true";
+  const enableEnumExtractive = process.env.ENABLE_ENUM_EXTRACTIVE !== "false";
   if (!enableEnumExtractive) return null;
   if (!analysis.expectsEnumeration || analysis.requestDetail || analysis.intent === "method") return null;
   if (searchResults.length === 0) return null;
