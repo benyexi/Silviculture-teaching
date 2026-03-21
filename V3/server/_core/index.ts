@@ -191,9 +191,13 @@ async function startServer() {
 
   // SSE 流式问答端点
   app.post("/api/stream/ask", async (req, res) => {
-    const { question } = req.body || {};
+    const { question, materialId } = req.body || {};
     if (!question || typeof question !== "string" || question.length < 2 || question.length > 1000) {
       res.status(400).json({ error: "问题长度需在 2-1000 字之间" });
+      return;
+    }
+    if (materialId !== undefined && (!Number.isInteger(materialId) || materialId <= 0)) {
+      res.status(400).json({ error: "materialId 必须是正整数" });
       return;
     }
 
@@ -218,6 +222,7 @@ async function startServer() {
       await generateAnswerStream(
         {
           question,
+          materialIds: materialId ? [materialId] : undefined,
           visitorIp: ip,
           visitorCity: geo.city || undefined,
           visitorRegion: geo.region || undefined,

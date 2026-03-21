@@ -30,8 +30,22 @@ function normalizeQuestion(q: string): string {
     .replace(/[?,;:!"'()\[\]\s]+/g, "");
 }
 
-function getCachedAnswer(question: string): CachedAnswer | null {
-  const key = normalizeQuestion(question);
+function normalizeMaterialIds(materialIds?: number[]): number[] | undefined {
+  if (!materialIds || materialIds.length === 0) return undefined;
+  const normalized = Array.from(
+    new Set(materialIds.filter((id) => Number.isInteger(id) && id > 0))
+  ).sort((a, b) => a - b);
+  return normalized.length > 0 ? normalized : undefined;
+}
+
+function buildCacheKey(question: string, materialIds?: number[]): string {
+  const scope = normalizeMaterialIds(materialIds);
+  const scopeKey = scope ? scope.join(",") : "all";
+  return `${scopeKey}::${normalizeQuestion(question)}`;
+}
+
+function getCachedAnswer(question: string, materialIds?: number[]): CachedAnswer | null {
+  const key = buildCacheKey(question, materialIds);
   const cached = answerCache.get(key);
   if (!cached) return null;
   if (Date.now() - cached.cachedAt > CACHE_TTL_MS) {
@@ -41,13 +55,17 @@ function getCachedAnswer(question: string): CachedAnswer | null {
   return cached;
 }
 
-function setCachedAnswer(question: string, data: Omit<CachedAnswer, "cachedAt">): void {
+function setCachedAnswer(
+  question: string,
+  data: Omit<CachedAnswer, "cachedAt">,
+  materialIds?: number[]
+): void {
   // 超出容量时清理最旧的条目
   if (answerCache.size >= CACHE_MAX_SIZE) {
     const firstKey = answerCache.keys().next().value;
     if (firstKey !== undefined) answerCache.delete(firstKey);
   }
-  answerCache.set(normalizeQuestion(question), { ...data, cachedAt: Date.now() });
+  answerCache.set(buildCacheKey(question, materialIds), { ...data, cachedAt: Date.now() });
 }
 
 /** 教材更新时清空缓存，保证答案基于最新教材 */
@@ -57,6 +75,7 @@ export function clearAnswerCache(): void {
 
 export type QARequest = {
   question: string;
+  materialIds?: number[];
   visitorIp?: string;
   visitorCity?: string;
   visitorRegion?: string;
@@ -759,6 +778,7 @@ export async function generateAnswer(req: QARequest): Promise<QAResponse> {
   const startTime = Date.now();
   const questionLanguage = detectLanguage(req.question);
   const questionAnalysis = detectQuestionIntent(req.question, questionLanguage);
+  const materialIds = normalizeMaterialIds(req.materialIds);
 
   // 检查当前配置是否启用了 RAG 模式
   const activeConfig = await getActiveLlmConfig();
@@ -770,7 +790,7 @@ export async function generateAnswer(req: QARequest): Promise<QAResponse> {
   let fromCache = false;
 
   // 检查缓存
-  const cached = getCachedAnswer(req.question);
+  const cached = getCachedAnswer(req.question, materialIds);
   if (cached) {
     mainResult = cached.mainResult;
     enAnswer = cached.enAnswer;
@@ -779,19 +799,19 @@ export async function generateAnswer(req: QARequest): Promise<QAResponse> {
   } else {
     // useRAG=true: 关键词+向量混合检索; useRAG=false: 仅关键词检索（两者都搜教材）
     if (questionLanguage === "en") {
-      const enResults = await semanticSearch(req.question, undefined, pickTopK("en", questionAnalysis), "en", useRAG);
-      mainResult = await callLLM(req.question, enResults, "en", "en", questionAnalysis);
+      const enResults = await semanticSearch(req.question, materialIds, pickTopK("en", questionAnalysis), "en", useRAG);
+      mainResult = await callLLM(req.question, enResults, "en", "en", questionAnalysis, materialIds);
     } else {
-      const zhResultsPromise = semanticSearch(req.question, undefined, pickTopK("zh", questionAnalysis), "zh", useRAG);
+      const zhResultsPromise = semanticSearch(req.question, materialIds, pickTopK("zh", questionAnalysis), "zh", useRAG);
       const enResultsPromise = ENABLE_AUX_EN_ANSWER
-        ? semanticSearch(req.question, undefined, pickTopK("en", questionAnalysis, true), "en", useRAG)
+        ? semanticSearch(req.question, materialIds, pickTopK("en", questionAnalysis, true), "en", useRAG)
         : Promise.resolve([] as SearchResult[]);
       const [zhResults, enResults] = await Promise.all([zhResultsPromise, enResultsPromise]);
 
-      mainResult = await callLLM(req.question, zhResults, "zh", "zh", questionAnalysis);
+      mainResult = await callLLM(req.question, zhResults, "zh", "zh", questionAnalysis, materialIds);
 
       if (ENABLE_AUX_EN_ANSWER && enResults.length > 0) {
-        const enResult = await callLLM(req.question, enResults, "zh", "en", questionAnalysis);
+        const enResult = await callLLM(req.question, enResults, "zh", "en", questionAnalysis, materialIds);
         if (enResult.foundInMaterials) {
           enAnswer = enResult.answer;
           enSources = enResult.sources;
@@ -801,7 +821,7 @@ export async function generateAnswer(req: QARequest): Promise<QAResponse> {
 
     // 只缓存教材中找到内容的答案
     if (mainResult.foundInMaterials) {
-      setCachedAnswer(req.question, { mainResult, enAnswer, enSources, questionLanguage });
+      setCachedAnswer(req.question, { mainResult, enAnswer, enSources, questionLanguage }, materialIds);
     }
   }
 
@@ -841,7 +861,8 @@ async function callLLM(
   searchResults: SearchResult[],
   questionLang: "zh" | "en",
   materialLang: "zh" | "en",
-  analysis: QuestionAnalysis = detectQuestionIntent(question, questionLang)
+  analysis: QuestionAnalysis = detectQuestionIntent(question, questionLang),
+  materialIds?: number[]
 ): Promise<CallLLMResult> {
   if (searchResults.length === 0) {
     const answer =
@@ -863,7 +884,13 @@ async function callLLM(
     ? [...searchResults]
     : focusResultsByChapter(question, searchResults, questionLang, analysis);
   if (analysis.conciseDefinition) {
-    effectiveResults = await enrichDefinitionResults(question, effectiveResults, questionLang, analysis);
+    effectiveResults = await enrichDefinitionResults(
+      question,
+      effectiveResults,
+      questionLang,
+      analysis,
+      materialIds
+    );
   }
   const promptChunks = preparePromptChunks(effectiveResults, questionLang, analysis);
   const reviewChunks = promptChunks.length > 0 ? promptChunks : effectiveResults;
@@ -2120,7 +2147,8 @@ async function enrichDefinitionResults(
   question: string,
   searchResults: SearchResult[],
   questionLang: "zh" | "en",
-  analysis: QuestionAnalysis
+  analysis: QuestionAnalysis,
+  materialIds?: number[]
 ): Promise<SearchResult[]> {
   if (!analysis.conciseDefinition || searchResults.length === 0) return searchResults;
 
@@ -2132,7 +2160,7 @@ async function enrichDefinitionResults(
       queryVariants.map((variant) =>
         semanticSearch(
           variant,
-          undefined,
+          materialIds,
           Math.max(6, pickTopK(questionLang, analysis) + 2),
           questionLang,
           false
@@ -2401,9 +2429,10 @@ export async function generateAnswerStream(
   const questionAnalysis = detectQuestionIntent(req.question, questionLanguage);
   const activeConfig = await getActiveLlmConfig();
   const useRAG = activeConfig?.useRAG ?? false;
+  const materialIds = normalizeMaterialIds(req.materialIds);
 
   try {
-    const cached = getCachedAnswer(req.question);
+    const cached = getCachedAnswer(req.question, materialIds);
     if (cached) {
       const responseTimeMs = Date.now() - startTime;
       const queryId = await createQuery({
@@ -2436,11 +2465,11 @@ export async function generateAnswerStream(
 
     const langFilter = questionLanguage === "en" ? "en" : "zh";
     const topK = questionLanguage === "en" ? pickTopK("en", questionAnalysis) : pickTopK("zh", questionAnalysis);
-    let searchResults: SearchResult[] = await semanticSearch(req.question, undefined, topK, langFilter, useRAG);
+    let searchResults: SearchResult[] = await semanticSearch(req.question, materialIds, topK, langFilter, useRAG);
 
     // useRAG=false 且首次未命中时，允许尝试 embedding 检索兜底
     if (searchResults.length === 0 && !useRAG && activeConfig?.embeddingModel) {
-      searchResults = await semanticSearch(req.question, undefined, topK, langFilter, true);
+      searchResults = await semanticSearch(req.question, materialIds, topK, langFilter, true);
     }
 
     const mainResult = await callLLM(
@@ -2448,7 +2477,8 @@ export async function generateAnswerStream(
       searchResults,
       questionLanguage,
       questionLanguage,
-      questionAnalysis
+      questionAnalysis,
+      materialIds
     );
 
     const responseTimeMs = Date.now() - startTime;
@@ -2477,7 +2507,7 @@ export async function generateAnswerStream(
     });
 
     if (mainResult.foundInMaterials) {
-      setCachedAnswer(req.question, { mainResult, questionLanguage });
+      setCachedAnswer(req.question, { mainResult, questionLanguage }, materialIds);
     }
 
     const today = new Date().toISOString().split("T")[0];

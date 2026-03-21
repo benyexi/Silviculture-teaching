@@ -63,12 +63,15 @@ function normalizeAnswerMarkdown(text: string): string {
 
 export default function Home() {
   const { user } = useAuth();
+  const { data: materials, isLoading: materialsLoading } = trpc.materials.list.useQuery();
   const [question, setQuestion] = useState("");
   const [askedQuestion, setAskedQuestion] = useState("");
+  const [askedMaterialTitle, setAskedMaterialTitle] = useState("");
   const [result, setResult] = useState<AnswerResult | null>(null);
   const [showSources, setShowSources] = useState(true);
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
   const [feedbackValue, setFeedbackValue] = useState<boolean | null>(null);
+  const [selectedMaterialId, setSelectedMaterialId] = useState<number | null>(null);
   const resultRef = useRef<HTMLDivElement>(null);
   const submitFeedback = trpc.qa.submitFeedback.useMutation();
 
@@ -81,16 +84,33 @@ export default function Home() {
   const [streamStartTime, setStreamStartTime] = useState(0);
   const [streamElapsed, setStreamElapsed] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
+  const publishedMaterials = (materials || []).filter((m) => m.status === "published");
+  const selectedMaterial = publishedMaterials.find((m) => m.id === selectedMaterialId) || null;
+
+  useEffect(() => {
+    if (publishedMaterials.length === 0) {
+      if (selectedMaterialId !== null) setSelectedMaterialId(null);
+      return;
+    }
+    if (!selectedMaterial || selectedMaterialId === null) {
+      setSelectedMaterialId(publishedMaterials[0].id);
+    }
+  }, [publishedMaterials, selectedMaterial, selectedMaterialId]);
 
   const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
     const q = question.trim();
     if (!q || isStreaming) return;
+    if (!selectedMaterial) {
+      setStreamError("请先选择一本已发布教材");
+      return;
+    }
 
     // 中断之前的请求
     if (abortRef.current) abortRef.current.abort();
 
     setAskedQuestion(q);
+    setAskedMaterialTitle(selectedMaterial.title);
     setResult(null);
     setStreamAnswer("");
     setStreamMeta(null);
@@ -106,7 +126,7 @@ export default function Home() {
     fetch("/api/stream/ask", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question: q }),
+      body: JSON.stringify({ question: q, materialId: selectedMaterial.id }),
       signal: controller.signal,
     })
       .then(async (resp) => {
@@ -170,7 +190,7 @@ export default function Home() {
         setIsStreaming(false);
         setIsSearching(false);
       });
-  }, [question, isStreaming]);
+  }, [question, isStreaming, selectedMaterial]);
 
   // 计时器：显示已用时间
   useEffect(() => {
@@ -271,7 +291,7 @@ export default function Home() {
             <p className="text-emerald-300/80 text-sm md:text-base tracking-[0.25em] uppercase font-light">
               Silviculture Intelligent Q&amp;A System
             </p>
-            <span className="text-xs font-mono text-emerald-400/70 border border-emerald-400/30 rounded px-1.5 py-0.5">V2.0</span>
+            <span className="text-xs font-mono text-emerald-400/70 border border-emerald-400/30 rounded px-1.5 py-0.5">V3.0</span>
           </div>
           <p className="text-white/80 text-sm md:text-base max-w-2xl mx-auto leading-relaxed mb-10 drop-shadow">
             Grounded in authoritative textbooks &middot; 严格基于教材内容回答 &middot; Every answer is fully cited
@@ -280,13 +300,44 @@ export default function Home() {
           {/* 查询框 */}
           <form onSubmit={handleSubmit}>
             <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl border border-white/40 overflow-hidden">
+              <div className="px-5 pt-4 pb-3 border-b border-border/30 bg-white/70">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <label htmlFor="material-select" className="text-xs font-medium text-foreground/80 tracking-wide">
+                    选择提问教材
+                  </label>
+                  <span className="text-xs text-muted-foreground">
+                    仅在当前教材内检索，不跨教材混合
+                  </span>
+                </div>
+                <select
+                  id="material-select"
+                  className="mt-2 w-full h-10 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  value={selectedMaterialId ?? ""}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setSelectedMaterialId(v ? Number(v) : null);
+                  }}
+                  disabled={isStreaming || materialsLoading || publishedMaterials.length === 0}
+                >
+                  {materialsLoading && <option value="">教材加载中...</option>}
+                  {!materialsLoading && publishedMaterials.length === 0 && (
+                    <option value="">暂无已发布教材，请先上传并发布教材</option>
+                  )}
+                  {!materialsLoading &&
+                    publishedMaterials.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.title}
+                      </option>
+                    ))}
+                </select>
+              </div>
               <Textarea
                 value={question}
                 onChange={(e) => setQuestion(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Ask a question about silviculture — 例如：什么是立地质量？如何进行树种选择？造林密度如何确定？"
                 className="min-h-[160px] md:min-h-[200px] text-base resize-none border-0 focus-visible:ring-0 p-5 bg-transparent text-foreground placeholder:text-muted-foreground/70 rounded-none"
-                disabled={isStreaming}
+                disabled={isStreaming || publishedMaterials.length === 0}
               />
               <div className="flex items-center justify-between px-5 py-4 border-t border-border/30 bg-white/60">
                 <span className="text-xs text-muted-foreground">
@@ -295,7 +346,7 @@ export default function Home() {
                 <Button
                   type="submit"
                   size="lg"
-                  disabled={!question.trim() || isStreaming}
+                  disabled={!question.trim() || isStreaming || !selectedMaterial}
                   className="gap-2 px-8 text-base"
                 >
                   {isStreaming ? (
@@ -373,6 +424,11 @@ export default function Home() {
                       </div>
                     </CardHeader>
                     <CardContent className="pt-0 sm:pt-1">
+                      {askedMaterialTitle && (
+                        <div className="mb-3 text-xs text-muted-foreground">
+                          当前检索教材：<span className="font-medium text-foreground/80">{askedMaterialTitle}</span>
+                        </div>
+                      )}
                       <div className="notebook-answer">
                         <CitedAnswer answer={displayAnswer} sourceCount={displaySources.length} />
                       </div>

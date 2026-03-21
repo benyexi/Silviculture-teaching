@@ -63,13 +63,19 @@ export const appRouter = router({
   // ─── 问答（学生端）──────────────────────────────────────────────────────────
   qa: router({
     ask: publicProcedure
-      .input(z.object({ question: z.string().min(2).max(1000) }))
+      .input(
+        z.object({
+          question: z.string().min(2).max(1000),
+          materialId: z.number().int().positive().optional(),
+        })
+      )
       .mutation(async ({ input, ctx }) => {
         const ip = extractIp(ctx.req as any);
         const geo = await getGeoInfo(ip);
 
         return generateAnswer({
           question: input.question,
+          materialIds: input.materialId ? [input.materialId] : undefined,
           visitorIp: ip,
           visitorCity: geo.city || undefined,
           visitorRegion: geo.region || undefined,
