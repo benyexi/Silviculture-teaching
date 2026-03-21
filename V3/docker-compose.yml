@@ -1,0 +1,52 @@
+services:
+  db:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_password}
+      MYSQL_DATABASE: silviculture
+      MYSQL_USER: ${MYSQL_USER:-silviculture}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-silviculture_password}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u$$MYSQL_USER -p$$MYSQL_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: mysql://${MYSQL_USER:-silviculture}:${MYSQL_PASSWORD:-silviculture_password}@db:3306/silviculture
+      JWT_SECRET: ${JWT_SECRET:-please_change_me}
+      # 管理员登录凭据
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?请设置管理员密码 ADMIN_PASSWORD}
+      # 文件上传目录（容器内路径，挂载为 volume）
+      UPLOAD_DIR: /data/uploads
+      # 前端显示标题
+      VITE_APP_TITLE: ${VITE_APP_TITLE:-森林培育学知识问答系统}
+    volumes:
+      - pdf_uploads:/data/uploads
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:'+(process.env.PORT||3000)+'/healthz',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+volumes:
+  mysql_data:
+  pdf_uploads:
