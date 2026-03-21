@@ -56,7 +56,7 @@ type SearchProfile = {
   broadTerms: string[];
   scoringTerms: string[];
   anchorTerms: string[];
-  queryMode: "definition" | "classification" | "method" | "general";
+  queryMode: "definition" | "classification" | "method" | "condition" | "general";
 };
 
 type TermStats = {
@@ -296,6 +296,10 @@ function isNumericLikeChapter(chapter: string): boolean {
 
 function hasDefinitionSignal(text: string): boolean {
   return /(是指|指的是|定义为|定义是|概念|含义|是研究|是一门|是.*?学科|\b(is|means|refers to|defined as|definition|concept)\b)/i.test(text);
+}
+
+function hasConditionSignal(text: string): boolean {
+  return /(条件|要求|前提|应当|必须|需要|时机|时间|时期|季节|when|timing|time to|best time|season|requirement|prerequisite|must|should)/i.test(text);
 }
 
 function looksLikeCatalogBlock(text: string): boolean {
@@ -660,6 +664,24 @@ const QUESTION_INTENT_WORDS = [
   "过程",
   "措施",
   "要求",
+  "definition",
+  "meaning",
+  "concept",
+  "types",
+  "category",
+  "method",
+  "methods",
+  "steps",
+  "process",
+  "condition",
+  "conditions",
+  "requirement",
+  "requirements",
+  "timing",
+  "season",
+  "compare",
+  "comparison",
+  "difference",
 ];
 
 const QUESTION_STOP_WORDS = new Set([
@@ -739,6 +761,17 @@ function stripQuestionWords(text: string): string {
     /什么是|如何|怎么|怎样|为什么|哪些|请问|介绍|说明|解释|试述|分析|比较|请说明|请介绍|阐述|论述|有哪几种|有哪些|分别|简述/g,
     " "
   );
+}
+
+function stripQuestionWordsEn(text: string): string {
+  return text.replace(
+    /\b(?:please|can you|could you|would you|tell me|show me|give me|what is|what are|how to|how do|how should|explain|describe|list)\b/gi,
+    " "
+  );
+}
+
+function stripQuestionWordsByLang(text: string, questionLang: "zh" | "en"): string {
+  return questionLang === "en" ? stripQuestionWordsEn(text) : stripQuestionWords(text);
 }
 
 function countOccurrences(text: string, term: string): number {
@@ -859,12 +892,79 @@ function extractIntentTerms(text: string): string[] {
   return QUESTION_INTENT_WORDS.filter((term) => normalized.includes(normalizeForComparison(term)));
 }
 
-function detectQuestionMode(question: string): SearchProfile["queryMode"] {
-  const normalized = normalizeForComparison(normalizeForLookup(question));
+function extractIntentTermsEn(text: string): string[] {
+  const normalized = normalizeForLookup(text).toLowerCase();
+  const terms: string[] = [];
 
-  if (/(什么是|是什么|何谓|何为|何谓|定义|概念|含义|内涵|界定)/.test(normalized)) return "definition";
-  if (/(指标|表现|形式|特征|要素|构成|有哪些|哪些|分类|类型|分为|包括)/.test(normalized)) return "classification";
-  if (/(如何|怎么|怎样|步骤|方法|措施|原则|过程|程序|实施)/.test(normalized)) return "method";
+  if (/\b(what is|what are|define|definition|meaning|concept)\b/.test(normalized)) {
+    terms.push("definition", "meaning", "concept");
+  }
+  if (/\b(types?|kinds?|categories?|classes?|forms?|indicators?|components?|elements?|includes?|including)\b/.test(normalized)) {
+    terms.push("types", "category", "indicator", "component");
+  }
+  if (/\b(methods?|ways?|steps?|process|procedure|how to|how do|how should|technique)\b/.test(normalized)) {
+    terms.push("method", "steps", "process");
+  }
+  if (/\b(conditions?|requirements?|prerequisites?|must|criteria|when|timing|time to|best time|season)\b/.test(normalized)) {
+    terms.push("condition", "requirement", "timing", "season");
+  }
+  if (/\b(compare|comparison|difference|differences|versus|vs\.?)\b/.test(normalized)) {
+    terms.push("comparison", "difference");
+  }
+
+  return uniqueSortedTerms(terms);
+}
+
+function extractEnglishPhrases(text: string): string[] {
+  const words = text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length >= 3 && !EN_STOP_WORDS.has(w));
+
+  if (words.length === 0) return [];
+  const phrases: string[] = [];
+  const compact = words.slice(0, 6).join(" ");
+  if (compact.length >= 5) phrases.push(compact);
+
+  for (let i = 0; i < words.length - 1; i++) {
+    phrases.push(`${words[i]} ${words[i + 1]}`);
+  }
+  for (let i = 0; i < words.length - 2; i++) {
+    phrases.push(`${words[i]} ${words[i + 1]} ${words[i + 2]}`);
+  }
+
+  return uniqueSortedTerms(phrases).slice(0, 8);
+}
+
+function detectQuestionMode(question: string): SearchProfile["queryMode"] {
+  const normalizedLookup = normalizeForLookup(question);
+  const normalizedCompact = normalizeForComparison(normalizedLookup);
+
+  if (
+    /(条件|要求|前提|必须|需要|时机|时间|时期|季节)/.test(normalizedCompact) ||
+    /\b(when|timing|time to|best time|season|conditions?|requirements?|prerequisites?|criteria)\b/i.test(normalizedLookup)
+  ) {
+    return "condition";
+  }
+  if (
+    /(什么是|是什么|何谓|何为|定义|概念|含义|内涵|界定)/.test(normalizedCompact) ||
+    /\b(what is|what are|define|definition|meaning|concept|what does .+ mean)\b/i.test(normalizedLookup)
+  ) {
+    return "definition";
+  }
+  if (
+    /(指标|表现|形式|特征|要素|构成|有哪些|哪些|分类|类型|分为|包括)/.test(normalizedCompact) ||
+    /\b(types?|kinds?|categories?|classes?|forms?|indicators?|components?|elements?|includes?|including|list)\b/i.test(normalizedLookup)
+  ) {
+    return "classification";
+  }
+  if (
+    /(如何|怎么|怎样|步骤|方法|措施|原则|过程|程序|实施)/.test(normalizedCompact) ||
+    /\b(how to|how do|how should|methods?|ways?|steps?|process|procedure|technique|approach)\b/i.test(normalizedLookup)
+  ) {
+    return "method";
+  }
   return "general";
 }
 
@@ -884,16 +984,22 @@ function buildAnchorTerms(question: string, questionLang: "zh" | "en", candidate
 
 function buildSearchProfile(question: string, questionLang: "zh" | "en"): SearchProfile {
   const normalizedQuestion = normalizeForLookup(question);
-  const strippedQuestion = stripQuestionWords(normalizedQuestion).trim();
+  const strippedQuestion = stripQuestionWordsByLang(normalizedQuestion, questionLang).trim();
   const queryMode = detectQuestionMode(question);
   const baseKeywords = questionLang === "en" ? extractKeywordsEn(question) : extractKeywords(question);
-  const exactPhrases = questionLang === "en" ? [] : extractDomainPhrases(strippedQuestion);
+  const exactPhrases = questionLang === "en" ? extractEnglishPhrases(strippedQuestion) : extractDomainPhrases(strippedQuestion);
   const derivedDefinitionTerms =
-    questionLang === "zh" && /(什么是|何谓|是指|定义|概念|含义)/.test(normalizedQuestion)
-      ? ["定义", "概念", "是指"]
+    questionLang === "zh"
+      ? (/(什么是|何谓|是指|定义|概念|含义)/.test(normalizedQuestion) ? ["定义", "概念", "是指"] : [])
+      : (/\b(what is|what are|define|definition|meaning|concept)\b/i.test(normalizedQuestion)
+          ? ["definition", "defined as", "means"]
+          : []);
+  const derivedConditionTerms =
+    questionLang === "en" && /\b(when|timing|time to|best time|season|conditions?|requirements?|prerequisites?)\b/i.test(normalizedQuestion)
+      ? ["condition", "timing", "season", "requirement"]
       : [];
   const intentTerms = questionLang === "en"
-    ? []
+    ? uniqueSortedTerms([...extractIntentTermsEn(normalizedQuestion), ...derivedDefinitionTerms, ...derivedConditionTerms]).slice(0, 8)
     : uniqueSortedTerms([...extractIntentTerms(normalizedQuestion), ...derivedDefinitionTerms]).slice(0, 8);
 
   const candidateTerms = uniqueSortedTerms([
@@ -908,8 +1014,22 @@ function buildSearchProfile(question: string, questionLang: "zh" | "en"): Search
     return normalized.length >= 3 || DOMAIN_VOCAB_KEYS.has(normalized) || QUESTION_INTENT_KEYS.has(normalized);
   }).slice(0, 8);
 
-  const broadLimit = queryMode === "definition" ? 14 : queryMode === "classification" ? 16 : 18;
-  const scoringLimit = queryMode === "definition" ? 14 : queryMode === "classification" ? 15 : 16;
+  const broadLimit =
+    queryMode === "definition"
+      ? 14
+      : queryMode === "classification"
+        ? 16
+        : queryMode === "condition"
+          ? 16
+          : 18;
+  const scoringLimit =
+    queryMode === "definition"
+      ? 14
+      : queryMode === "classification"
+        ? 15
+        : queryMode === "condition"
+          ? 15
+          : 16;
   const broadTerms = uniqueSortedTerms([
     ...candidateTerms,
     ...expandWithSynonyms(candidateTerms).slice(0, 12),
@@ -1098,7 +1218,8 @@ function scoreChunk(
 
   const compactContent = normalizeForComparison(content);
   const compactChapter = normalizeForComparison(chapter || "");
-  const cleanedQuestion = normalizeForComparison(stripQuestionWords(originalQuestion));
+  const questionLang = detectLanguage(originalQuestion);
+  const cleanedQuestion = normalizeForComparison(stripQuestionWordsByLang(originalQuestion, questionLang));
   const stats = options?.stats;
   const intentTerms = options?.intentTerms ?? [];
   const anchorTerms = options?.anchorTerms ?? [];
@@ -1146,9 +1267,9 @@ function scoreChunk(
   let phraseBonus = 0;
   let leadBonus = 0;
   if (cleanedQuestion.length >= 3 && compactContent.includes(cleanedQuestion)) {
-    phraseBonus += cleanedQuestion.length * (queryMode === "definition" ? 1.15 : 0.9);
+    phraseBonus += cleanedQuestion.length * (queryMode === "definition" ? 1.15 : queryMode === "condition" ? 1.02 : 0.9);
     if (compactContent.slice(0, 140).includes(cleanedQuestion)) {
-      leadBonus += queryMode === "definition" || queryMode === "classification" ? 2.2 : 1.2;
+      leadBonus += queryMode === "definition" || queryMode === "classification" ? 2.2 : queryMode === "condition" ? 1.8 : 1.2;
     }
   }
 
@@ -1164,7 +1285,7 @@ function scoreChunk(
     for (const keyword of coreKeywords) {
       const termKey = normalizeForComparison(keyword);
       if (termKey.length >= 2 && compactChapter.includes(termKey)) {
-        chapterBonus += Math.min(queryMode === "definition" ? 4.5 : 6, termKey.length * (queryMode === "definition" ? 0.5 : 0.65));
+        chapterBonus += Math.min(queryMode === "definition" ? 4.5 : queryMode === "condition" ? 5.2 : 6, termKey.length * (queryMode === "definition" ? 0.5 : 0.65));
       }
     }
 
@@ -1181,14 +1302,20 @@ function scoreChunk(
     containsEnumerationMarkers(content) &&
     intentTerms.some((term) => QUESTION_INTENT_KEYS.has(normalizeForComparison(term)));
   if (hasStructuredClue) {
-    structureBonus += queryMode === "classification" ? 2.8 : 2.2;
+    structureBonus += queryMode === "classification" ? 2.8 : queryMode === "condition" ? 2.4 : 2.2;
   }
   if (queryMode === "definition" && hasDefinitionSignal(content)) {
     structureBonus += 1.3;
   }
+  if (queryMode === "condition" && hasConditionSignal(content)) {
+    structureBonus += 1.4;
+  }
 
   if ((queryMode === "definition" || queryMode === "classification") && !hasDefinitionSignal(content) && !containsEnumerationMarkers(content)) {
     chapterBonus *= 0.78;
+  }
+  if (queryMode === "condition" && !hasConditionSignal(content)) {
+    chapterBonus *= 0.82;
   }
 
   if (queryMode === "classification" && compactContent.includes(cleanedQuestion) && containsEnumerationMarkers(content)) {
@@ -1245,7 +1372,7 @@ function computeRepetitionPenalty(content: string): number {
 }
 
 function containsEnumerationMarkers(content: string): boolean {
-  return /(?:^|\n)\s*(?:[一二三四五六七八九十]+[、．.）)]|\d+[\.、）)]|\([一二三四五六七八九十]+\))/m.test(content);
+  return /(?:^|\n)\s*(?:[一二三四五六七八九十]+[、．.）)]|\d+[\.、）)]|\([一二三四五六七八九十]+\)|[-*•]\s+|[A-Za-z][.)]\s+)/m.test(content);
 }
 
 function buildBaseFilters(
@@ -1524,6 +1651,8 @@ export async function semanticSearch(
       ? profile.broadTerms.slice(0, 12)
       : profile.queryMode === "classification"
         ? profile.broadTerms.slice(0, 15)
+        : profile.queryMode === "condition"
+          ? profile.broadTerms.slice(0, 15)
         : profile.broadTerms.slice(0, 18);
   const routePlan: Array<{
     route: RouteName;
