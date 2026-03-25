@@ -392,7 +392,8 @@ Answering protocol:
 6. CITATION REQUIRED: For every factual claim, add an inline citation marker like [1], [2] matching the excerpt number. Example: "Silviculture covers the full cultivation cycle [1] including thinning operations [3]."
 7. Never add background history or external knowledge not supported by excerpts.
 8. Do not add meta commentary like "the textbook clearly states", "completeness note", or process explanations.
-9. Do not output exclusion paragraphs such as "X is not covered / not listed" unless the user explicitly asks what is missing.`;
+9. Do not output exclusion paragraphs such as "X is not covered / not listed" unless the user explicitly asks what is missing.
+10. Synthesize in your own words with concise phrasing. Do not copy long excerpt passages verbatim unless necessary for a definition.`;
   }
 
   const materialNote =
@@ -413,7 +414,8 @@ ${materialNote}
 7. 引用标注：每个事实性陈述后必须添加引用标记 [1]、[2]，对应片段编号。例如："森林培育涵盖从种子到成林的全过程[1]，包括间伐经营[3]。"
 8. 严禁扩展教材外知识，不要凭常识或通用知识补充。
 9. 禁止写过程性废话或自我说明，如"教材明确将…""完整性说明""本回答完全限定于…"。答案第一句必须直接进入结论或清单。
-10. 证据不足时只用一句短提示，不要展开排除说明；除非用户明确问"哪些没有提到"，才可以说明缺失项。`;
+10. 证据不足时只用一句短提示，不要展开排除说明；除非用户明确问"哪些没有提到"，才可以说明缺失项。
+11. 优先用自己的话进行精炼组织，不要长段逐句摘抄教材原文；每个条目尽量控制在1-2句。`;
 }
 
 export function buildSystemPrompt(
@@ -1000,13 +1002,24 @@ async function callLLM(
     compactLen >= 180 &&
     !analysis.expectsEnumeration &&
     !analysis.requestDetail;
+  const conciseReviewThreshold = questionLang === "en" ? 90 : 60;
+  const conciseNeedsQualityReview =
+    analysis.conciseDefinition &&
+    localReview.shouldRetry &&
+    (severeGroundingIssue || compactLen < conciseReviewThreshold);
   const shouldRunQualityEval =
     ENABLE_LLM_QUALITY_REVIEW &&
     !englishFastPath &&
     !skipLLMReview &&
     (
       severeGroundingIssue ||
-      (localReview.shouldRetry && structureSensitiveIntent && compactLen < (TOKEN_SAVER_MODE ? (questionLang === "en" ? 900 : 1200) : 1600))
+      conciseNeedsQualityReview ||
+      (
+        !analysis.conciseDefinition &&
+        localReview.shouldRetry &&
+        structureSensitiveIntent &&
+        compactLen < (TOKEN_SAVER_MODE ? (questionLang === "en" ? 900 : 1200) : 1600)
+      )
     );
 
   if (shouldRunQualityEval) {
@@ -2252,7 +2265,7 @@ function buildExtractiveAnswer(
     ? prioritizeDefinitionResults(question, searchResults, questionLang, keywords)
     : searchResults;
 
-  const scored: Array<{ sentence: string; score: number; chunkId: number }> = [];
+  const scored: Array<{ sentence: string; score: number; chunkId: number; hitCount: number; hasExactQuery: boolean }> = [];
   const strictScored: Array<{ sentence: string; score: number; chunkId: number }> = [];
   const fallbackScored: Array<{ sentence: string; score: number; chunkId: number }> = [];
   const sanitizeSentence = (sentence: string): string =>
@@ -2320,11 +2333,23 @@ function buildExtractiveAnswer(
       }
 
       let score = 0;
-      if (queryNorm && sNorm.includes(queryNorm)) score += 8;
-      for (const kw of keywords) {
-        if (sNorm.includes(normalizeQuestion(kw))) score += Math.min(4, kw.length);
+      let hitCount = 0;
+      const hasExactQuery = Boolean(queryNorm && sNorm.includes(queryNorm));
+      if (hasExactQuery) {
+        score += 8;
+        hitCount += 2;
       }
-      if (score > 0) scored.push({ sentence, score, chunkId: chunk.chunkId });
+      for (const kw of keywords) {
+        if (sNorm.includes(normalizeQuestion(kw))) {
+          score += Math.min(4, kw.length);
+          hitCount += 1;
+        }
+      }
+      const minScore = analysis.expectsEnumeration ? 8 : analysis.intent === "definition" ? 7 : 5;
+      const strongEnough = score >= minScore && (hasExactQuery || hitCount >= 2);
+      if (strongEnough) {
+        scored.push({ sentence, score, chunkId: chunk.chunkId, hitCount, hasExactQuery });
+      }
     }
   }
 
@@ -2334,7 +2359,14 @@ function buildExtractiveAnswer(
   if (analysis.conciseDefinition && definitionPool.length === 0) return null;
   if (!analysis.conciseDefinition && scored.length === 0) return null;
 
-  const rankedPool = analysis.conciseDefinition ? definitionPool : scored.sort((a, b) => b.score - a.score);
+  const rankedPool = analysis.conciseDefinition
+    ? definitionPool
+    : scored.sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        if (b.hitCount !== a.hitCount) return b.hitCount - a.hitCount;
+        if (a.hasExactQuery !== b.hasExactQuery) return a.hasExactQuery ? -1 : 1;
+        return 0;
+      });
   const used = new Set<number>();
   const picked: Array<{ sentence: string; chunkId: number }> = [];
   const seen = new Set<string>();
@@ -2350,6 +2382,7 @@ function buildExtractiveAnswer(
   }
 
   if (picked.length === 0) return null;
+  if (!analysis.conciseDefinition && picked.length < 2) return null;
 
   const lines = picked.map((p) => {
     const trimmed = truncateSentenceSmart(p.sentence, questionLang, questionLang === "en" ? 180 : 90);
@@ -2426,9 +2459,18 @@ function buildMinimalGroundedFallback(
     const content = `${item.text}${ending ? "" : questionLang === "en" ? "." : "。"} [${cite}]`;
     return analysis.expectsEnumeration ? `${idx + 1}. ${content}` : `- ${content}`;
   });
+  const heading = analysis.expectsEnumeration
+    ? (questionLang === "en"
+      ? analysis.intent === "method"
+        ? "## Methods / steps"
+        : "## Key items"
+      : analysis.intent === "method"
+        ? "## 方法/步骤"
+        : "## 关键条目")
+    : "";
 
   return {
-    answer: lines.join("\n"),
+    answer: heading ? `${heading}\n\n${lines.join("\n")}` : lines.join("\n"),
     usedChunkIds,
   };
 }
