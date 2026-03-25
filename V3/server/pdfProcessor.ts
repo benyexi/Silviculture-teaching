@@ -6,7 +6,7 @@ import { getDb, getActiveLlmConfig } from "./db";
 import { materials, materialChunks } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
 import { detectDocumentLanguage } from "./languageDetect";
-import { getEmbedding } from "./llmDriver";
+import { getEmbedding, getEmbeddings } from "./llmDriver";
 import mammoth from "mammoth";
 import WordExtractor from "word-extractor";
 
@@ -20,7 +20,7 @@ type TextChunk = {
 };
 
 const HEADING_PATTERN =
-  /^(第[一二三四五六七八九十百零\d]+[章节篇部编]|[\d]+\.[\d]+[\s\S]{0,30}|[一二三四五六七八九十]+[、．.]\s*\S|Chapter\s+\d+|CHAPTER\s+\d+|Part\s+[IVX\d]+)/i;
+  /^(第[一二三四五六七八九十百零\d]+[章节篇部编]|[\d]+\.[\d]+[\s\S]{0,30}|[一二三四五六七八九十]+[、．.]\s*\S|Chapter\s+\d+(?:\.\d+)*|CHAPTER\s+\d+(?:\.\d+)*|Part\s+[IVX\d]+|Section\s+\d+(?:\.\d+)*|SECTION\s+\d+(?:\.\d+)*|\d+(?:\.\d+){0,3}\s+[A-Z][A-Za-z0-9 ,:;()\-]{2,90})$/i;
 
 const LIST_ITEM_PATTERN =
   /^(?:[（(]?(?:[一二三四五六七八九十百千零\d]+|[a-zA-Z]+)[)）.、．]|(?:\d+|[ivxlcdmIVXLCDM]+)[)）.、．]|[-*•·●○])\s*\S/;
@@ -204,6 +204,92 @@ function getFileType(filename: string): "pdf" | "docx" | "doc" {
   return "pdf";
 }
 
+type MaterialProcessJob = {
+  materialId: number;
+  filename: string;
+  loadBuffer: () => Promise<Buffer>;
+  onDone?: () => void;
+  onError?: (error: unknown) => void;
+};
+
+const MATERIAL_PROCESS_CONCURRENCY = Math.max(
+  1,
+  parseInt(process.env.MATERIAL_PROCESS_CONCURRENCY || "1", 10)
+);
+const materialProcessQueue: MaterialProcessJob[] = [];
+let activeMaterialProcessJobs = 0;
+
+function pumpMaterialProcessQueue(): void {
+  while (activeMaterialProcessJobs < MATERIAL_PROCESS_CONCURRENCY && materialProcessQueue.length > 0) {
+    const job = materialProcessQueue.shift();
+    if (!job) break;
+    activeMaterialProcessJobs++;
+    void runMaterialProcessJob(job);
+  }
+}
+
+async function runMaterialProcessJob(job: MaterialProcessJob): Promise<void> {
+  try {
+    const buffer = await job.loadBuffer();
+    await processMaterial(job.materialId, buffer, job.filename);
+    job.onDone?.();
+  } catch (error) {
+    if (job.onError) {
+      job.onError(error);
+    } else {
+      console.error(`[DocQueue] 教材 ${job.materialId} 处理失败:`, error);
+    }
+  } finally {
+    activeMaterialProcessJobs = Math.max(0, activeMaterialProcessJobs - 1);
+    pumpMaterialProcessQueue();
+  }
+}
+
+export function enqueueMaterialProcessing(job: MaterialProcessJob): void {
+  materialProcessQueue.push(job);
+  pumpMaterialProcessQueue();
+}
+
+export function getMaterialProcessingQueueStats() {
+  return {
+    active: activeMaterialProcessJobs,
+    queued: materialProcessQueue.length,
+    concurrency: MATERIAL_PROCESS_CONCURRENCY,
+  };
+}
+
+async function getEmbeddingWithRetry(text: string, maxAttempts = 3): Promise<number[] | undefined> {
+  let attempt = 0;
+  while (attempt < maxAttempts) {
+    try {
+      return await getEmbedding(text);
+    } catch (error) {
+      attempt++;
+      if (attempt >= maxAttempts) break;
+      const backoffMs = Math.min(1200, 250 * Math.pow(2, attempt - 1));
+      await sleep(backoffMs);
+    }
+  }
+  return undefined;
+}
+
+async function getEmbeddingsWithRetry(texts: string[], maxAttempts = 2): Promise<(number[] | undefined)[]> {
+  if (texts.length === 0) return [];
+  let attempt = 0;
+  while (attempt < maxAttempts) {
+    try {
+      const vectors = await getEmbeddings(texts);
+      return vectors.map((vec) => vec || undefined);
+    } catch (error) {
+      attempt++;
+      if (attempt >= maxAttempts) break;
+      const backoffMs = Math.min(1500, 300 * Math.pow(2, attempt - 1));
+      await sleep(backoffMs);
+    }
+  }
+  return new Array(texts.length).fill(undefined);
+}
+
 // ─── 主处理函数 ───────────────────────────────────────────────────────────────
 export async function processMaterial(
   materialId: number,
@@ -242,14 +328,14 @@ export async function processMaterial(
     const useRAG = activeConfig?.useRAG ?? false;
 
     let embeddingEnabled = useRAG; // 只有开启语义检索模式才尝试生成 Embedding
-    const BATCH_SIZE = 10;
+    const BATCH_SIZE = Math.max(4, parseInt(process.env.DOC_EMBED_BATCH_SIZE || "16", 10));
 
     if (!useRAG) {
       console.log(`[Doc] 当前为关键词检索模式，跳过 Embedding 生成`);
     } else {
       // 先测试 Embedding 是否可用
       try {
-        await getEmbedding("test");
+        await getEmbeddings(["test"]);
       } catch (err: any) {
         embeddingEnabled = false;
         const msg = err?.message || String(err);
@@ -265,19 +351,26 @@ export async function processMaterial(
 
     for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
       const batch = chunks.slice(i, i + BATCH_SIZE);
+      const embeddings: Array<number[] | undefined> = new Array(batch.length).fill(undefined);
+
+      // 先尝试批量 embedding，失败后再逐条补偿，减少 800 页教材导入时的 API 调用量
+      if (embeddingEnabled) {
+        const batched = await getEmbeddingsWithRetry(batch.map((chunk) => chunk.content), 2);
+        for (let j = 0; j < batched.length; j++) embeddings[j] = batched[j];
+
+        for (let j = 0; j < batch.length; j++) {
+          if (embeddings[j]) continue;
+          embeddings[j] = await getEmbeddingWithRetry(batch[j].content, 2);
+          if (!embeddings[j]) {
+            console.warn(`[Doc] 块 ${i + j} Embedding 生成失败，已降级为关键词检索块`);
+          }
+        }
+      }
+
       await Promise.all(
         batch.map(async (chunk, batchIdx) => {
           const idx = i + batchIdx;
-          let embedding: number[] | undefined;
-
-          // 生成 Embedding（如果已配置）
-          if (embeddingEnabled) {
-            try {
-              embedding = await getEmbedding(chunk.content);
-            } catch (err) {
-              console.warn(`[Doc] 块 ${idx} Embedding 生成失败:`, err);
-            }
-          }
+          const embedding = embeddings[batchIdx];
 
           await db.insert(materialChunks).values({
             materialId,

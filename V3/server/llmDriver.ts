@@ -188,6 +188,35 @@ export async function getEmbedding(text: string): Promise<number[]> {
   );
 }
 
+/** 批量 Embedding（用于大文档导入阶段降本增效） */
+export async function getEmbeddings(texts: string[]): Promise<number[][]> {
+  if (texts.length === 0) return [];
+
+  const config = await getActiveLlmConfig();
+  if (config?.embeddingModel && config?.embeddingApiKey) {
+    const baseURL = getProviderBaseUrl(config.provider, config.embeddingBaseUrl);
+    const client = buildOpenAIClient(config.embeddingApiKey, baseURL);
+
+    const response = await client.embeddings.create({
+      model: config.embeddingModel,
+      input: texts,
+    });
+
+    const ordered = [...response.data]
+      .sort((a, b) => a.index - b.index)
+      .map((item) => item.embedding);
+
+    if (ordered.length !== texts.length) {
+      throw new Error(`批量 Embedding 返回数量异常：expected=${texts.length}, actual=${ordered.length}`);
+    }
+    return ordered;
+  }
+
+  throw new Error(
+    "未配置 Embedding 模型。请在教师端「模型配置」页面配置 Embedding 模型和 API Key。"
+  );
+}
+
 // ─── 测试连接 ─────────────────────────────────────────────────────────────────
 export async function testLLMConnection(config: {
   provider: string;

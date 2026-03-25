@@ -50,6 +50,66 @@ export async function runMigrations() {
   }
   const migrationsFolder = path.resolve(process.cwd(), "drizzle");
   await migrate(db, { migrationsFolder });
+  await ensureRetrievalIndexes();
+}
+
+async function ensureRetrievalIndexes() {
+  const db = await getDb();
+  if (!db) return;
+
+  const wantedIndexes = [
+    {
+      table: "material_chunks",
+      name: "idx_material_chunks_material_chunk",
+      ddl: "CREATE INDEX `idx_material_chunks_material_chunk` ON `material_chunks` (`materialId`, `chunkIndex`)",
+    },
+    {
+      table: "material_chunks",
+      name: "idx_material_chunks_material_vector",
+      ddl: "CREATE INDEX `idx_material_chunks_material_vector` ON `material_chunks` (`materialId`, `vectorId`)",
+    },
+    {
+      table: "materials",
+      name: "idx_materials_status_language",
+      ddl: "CREATE INDEX `idx_materials_status_language` ON `materials` (`status`, `language`)",
+    },
+    {
+      table: "material_chunks",
+      name: "ft_material_chunks_content_chapter",
+      ddl: "CREATE FULLTEXT INDEX `ft_material_chunks_content_chapter` ON `material_chunks` (`content`, `chapter`)",
+    },
+  ] as const;
+
+  try {
+    const [rows] = await (db as any).$client.execute(`
+      SELECT TABLE_NAME as tableName, INDEX_NAME as indexName
+      FROM INFORMATION_SCHEMA.STATISTICS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME IN ('material_chunks', 'materials')
+    `);
+
+    const existing = new Set<string>();
+    if (Array.isArray(rows)) {
+      for (const row of rows) {
+        const tableName = String((row as any).tableName ?? "");
+        const indexName = String((row as any).indexName ?? "");
+        if (tableName && indexName) existing.add(`${tableName}:${indexName}`);
+      }
+    }
+
+    for (const item of wantedIndexes) {
+      const key = `${item.table}:${item.name}`;
+      if (existing.has(key)) continue;
+      try {
+        await (db as any).$client.execute(item.ddl);
+        console.log(`[Database] Created index ${item.name}`);
+      } catch (error) {
+        console.warn(`[Database] Failed to create index ${item.name}:`, error);
+      }
+    }
+  } catch (error) {
+    console.warn("[Database] Failed to inspect/create retrieval indexes:", error);
+  }
 }
 
 // ─── Users ────────────────────────────────────────────────────────────────────

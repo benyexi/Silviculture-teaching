@@ -11,7 +11,7 @@
  */
 import { getDb } from "./db";
 import { materialChunks, materials } from "../drizzle/schema";
-import { eq, inArray, and, like, or, isNotNull } from "drizzle-orm";
+import { eq, inArray, and, like, or, isNotNull, asc } from "drizzle-orm";
 import { detectLanguage } from "./languageDetect";
 import { getEmbedding, cosineSimilarity } from "./llmDriver";
 
@@ -96,6 +96,8 @@ const SEARCH_CONFIG = {
   embeddingTopK: parseInt(process.env.EMBEDDING_TOP_K || "30", 10),
   // RAM 缓存最大条目数
   ramCacheMaxSize: parseInt(process.env.RAM_CACHE_MAX_SIZE || "5000", 10),
+  ramCachePerMaterialMaxSize: parseInt(process.env.RAM_CACHE_PER_MATERIAL_MAX_SIZE || "16000", 10),
+  enableFulltextBroadRoute: process.env.ENABLE_FULLTEXT_BROAD_ROUTE !== "false",
 } as const;
 
 // ─── RAM: 内存向量缓存 ────────────────────────────────────────────────────────
@@ -112,7 +114,12 @@ type RAMEntry = {
 let _ramCache: RAMEntry[] = [];
 let _ramLoadedAt = 0;
 let _ramLoading: Promise<void> | null = null;
+const _ramCacheByMaterial = new Map<number, { entries: RAMEntry[]; loadedAt: number }>();
 const RAM_TTL_MS = 10 * 60 * 1000; // RAM 缓存 10 分钟有效
+
+function isCacheFresh(loadedAt: number): boolean {
+  return Date.now() - loadedAt < RAM_TTL_MS;
+}
 
 // ─── Query Embedding LRU 缓存 ────────────────────────────────────────────────
 // 避免相同/相似问题重复调用 Embedding API
@@ -143,7 +150,7 @@ function setCachedQueryEmbedding(question: string, embedding: number[]): void {
 
 async function ensureRAMCache(): Promise<RAMEntry[]> {
   const now = Date.now();
-  if (_ramCache.length > 0 && now - _ramLoadedAt < RAM_TTL_MS) {
+  if (_ramCache.length > 0 && isCacheFresh(_ramLoadedAt)) {
     return _ramCache;
   }
 
@@ -160,6 +167,73 @@ async function ensureRAMCache(): Promise<RAMEntry[]> {
     _ramLoading = null;
   }
   return _ramCache;
+}
+
+async function ensureRAMCacheForMaterials(materialIds: number[]): Promise<RAMEntry[]> {
+  if (materialIds.length === 0) return [];
+  const uniqueMaterialIds = Array.from(new Set(materialIds.filter((id) => Number.isInteger(id) && id > 0)));
+  if (uniqueMaterialIds.length === 0) return [];
+
+  const staleIds = uniqueMaterialIds.filter((materialId) => {
+    const cached = _ramCacheByMaterial.get(materialId);
+    return !cached || !isCacheFresh(cached.loadedAt);
+  });
+
+  if (staleIds.length > 0) {
+    const db = await getDb();
+    if (db) {
+      const rows = await db
+        .select({
+          id: materialChunks.id,
+          materialId: materialChunks.materialId,
+          chunkIndex: materialChunks.chunkIndex,
+          embedding: materialChunks.embedding,
+          language: materials.language,
+        })
+        .from(materialChunks)
+        .innerJoin(materials, eq(materialChunks.materialId, materials.id))
+        .where(and(
+          eq(materials.status, "published"),
+          inArray(materialChunks.materialId, staleIds),
+          eq(materialChunks.vectorId, "embedded"),
+          isNotNull(materialChunks.embedding)
+        ))
+        .orderBy(asc(materialChunks.materialId), asc(materialChunks.chunkIndex));
+
+      const grouped = new Map<number, RAMEntry[]>();
+      for (const row of rows) {
+        const emb = row.embedding as number[] | null;
+        if (!emb || !Array.isArray(emb) || emb.length === 0) continue;
+        const list = grouped.get(row.materialId) ?? [];
+        if (list.length >= SEARCH_CONFIG.ramCachePerMaterialMaxSize) continue;
+        list.push({
+          chunkId: row.id,
+          materialId: row.materialId,
+          chunkIndex: row.chunkIndex,
+          language: (row.language as "zh" | "en") || "zh",
+          embedding: emb,
+        });
+        grouped.set(row.materialId, list);
+      }
+
+      const now = Date.now();
+      for (const materialId of staleIds) {
+        _ramCacheByMaterial.set(materialId, {
+          entries: grouped.get(materialId) ?? [],
+          loadedAt: now,
+        });
+      }
+    }
+  }
+
+  const scoped: RAMEntry[] = [];
+  for (const materialId of uniqueMaterialIds) {
+    const cached = _ramCacheByMaterial.get(materialId);
+    if (cached && cached.entries.length > 0) {
+      scoped.push(...cached.entries);
+    }
+  }
+  return scoped;
 }
 
 async function loadRAMCache(): Promise<void> {
@@ -206,6 +280,7 @@ async function loadRAMCache(): Promise<void> {
 export function invalidateRAMCache(): void {
   _ramCache = [];
   _ramLoadedAt = 0;
+  _ramCacheByMaterial.clear();
 }
 
 // ─── Embedding 向量检索 ────────────────────────────────────────────────────────
@@ -235,8 +310,11 @@ async function embeddingSearch(
     }
   }
 
-  // 2. 从 RAM 缓存中加载 chunk embeddings
-  const cache = await ensureRAMCache();
+  // 2. 从 RAM 缓存中加载 chunk embeddings（教材已选中时优先按教材分片缓存）
+  const cache =
+    materialIds && materialIds.length > 0
+      ? await ensureRAMCacheForMaterials(materialIds)
+      : await ensureRAMCache();
   if (cache.length === 0) return [];
 
   // 3. 过滤符合条件的 chunks（包含语言过滤）
@@ -382,7 +460,8 @@ async function keywordFallbackSearch(
   topK: number,
   languageFilter: "zh" | "en" | "all",
   profile: SearchProfile,
-  questionLang: "zh" | "en"
+  questionLang: "zh" | "en",
+  allowLanguageFallback: boolean = true
 ): Promise<SearchResult[]> {
   const terms = uniqueSortedTerms([
     ...profile.coreTerms,
@@ -411,7 +490,11 @@ async function keywordFallbackSearch(
       .from(materialChunks)
       .innerJoin(materials, eq(materialChunks.materialId, materials.id))
       .where(and(...filters, matchClause))
-      .limit(Math.max(100, topK * 24));
+      .limit(
+        materialIds && materialIds.length === 1
+          ? Math.max(80, topK * 16)
+          : Math.max(120, topK * 24)
+      );
 
     return rows.map((row) => ({
       id: row.id,
@@ -426,7 +509,7 @@ async function keywordFallbackSearch(
   };
 
   let rows = await runLikeQuery(languageFilter);
-  if (rows.length === 0 && languageFilter !== "all") {
+  if (rows.length === 0 && languageFilter !== "all" && allowLanguageFallback) {
     rows = await runLikeQuery("all");
   }
   if (rows.length === 0) return [];
@@ -1394,6 +1477,80 @@ function buildTermCondition(term: string) {
   );
 }
 
+function sanitizeFulltextToken(term: string): string {
+  return term
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function buildFulltextBooleanQuery(terms: string[]): string {
+  const cleaned = terms
+    .map(sanitizeFulltextToken)
+    .filter((term) => term.length >= 3)
+    .slice(0, 10);
+
+  if (cleaned.length === 0) return "";
+  const clauses = cleaned.map((term) => {
+    if (term.includes(" ")) return `+"${term}"`;
+    return `+${term}*`;
+  });
+  return clauses.join(" ");
+}
+
+async function fetchRouteCandidatesByFulltext(
+  db: DbConnection,
+  terms: string[],
+  materialIds: number[] | undefined,
+  languageFilter: "zh" | "en" | "all",
+  limit: number
+): Promise<CandidateRow[]> {
+  const booleanQuery = buildFulltextBooleanQuery(terms);
+  if (!booleanQuery) return [];
+
+  const whereClauses = ["m.`status` = 'published'", "MATCH(mc.`content`, mc.`chapter`) AGAINST (? IN BOOLEAN MODE)"];
+  const params: Array<string | number> = [booleanQuery];
+
+  if (languageFilter !== "all") {
+    whereClauses.push("m.`language` = ?");
+    params.push(languageFilter);
+  }
+  if (materialIds && materialIds.length > 0) {
+    whereClauses.push(`mc.\`materialId\` IN (${materialIds.map(() => "?").join(",")})`);
+    params.push(...materialIds);
+  }
+  params.push(limit);
+
+  const query = `
+    SELECT
+      mc.id,
+      mc.\`materialId\` AS materialId,
+      mc.\`chunkIndex\` AS chunkIndex,
+      mc.content,
+      mc.chapter,
+      mc.\`pageStart\` AS pageStart,
+      mc.\`pageEnd\` AS pageEnd
+    FROM material_chunks mc
+    INNER JOIN materials m ON mc.\`materialId\` = m.id
+    WHERE ${whereClauses.join(" AND ")}
+    LIMIT ?
+  `;
+
+  const [rows] = await (db as any).$client.execute(query, params);
+  if (!Array.isArray(rows)) return [];
+
+  return rows.map((row: any) => ({
+    id: Number(row.id),
+    materialId: Number(row.materialId),
+    chunkIndex: Number(row.chunkIndex),
+    content: String(row.content || ""),
+    chapter: row.chapter ? String(row.chapter) : null,
+    pageStart: row.pageStart === null || row.pageStart === undefined ? null : Number(row.pageStart),
+    pageEnd: row.pageEnd === null || row.pageEnd === undefined ? null : Number(row.pageEnd),
+  }));
+}
+
 function mergeCandidate(
   map: Map<number, CandidateState>,
   row: CandidateRow
@@ -1529,11 +1686,27 @@ async function fetchRouteCandidates(
   db: DbConnection,
   route: RouteName,
   terms: string[],
+  questionLang: "zh" | "en",
   materialIds: number[] | undefined,
   languageFilter: "zh" | "en" | "all",
   limit: number
 ): Promise<CandidateRow[]> {
   if (terms.length === 0) return [];
+
+  const shouldUseFulltextBroadRoute =
+    SEARCH_CONFIG.enableFulltextBroadRoute &&
+    route === "broad" &&
+    questionLang === "en" &&
+    terms.some((term) => /[a-z]{3,}/i.test(term));
+
+  if (shouldUseFulltextBroadRoute) {
+    try {
+      const fulltextRows = await fetchRouteCandidatesByFulltext(db, terms, materialIds, languageFilter, limit);
+      if (fulltextRows.length > 0) return fulltextRows;
+    } catch (error) {
+      console.warn(`[HybridSearch] Fulltext broad route unavailable, fallback to LIKE route: ${error}`);
+    }
+  }
 
   const baseFilters = buildBaseFilters(materialIds, languageFilter);
   const termConditions = terms.map((term) => buildTermCondition(term));
@@ -1644,6 +1817,15 @@ export async function semanticSearch(
   const questionLang = detectLanguage(question);
   const profile = buildSearchProfile(question, questionLang);
   const emergencyTerms = buildEmergencyTerms(question, questionLang);
+  const singleMaterialScoped = Boolean(materialIds && materialIds.length === 1);
+  const routeLimitScale = singleMaterialScoped ? 0.72 : 1;
+  const adaptiveStrictLimit = Math.max(topK * 8, Math.floor(SEARCH_CONFIG.strictLimit * routeLimitScale));
+  const adaptivePhraseLimit = Math.max(topK * 12, Math.floor(SEARCH_CONFIG.phraseLimit * routeLimitScale));
+  const adaptiveBroadLimit = Math.max(topK * 14, Math.floor(SEARCH_CONFIG.broadLimit * routeLimitScale));
+  const adaptiveEmbeddingTopK = Math.max(
+    topK * 3,
+    Math.min(SEARCH_CONFIG.embeddingTopK, singleMaterialScoped ? 24 : SEARCH_CONFIG.embeddingTopK)
+  );
   const strictTerms = uniqueSortedTerms(profile.coreTerms.slice(0, 5));
   const phraseTerms = uniqueSortedTerms([...profile.exactPhrases, ...profile.intentTerms]).slice(0, 8);
   const broadTerms =
@@ -1668,7 +1850,7 @@ export async function semanticSearch(
           : phraseTerms.length > 0
             ? phraseTerms.slice(0, 3)
             : emergencyTerms.slice(0, 3),
-      limit: SEARCH_CONFIG.strictLimit,
+      limit: adaptiveStrictLimit,
       weight: SEARCH_CONFIG.strictWeight,
     },
     {
@@ -1679,13 +1861,13 @@ export async function semanticSearch(
           : broadTerms.length > 0
             ? broadTerms.slice(0, 6)
             : emergencyTerms.slice(0, 6),
-      limit: SEARCH_CONFIG.phraseLimit,
+      limit: adaptivePhraseLimit,
       weight: SEARCH_CONFIG.phraseWeight,
     },
     {
       route: "broad",
       terms: broadTerms.length > 0 ? broadTerms : emergencyTerms.slice(0, 8),
-      limit: SEARCH_CONFIG.broadLimit,
+      limit: adaptiveBroadLimit,
       weight: SEARCH_CONFIG.broadWeight,
     },
   ];
@@ -1696,7 +1878,7 @@ export async function semanticSearch(
   const embeddingScoreMap = new Map<number, number>(); // chunkId → embedding similarity
 
   const embeddingPromise = useEmbedding
-    ? embeddingSearch(question, materialIds, languageFilter, SEARCH_CONFIG.embeddingTopK)
+    ? embeddingSearch(question, materialIds, languageFilter, adaptiveEmbeddingTopK)
         .catch((err: any) => {
           console.warn(`[HybridSearch] Embedding search failed, falling back to keyword-only: ${err?.message || err}`);
           return [] as EmbeddingCandidate[];
@@ -1706,7 +1888,7 @@ export async function semanticSearch(
   const routePromises = routePlan
     .filter((route) => route.terms.length > 0)
     .map((route) =>
-      fetchRouteCandidates(db, route.route, route.terms, materialIds, languageFilter, route.limit)
+      fetchRouteCandidates(db, route.route, route.terms, questionLang, materialIds, languageFilter, route.limit)
         .then((rows) => ({ route, rows }))
     );
 
@@ -1774,7 +1956,7 @@ export async function semanticSearch(
   }
 
   if (candidateMap.size === 0) {
-    return keywordFallbackSearch(db, question, materialIds, topK, languageFilter, profile, questionLang);
+    return keywordFallbackSearch(db, question, materialIds, topK, languageFilter, profile, questionLang, allowLanguageFallback);
   }
 
   let candidates = Array.from(candidateMap.values());
@@ -1857,7 +2039,7 @@ export async function semanticSearch(
   const topResults = applyDiversitySelection(candidates, topK).filter((candidate) => candidate.finalScore > 0);
 
   if (topResults.length === 0) {
-    return keywordFallbackSearch(db, question, materialIds, topK, languageFilter, profile, questionLang);
+    return keywordFallbackSearch(db, question, materialIds, topK, languageFilter, profile, questionLang, allowLanguageFallback);
   }
 
   const matIds = Array.from(new Set(topResults.map((c) => c.materialId)));

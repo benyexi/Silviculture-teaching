@@ -638,6 +638,7 @@ function focusResultsByChapter(
   analysis: QuestionAnalysis
 ): SearchResult[] {
   if (searchResults.length <= 6) return searchResults;
+  if (analysis.expectsEnumeration) return searchResults;
   if (analysis.requestDetail) return searchResults;
 
   const focusTerms = pickFocusTerms(question, questionLang, analysis);

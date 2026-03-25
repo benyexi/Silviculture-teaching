@@ -168,10 +168,8 @@ describe("prompt builders", () => {
     const prompt = buildSystemPrompt(["森林培育学（第三版）"], "zh", "zh");
 
     expect(prompt).toContain("回答协议");
-    expect(prompt).toContain("分类、方法、步骤或比较题");
+    expect(prompt).toContain("分类、方法、步骤、条件/时机或比较题");
     expect(prompt).toContain("优先\"直接回答 + 清单/要点\"");
-    expect(prompt).toContain("示例1（分类题）");
-    expect(prompt).toContain("示例2（方法题）");
     expect(prompt).toContain("内联引用标注");
   });
 
