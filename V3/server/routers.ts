@@ -34,7 +34,7 @@ import {
 } from "./db";
 import { generateAnswer, clearAnswerCache } from "./qaService";
 import { testLLMConnection } from "./llmDriver";
-import { processMaterial } from "./pdfProcessor";
+import { enqueueMaterialProcessing } from "./pdfProcessor";
 import { invalidateMaterialCache } from "./vectorSearch";
 import { getGeoInfo, extractIp } from "./geoip";
 import { storagePut } from "./storage";
@@ -254,13 +254,16 @@ export const appRouter = router({
           materialId,
         });
 
-        // 异步处理文档（读取完整文件用于解析）
-        const fullBuffer = fs.readFileSync(destPath);
-        processMaterial(materialId, fullBuffer, session.filename)
-          .then(() => clearAnswerCache())
-          .catch((err) => {
+        // 异步入队处理文档（避免单请求占满 CPU/内存）
+        enqueueMaterialProcessing({
+          materialId,
+          filename: session.filename,
+          loadBuffer: () => fs.promises.readFile(destPath),
+          onDone: () => clearAnswerCache(),
+          onError: (err) => {
             console.error(`[Router] 教材 ${materialId} 处理失败:`, err);
-          });
+          },
+        });
 
         // 清理临时分块文件
         const chunkDir = path.join(uploadDir, "uploads", "chunks", input.sessionId);
@@ -290,15 +293,6 @@ export const appRouter = router({
         if (!mat) throw new TRPCError({ code: "NOT_FOUND", message: "教材不存在" });
         if (!mat.fileKey) throw new TRPCError({ code: "BAD_REQUEST", message: "教材文件不存在" });
 
-        // 读取原始文件
-        const { storageReadBuffer } = await import("./storage");
-        let fileBuffer: Buffer;
-        try {
-          fileBuffer = await storageReadBuffer(mat.fileKey);
-        } catch {
-          throw new TRPCError({ code: "BAD_REQUEST", message: "教材原始文件已丢失，请重新上传" });
-        }
-
         // 删除旧 chunks，更新状态为处理中
         await deleteChunksByMaterialId(input.id);
         await updateMaterialStatus(input.id, "processing");
@@ -307,12 +301,19 @@ export const appRouter = router({
         // 提取文件名
         const filename = mat.fileKey.split("/").pop() || "document.pdf";
 
-        // 异步重新处理
-        processMaterial(input.id, fileBuffer, filename)
-          .then(() => clearAnswerCache())
-          .catch((err) => {
+        // 异步入队重新处理（读取文件延后到真正执行时）
+        enqueueMaterialProcessing({
+          materialId: input.id,
+          filename,
+          loadBuffer: async () => {
+            const { storageReadBuffer } = await import("./storage");
+            return storageReadBuffer(mat.fileKey!);
+          },
+          onDone: () => clearAnswerCache(),
+          onError: (err) => {
             console.error(`[Router] 教材 ${input.id} 重新处理失败:`, err);
-          });
+          },
+        });
 
         return { status: "processing" };
       }),
@@ -320,7 +321,6 @@ export const appRouter = router({
     // 一键重新处理所有教材
     reprocessAll: adminProcedure
       .mutation(async () => {
-        const { storageReadBuffer } = await import("./storage");
         const allMaterials = await getMaterials();
         const published = allMaterials.filter(m => m.status === "published" || m.status === "error");
 
@@ -332,13 +332,21 @@ export const appRouter = router({
             continue;
           }
           try {
-            const fileBuffer = await storageReadBuffer(mat.fileKey);
             await deleteChunksByMaterialId(mat.id);
             await updateMaterialStatus(mat.id, "processing");
             invalidateMaterialCache(mat.id);
             const filename = mat.fileKey.split("/").pop() || "document.pdf";
-            processMaterial(mat.id, fileBuffer, filename).catch((err) => {
-              console.error(`[Router] 教材 ${mat.id} 重新处理失败:`, err);
+            enqueueMaterialProcessing({
+              materialId: mat.id,
+              filename,
+              loadBuffer: async () => {
+                const { storageReadBuffer } = await import("./storage");
+                return storageReadBuffer(mat.fileKey!);
+              },
+              onDone: () => clearAnswerCache(),
+              onError: (err) => {
+                console.error(`[Router] 教材 ${mat.id} 重新处理失败:`, err);
+              },
             });
             started++;
           } catch (err) {
