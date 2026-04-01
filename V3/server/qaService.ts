@@ -679,8 +679,8 @@ ${buildAnswerBlueprint(analysis, questionLang)}
 - 直接列与问题最相关的条目，第一句必须直接进入答案，不要写导语。
 - 仅在确实缺失且用户明确追问缺失内容时，用1句短注说明，不要扩展解释过程。
 ${analysis.conciseDefinition ? "- 这是简洁定义题：只用2-4句话回答定义本身，禁止历史背景/分类/目的等延伸。" : ""}
-${analysis.intent === "method" ? "- 格式硬性要求：必须使用 `## 核心结论` + `## 具体做法` 两个二级标题；"具体做法"下用编号列表逐条写。" : ""}
-${analysis.intent === "classification" ? "- 格式硬性要求：必须使用 `## 类型总览` + `## 逐项说明` 两个二级标题；"逐项说明"下用编号列表逐条写。" : ""}
+${analysis.intent === "method" ? "- 格式硬性要求：必须使用 `## 核心结论` + `## 具体做法` 两个二级标题；\"具体做法\"下用编号列表逐条写。" : ""}
+${analysis.intent === "classification" ? "- 格式硬性要求：必须使用 `## 类型总览` + `## 逐项说明` 两个二级标题；\"逐项说明\"下用编号列表逐条写。" : ""}
 
 ${extractedFacts ? `\n【阶段一抽取的关键事实】\n${extractedFacts}\n\n` : ""}【教材内容片段（共 ${chunks.length} 条）】
 ${chunkTexts}
