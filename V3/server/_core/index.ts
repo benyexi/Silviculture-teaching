@@ -40,7 +40,8 @@ async function startServer() {
     await runMigrations();
     console.log("[Server] Database migrations completed");
   } catch (err) {
-    console.error("[Server] Database migration failed (app will continue with degraded DB):", err);
+    const errMsg = err instanceof Error ? `${err.message}\n${err.stack}` : String(err);
+    console.error("[Server] Database migration failed (app will continue with degraded DB):", errMsg);
   }
 
   const app = express();
@@ -66,6 +67,21 @@ async function startServer() {
         res.json({ error: "Database not available", DATABASE_URL_SET: !!process.env.DATABASE_URL });
         return;
       }
+
+      // 0. Check if startOffset/endOffset columns exist
+      let columnsExist = { startOffset: false, endOffset: false, conversationId: false };
+      try {
+        const [colRows] = await (db as any).execute(
+          `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='material_chunks' AND COLUMN_NAME IN ('startOffset','endOffset')`
+        );
+        const colNames = (colRows as any[]).map((r: any) => r.COLUMN_NAME);
+        columnsExist.startOffset = colNames.includes('startOffset');
+        columnsExist.endOffset = colNames.includes('endOffset');
+        const [qRows] = await (db as any).execute(
+          `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='queries' AND COLUMN_NAME='conversationId'`
+        );
+        columnsExist.conversationId = (qRows as any[]).length > 0;
+      } catch (_e) { /* ignore */ }
 
       // 1. 检查 materials 表
       const allMaterials = await db.select({
@@ -137,6 +153,7 @@ async function startServer() {
 
       res.json({
         database: "connected",
+        schema: columnsExist,
         materials: allMaterials.map(m => ({
           id: m.id,
           title: m.title,
