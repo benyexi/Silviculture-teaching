@@ -50,7 +50,67 @@ export async function runMigrations() {
   }
   const migrationsFolder = path.resolve(process.cwd(), "drizzle");
   await migrate(db, { migrationsFolder });
+  await ensureSchemaColumns();
   await ensureRetrievalIndexes();
+}
+
+/** Idempotently ensure columns that may have been missed by Drizzle migrations. */
+async function ensureSchemaColumns() {
+  const db = await getDb();
+  if (!db) return;
+
+  const wantedColumns: { table: string; column: string; ddl: string }[] = [
+    {
+      table: "material_chunks",
+      column: "startOffset",
+      ddl: "ALTER TABLE `material_chunks` ADD COLUMN `startOffset` int DEFAULT NULL",
+    },
+    {
+      table: "material_chunks",
+      column: "endOffset",
+      ddl: "ALTER TABLE `material_chunks` ADD COLUMN `endOffset` int DEFAULT NULL",
+    },
+    {
+      table: "queries",
+      column: "conversationId",
+      ddl: "ALTER TABLE `queries` ADD COLUMN `conversationId` varchar(64) DEFAULT NULL",
+    },
+  ];
+
+  try {
+    const [rows] = await (db as any).$client.execute(`
+      SELECT TABLE_NAME as t, COLUMN_NAME as c
+      FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME IN ('material_chunks', 'queries')
+        AND COLUMN_NAME IN ('startOffset', 'endOffset', 'conversationId')
+    `);
+    const existing = new Set<string>();
+    if (Array.isArray(rows)) {
+      for (const row of rows) {
+        existing.add(`${row.t}:${row.c}`);
+      }
+    }
+    for (const item of wantedColumns) {
+      if (existing.has(`${item.table}:${item.column}`)) continue;
+      try {
+        await (db as any).$client.execute(item.ddl);
+        console.log(`[Database] Added column ${item.table}.${item.column}`);
+      } catch (err) {
+        console.warn(`[Database] Failed to add column ${item.table}.${item.column}:`, err);
+      }
+    }
+    // Ensure index on queries.conversationId
+    if (!existing.has("queries:conversationId")) {
+      try {
+        await (db as any).$client.execute(
+          "CREATE INDEX `queries_conversationId_idx` ON `queries` (`conversationId`)"
+        );
+      } catch (_e) { /* already exists */ }
+    }
+  } catch (err) {
+    console.warn("[Database] ensureSchemaColumns failed:", err);
+  }
 }
 
 async function ensureRetrievalIndexes() {
