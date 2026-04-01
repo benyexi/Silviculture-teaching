@@ -191,7 +191,7 @@ async function startServer() {
 
   // SSE 流式问答端点
   app.post("/api/stream/ask", async (req, res) => {
-    const { question, materialId } = req.body || {};
+    const { question, materialId, history, conversationId, ...visitorInfo } = req.body || {};
     if (!question || typeof question !== "string" || question.length < 2 || question.length > 1000) {
       res.status(400).json({ error: "问题长度需在 2-1000 字之间" });
       return;
@@ -219,10 +219,19 @@ async function startServer() {
     };
 
     try {
+      const validatedHistory = Array.isArray(history)
+        ? history
+            .filter((t: any) => t && (t.role === "user" || t.role === "assistant") && typeof t.content === "string")
+            .map((t: any) => ({ role: t.role as "user" | "assistant", content: String(t.content).slice(0, 2000) }))
+            .slice(-20)
+        : undefined;
+
       await generateAnswerStream(
         {
           question,
           materialIds: materialId ? [materialId] : undefined,
+          history: validatedHistory,
+          conversationId: typeof conversationId === "string" ? conversationId : undefined,
           visitorIp: ip,
           visitorCity: geo.city || undefined,
           visitorRegion: geo.region || undefined,

@@ -73,6 +73,11 @@ export function clearAnswerCache(): void {
   answerCache.clear();
 }
 
+export type ConversationTurn = {
+  role: "user" | "assistant";
+  content: string;
+};
+
 export type QARequest = {
   question: string;
   materialIds?: number[];
@@ -82,6 +87,8 @@ export type QARequest = {
   visitorCountry?: string;
   visitorLat?: number;
   visitorLng?: number;
+  history?: ConversationTurn[];
+  conversationId?: string;
 };
 
 export type QAResponse = {
@@ -102,6 +109,16 @@ type LLMStructuredOutput = {
   found_in_materials: boolean;
   citation_indices: number[];
   confidence: number;
+};
+
+type CitationRepairResult = {
+  answer: string;
+  orderedResults: SearchResult[];
+};
+
+type EnumeratedItem = {
+  item: string;
+  sourceChunkId: number;
 };
 
 type CallLLMResult = {
@@ -420,14 +437,21 @@ ${materialNote}
 
 export function buildSystemPrompt(
   materialTitles: string[],
-  questionLang: "zh" | "en" = "zh",
-  materialLang: "zh" | "en" = "zh",
-  analysis: QuestionAnalysis = detectQuestionIntent("", questionLang)
+  questionLang: “zh” | “en” = “zh”,
+  materialLang: “zh” | “en” = “zh”,
+  analysis: QuestionAnalysis = detectQuestionIntent(“”, questionLang),
+  history?: ConversationTurn[]
 ): string {
-  if (questionLang === "en") {
+  const multiTurnSuffix = history && history.length > 0
+    ? (questionLang === “en”
+      ? “\n\nThis is a multi-turn conversation. Use the conversation history to understand the question, but your answer must be strictly grounded in the provided textbook excerpts.”
+      : “\n\n当前为多轮对话。请结合对话历史理解用户问题，但答案必须严格基于教材片段，不得引入历史对话中未在教材中出现的信息。”)
+    : “”;
+
+  if (questionLang === “en”) {
     const titleList = materialTitles.length
-      ? materialTitles.map((t) => `- ${t}`).join("\n")
-      : "- (No textbook excerpts)";
+      ? materialTitles.map((t) => `- ${t}`).join(“\n”)
+      : “- (No textbook excerpts)”;
 
     return `${buildSystemHeader(questionLang, materialLang, analysis)}
 
@@ -436,19 +460,19 @@ ${titleList}
 
 Requirements:
 1. Source only: use only the provided excerpts. Do not add outside knowledge. If not covered, reply with a single short sentence and stop.
-2. ${analysis.conciseDefinition ? "Concise definition mode: answer only the core definition from excerpts in 2-4 sentences, with the first sentence being the direct answer." : "Completeness: synthesize ALL provided excerpts thoroughly. For classification/method/step/comparison questions, list every item that appears in the excerpts."}
+2. ${analysis.conciseDefinition ? “Concise definition mode: answer only the core definition from excerpts in 2-4 sentences, with the first sentence being the direct answer.” : “Completeness: synthesize ALL provided excerpts thoroughly. For classification/method/step/comparison questions, list every item that appears in the excerpts.”}
 3. Structure: follow this blueprint: ${buildAnswerBlueprint(analysis, questionLang)}. Do not add a preface like 'the textbook says' or 'excerpt-grounded'.
 4. Key terms: use **bold** for key terms, important concepts, and critical conclusions. Precisely preserve numeric data, formulas, and ratios from the textbook.
 5. Textbook language: preserve original terminology. If multiple viewpoints exist, list them all.
-6. ${analysis.conciseDefinition ? "Format: output plain concise Markdown in 2-4 sentences; do not use long sectioned expansion." : "Format: output directly in Markdown. Start with a 1-2 sentence overview, then expand with full details."}
+6. ${analysis.conciseDefinition ? “Format: output plain concise Markdown in 2-4 sentences; do not use long sectioned expansion.” : “Format: output directly in Markdown. Start with a 1-2 sentence overview, then expand with full details.”}
 7. Inline citations: add [1], [2], [3] etc. after each factual claim, matching the excerpt number it came from. Every key statement must have at least one citation.
 
-${analysis.conciseDefinition ? "8. This is a concise definition question. Answer in 2-4 sentences only; do not add history, classification, purpose, development, or other extensions." : ""}
+${analysis.conciseDefinition ? “8. This is a concise definition question. Answer in 2-4 sentences only; do not add history, classification, purpose, development, or other extensions.” : “”}
 
-${buildFewShotBlock(questionLang, analysis)}`;
+${buildFewShotBlock(questionLang, analysis)}${multiTurnSuffix}`;
   }
 
-  if (materialLang === "en") {
+  if (materialLang === “en”) {
     return `${buildSystemHeader(questionLang, materialLang, analysis)}
 
 下面是英文教材相关段落，请基于这些英文教材内容，用中文回答问题。
@@ -456,18 +480,18 @@ ${buildFewShotBlock(questionLang, analysis)}`;
 1. 先给出英文教材的关键原文或关键术语（1-2句）
 2. 再给出中文翻译和解释
 3. 若问题属于分类/方法/步骤/比较题，必须完整列出教材中明确出现的项目，不能只给概述
-4. 直接进入答案，不要先写“教材中关于…”或“根据片段…”之类的引导语；如果证据不足，只用一句短提示。
+4. 直接进入答案，不要先写”教材中关于…”或”根据片段…”之类的引导语；如果证据不足，只用一句短提示。
 
 规则：
 - 只能基于提供的教材内容回答，不能使用教材以外的知识
-- 如果教材中没有相关内容，回复"教材中未涉及此内容"
+- 如果教材中没有相关内容，回复”教材中未涉及此内容”
 - 使用 **加粗**（Markdown格式）标记关键术语和重要概念
-- 直接输出 Markdown 格式的回答，不要包裹在 JSON 或代码块中`;
+- 直接输出 Markdown 格式的回答，不要包裹在 JSON 或代码块中${multiTurnSuffix}`;
   }
 
   const titleList = materialTitles.length
-    ? materialTitles.map((t, i) => `  ${i + 1}. 《${t}》`).join("\n")
-    : "  （暂无已发布教材）";
+    ? materialTitles.map((t, i) => `  ${i + 1}. 《${t}》`).join(“\n”)
+    : “  （暂无已发布教材）”;
 
   return `${buildSystemHeader(questionLang, materialLang, analysis)}
 
@@ -475,23 +499,108 @@ ${buildFewShotBlock(questionLang, analysis)}`;
 ${titleList}
 
 回答要求：
-1. 知识来源：只能基于提供的教材片段回答，不得使用教材外知识。如果教材未涉及该内容，明确回复"教材中未涉及此内容"。
-2. ${analysis.conciseDefinition ? "简洁定义模式：仅基于教材给出定义本身，控制在2-4句，不做延伸讲解。" : "全面完整：综合所有提供的教材片段信息，给出尽可能全面、详尽的回答。对于分类、类型、方法、步骤、比较等题目，要完整列出每一项，并逐项说明。"}
-3. 结构清晰：${analysis.conciseDefinition ? `直接按"定义句 + 1-2句补充说明"输出。` : `优先"直接回答 + 清单/要点"。`} ${buildAnswerBlueprint(analysis, questionLang)}
+1. 知识来源：只能基于提供的教材片段回答，不得使用教材外知识。如果教材未涉及该内容，明确回复”教材中未涉及此内容”。
+2. ${analysis.conciseDefinition ? “简洁定义模式：仅基于教材给出定义本身，控制在2-4句，不做延伸讲解。” : “全面完整：综合所有提供的教材片段信息，给出尽可能全面、详尽的回答。对于分类、类型、方法、步骤、比较等题目，要完整列出每一项，并逐项说明。”}
+3. 结构清晰：${analysis.conciseDefinition ? `直接按”定义句 + 1-2句补充说明”输出。` : `优先”直接回答 + 清单/要点”。`} ${buildAnswerBlueprint(analysis, questionLang)}
 4. 突出重点：使用 **加粗** 标记关键术语、重要概念和核心结论。对于教材中的数据、公式、比例等要精确引用。
 5. 保留教材表述：尽量使用教材中的原始术语和表述，可以适当组织和概括，但核心信息必须来自教材。如果教材中有多个观点或说法，应完整列出。
-6. 格式规范：${analysis.conciseDefinition ? "直接输出 Markdown，2-4句即可，不要使用长篇多级标题，也不要写导语。" : "直接输出 Markdown 格式，不要包裹在 JSON 或代码块中。不要求固定写'一、概述/三、完整性说明'。"}
+6. 格式规范：${analysis.conciseDefinition ? “直接输出 Markdown，2-4句即可，不要使用长篇多级标题，也不要写导语。” : “直接输出 Markdown 格式，不要包裹在 JSON 或代码块中。不要求固定写'一、概述/三、完整性说明'。”}
 7. 内联引用标注：每个事实性陈述后必须添加 [1]、[2]、[3] 等标记，对应其来自的片段编号。每个关键陈述至少有一个引用标记。例如：造林密度取决于立地条件[2]和树种特性[4]。
-${analysis.conciseDefinition ? `\n8. 当前是简洁定义题，仅回答定义本身（2-4句），不得扩展到历史、分类、目的、发展、问题等延伸内容。` : ""}
+${analysis.conciseDefinition ? `\n8. 当前是简洁定义题，仅回答定义本身（2-4句），不得扩展到历史、分类、目的、发展、问题等延伸内容。` : “”}
 
-${buildFewShotBlock(questionLang, analysis)}`;
+${buildFewShotBlock(questionLang, analysis)}${multiTurnSuffix}`;
+}
+
+function cleanEnumeratedItemText(text: string, questionLang: "zh" | "en"): string | null {
+  const cleaned = text
+    .replace(/\r\n/g, " ").replace(/\r/g, " ").replace(/\n+/g, " ").replace(/\s+/g, " ")
+    .replace(/^[：:、，,;；\-.()\[\]【】\s]+/, "")
+    .replace(/[；;。！？.!?]+$/g, "")
+    .replace(/^[""''（(]+/, "").replace(/[""''）)]+$/g, "")
+    .replace(/^(?:包括|可分为|分为|主要有|步骤为|分成|一般分为)\s*[:：]?\s*/i, "")
+    .replace(/^(?:includes?|including|consists?\s+of|are\s+divided\s+into|is\s+divided\s+into|steps?\s*:)\s*/i, "")
+    .replace(/^(?:and|or|以及|及|和|与)\s+/i, "")
+    .trim();
+  if (!cleaned) return null;
+  const normalized = questionLang === "en"
+    ? cleaned.toLowerCase().replace(/[^a-z0-9]+/g, "")
+    : cleaned.replace(/[，。？！、；：""''（）【】《》\s]/g, "");
+  if (normalized.length < 2) return null;
+  if (/^(?:等|等等|etc\.?|andsoon)$/i.test(normalized)) return null;
+  return cleaned;
+}
+
+function splitEnumeratedTail(text: string, questionLang: "zh" | "en"): string[] {
+  const normalized = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\n+/g, " ").trim();
+  if (!normalized) return [];
+  const numberedParts = normalized
+    .split(/(?=(?:\d+[.)、．]|[A-Za-z][.)]|[一二三四五六七八九十]+[、.)．])\s+)/)
+    .map(p => p.replace(/^(?:\d+[.)、．]|[A-Za-z][.)]|[一二三四五六七八九十]+[、.)．])\s+/, "").trim())
+    .filter(Boolean);
+  const baseParts = numberedParts.length >= 2
+    ? numberedParts
+    : normalized.split(/\s*(?:；|;|、|，|,|\band\b|\bor\b|以及|及|和|与)\s*/i).map(p => p.trim()).filter(Boolean);
+  return baseParts.map(p => cleanEnumeratedItemText(p, questionLang)).filter((p): p is string => Boolean(p));
+}
+
+export function extractEnumeratedItems(chunk: SearchResult, questionLang: "zh" | "en"): EnumeratedItem[] {
+  const content = chunk.content.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  const candidates: string[] = [];
+  const numberedLineRe = /^\s*(?:\d+[.)、．]|[A-Za-z][.)]|[一二三四五六七八九十]+[、.)．])\s+(.+?)\s*$/gm;
+  for (const match of content.matchAll(numberedLineRe)) {
+    const item = cleanEnumeratedItemText(match[1], questionLang);
+    if (item) candidates.push(item);
+  }
+  const leadPatterns = questionLang === "en"
+    ? [
+        /(?:includes?|including|consists?\s+of|are\s+divided\s+into|is\s+divided\s+into)\s*[:：]?\s*([^\n.!?。！？；;]+)/gi,
+        /steps?\s*[:：]\s*([^\n.!?。！？；;]+)/gi,
+      ]
+    : [/(?:包括|可分为|分为|主要有|步骤为|分成|一般分为)\s*[:：]?\s*([^\n。！？；;.!?]+)/g];
+  for (const pattern of leadPatterns) {
+    for (const match of content.matchAll(pattern)) {
+      candidates.push(...splitEnumeratedTail(match[1], questionLang));
+    }
+  }
+  const seen = new Set<string>();
+  const uniqueItems: EnumeratedItem[] = [];
+  for (const rawItem of candidates) {
+    const item = cleanEnumeratedItemText(rawItem, questionLang);
+    if (!item) continue;
+    const key = questionLang === "en"
+      ? item.toLowerCase().replace(/[^a-z0-9]+/g, "")
+      : item.replace(/[，。？！、；：""''（）【】《》\s]/g, "");
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    uniqueItems.push({ item, sourceChunkId: chunk.chunkId });
+  }
+  return uniqueItems.length >= 2 ? uniqueItems : [];
+}
+
+function buildEvidenceExtractionPrompt(question: string, chunks: SearchResult[], questionLang: "zh" | "en"): string {
+  const chunkTexts = chunks.map((chunk, idx) => {
+    const location = [
+      `《${chunk.materialTitle}》`,
+      chunk.chapter ?? null,
+      chunk.pageStart ? `第${chunk.pageStart}页${chunk.pageEnd && chunk.pageEnd !== chunk.pageStart ? `~${chunk.pageEnd}页` : ""}` : null,
+    ].filter(Boolean).join(" · ");
+    return `[${idx + 1}] 来源：${location}\n${chunk.content}`;
+  }).join("\n\n---\n\n");
+  return `${questionLang === "en" ? "Question" : "问题"}:\n${question}\n\n${chunkTexts}`;
+}
+
+function normalizeExtractedFacts(content: string): string {
+  return content.replace(/\r\n/g, "\n").replace(/\r/g, "\n")
+    .split("\n").map(l => l.trim()).filter(Boolean).slice(0, 40).join("\n");
 }
 
 export function buildUserPrompt(
   question: string,
   chunks: SearchResult[],
   questionLang: "zh" | "en" = "zh",
-  analysis: QuestionAnalysis = detectQuestionIntent(question, questionLang)
+  analysis: QuestionAnalysis = detectQuestionIntent(question, questionLang),
+  extractedFacts?: string,
+  history?: ConversationTurn[]
 ): string {
   const chunkTexts = chunks
     .map((r, idx) => {
@@ -505,14 +614,34 @@ export function buildUserPrompt(
         .filter(Boolean)
         .join(" · ");
 
-      return `【片段${idx + 1}】来源：${location}\n${r.content}`;
+      const structuredItems = analysis.expectsEnumeration
+        ? extractEnumeratedItems(r, questionLang).map(e => e.item).slice(0, 10)
+        : [];
+      const structuredPrefix = structuredItems.length > 0 ? `[结构化条目: ${structuredItems.join(" | ")}]\n` : "";
+
+      return `【片段${idx + 1}】来源：${location}\n${structuredPrefix}${r.content}`;
     })
     .join("\n\n---\n\n");
+
+  const recentHistoryBlock = (() => {
+    if (!history || history.length === 0) return "";
+    const recentTurns = history.slice(-2);
+    if (questionLang === "en") {
+      const lines = recentTurns.map(t =>
+        `${t.role === "user" ? "User" : "Assistant"}: ${t.content.slice(0, 150)}`
+      ).join("\n");
+      return `Recent conversation:\n${lines}\n\n`;
+    }
+    const lines = recentTurns.map(t =>
+      `${t.role === "user" ? "用户" : "助手"}：${t.content.slice(0, 150)}`
+    ).join("\n");
+    return `【近期对话】\n${lines}\n\n`;
+  })();
 
   if (questionLang === "en") {
     return `Question intent: ${describeIntent(analysis.intent, "en")}
 
-Question:
+${recentHistoryBlock}Question:
 ${question}
 
 Answer blueprint:
@@ -528,7 +657,7 @@ Completion constraints (Strict Grounding Mode):
 - ${analysis.intent === "condition" ? "Use `## Timing / requirements` and provide a numbered list." : "Use short structured sections only when needed."}
 ${analysis.conciseDefinition ? "- This is a concise definition question. Use 2-4 sentences only and stop after the core definition." : ""}
 
-Textbook excerpts (${chunks.length}):
+${extractedFacts ? `Stage-1 extracted facts:\n${extractedFacts}\n\n` : ""}Textbook excerpts (${chunks.length}):
 ${chunkTexts}
 
 Please answer based on the excerpts above and keep the structure aligned with the blueprint.`;
@@ -536,7 +665,7 @@ Please answer based on the excerpts above and keep the structure aligned with th
 
   return `【问题类型】${describeIntent(analysis.intent, "zh")}
 
-【学生问题】
+${recentHistoryBlock}【学生问题】
 ${question}
 
 【回答蓝图】
@@ -553,7 +682,7 @@ ${analysis.conciseDefinition ? "- 这是简洁定义题：只用2-4句话回答�
 ${analysis.intent === "method" ? "- 格式硬性要求：必须使用 `## 核心结论` + `## 具体做法` 两个二级标题；“具体做法”下用编号列表逐条写。" : ""}
 ${analysis.intent === "classification" ? "- 格式硬性要求：必须使用 `## 类型总览` + `## 逐项说明` 两个二级标题；“逐项说明”下用编号列表逐条写。" : ""}
 
-【教材内容片段（共 ${chunks.length} 条）】
+${extractedFacts ? `\n【阶段一抽取的关键事实】\n${extractedFacts}\n\n` : ""}【教材内容片段（共 ${chunks.length} 条）】
 ${chunkTexts}
 
 ${analysis.conciseDefinition
@@ -640,7 +769,9 @@ function focusResultsByChapter(
   analysis: QuestionAnalysis
 ): SearchResult[] {
   if (searchResults.length <= 6) return searchResults;
+  // 分类/方法/条件/优缺点/比较题需要跨章节召回，跳过章节收窄逻辑
   if (analysis.expectsEnumeration) return searchResults;
+  if (analysis.intent === "comparison") return searchResults;
   if (analysis.requestDetail) return searchResults;
 
   const focusTerms = pickFocusTerms(question, questionLang, analysis);
@@ -751,16 +882,30 @@ function pickTopK(questionLang: "zh" | "en", analysis: QuestionAnalysis, forAuxE
 
 function pickPromptChunkBudget(questionLang: "zh" | "en", analysis: QuestionAnalysis): number {
   if (analysis.conciseAnswer) return questionLang === "en" ? 2 : 3;
-  if (analysis.requestDetail) return TOKEN_SAVER_MODE ? (questionLang === "en" ? 4 : 6) : (questionLang === "en" ? 6 : 9);
-  if (analysis.expectsFullCoverage) return TOKEN_SAVER_MODE ? (questionLang === "en" ? 4 : 5) : (questionLang === "en" ? 6 : 7);
-  return TOKEN_SAVER_MODE ? (questionLang === "en" ? 3 : 4) : (questionLang === "en" ? 5 : 6);
+  // 分类/方法/比较/条件题需要跨章节召回更多证据片段，TOKEN_SAVER_MODE 下也放宽上限
+  const isEnumOrCompare =
+    analysis.expectsEnumeration ||
+    analysis.intent === "comparison" ||
+    analysis.intent === "classification" ||
+    analysis.intent === "method" ||
+    analysis.intent === "condition";
+  if (analysis.requestDetail) {
+    if (TOKEN_SAVER_MODE) return isEnumOrCompare ? (questionLang === "en" ? 10 : 15) : (questionLang === "en" ? 6 : 9);
+    return questionLang === "en" ? 6 : 9;
+  }
+  if (analysis.expectsFullCoverage) {
+    if (TOKEN_SAVER_MODE) return isEnumOrCompare ? (questionLang === "en" ? 10 : 12) : (questionLang === "en" ? 6 : 7);
+    return questionLang === "en" ? 6 : 7;
+  }
+  if (TOKEN_SAVER_MODE) return isEnumOrCompare ? (questionLang === "en" ? 10 : 12) : (questionLang === "en" ? 5 : 6);
+  return questionLang === "en" ? 5 : 6;
 }
 
 function pickPromptChunkCharLimit(questionLang: "zh" | "en", analysis: QuestionAnalysis): number {
   if (analysis.conciseAnswer) return questionLang === "en" ? 380 : 320;
-  if (analysis.requestDetail) return TOKEN_SAVER_MODE ? (questionLang === "en" ? 560 : 560) : (questionLang === "en" ? 780 : 780);
-  if (analysis.expectsFullCoverage) return TOKEN_SAVER_MODE ? (questionLang === "en" ? 500 : 500) : (questionLang === "en" ? 680 : 680);
-  return TOKEN_SAVER_MODE ? (questionLang === "en" ? 420 : 420) : (questionLang === "en" ? 600 : 560);
+  if (analysis.requestDetail) return TOKEN_SAVER_MODE ? (questionLang === "en" ? 800 : 900) : (questionLang === "en" ? 780 : 780);
+  if (analysis.expectsFullCoverage) return TOKEN_SAVER_MODE ? (questionLang === "en" ? 700 : 800) : (questionLang === "en" ? 680 : 680);
+  return TOKEN_SAVER_MODE ? (questionLang === "en" ? 600 : 700) : (questionLang === "en" ? 600 : 560);
 }
 
 function truncatePromptContent(content: string, maxLen: number): string {
@@ -768,18 +913,102 @@ function truncatePromptContent(content: string, maxLen: number): string {
   return `${content.slice(0, Math.max(0, maxLen)).trim()}\n……`;
 }
 
+/**
+ * 证据打包：从 chunk 文本中提取与 keywords 命中的句子及其前后各1句上下文，
+ * 去重合并后拼接为证据文本，而不是直接截取头部固定字符数。
+ * 若无命中句子，则回退到截取头部（truncatePromptContent）。
+ */
+function packEvidenceUnits(
+  content: string,
+  keywords: string[],
+  maxLen: number,
+  questionLang: "zh" | "en"
+): string {
+  if (!content || keywords.length === 0) {
+    return truncatePromptContent(content, maxLen);
+  }
+
+  // 按中文句号/问号/感叹号或英文句末标点切句
+  const sentenceRe =
+    questionLang === "zh"
+      ? /[^。！？\n]{2,}/g
+      : /[^.!?\n]{4,}/g;
+  const sentences: string[] = [];
+  let m: RegExpExecArray | null;
+  const tempRe = new RegExp(sentenceRe.source, "g");
+  while ((m = tempRe.exec(content)) !== null) {
+    const s = m[0].trim();
+    if (s) sentences.push(s);
+  }
+
+  if (sentences.length === 0) {
+    return truncatePromptContent(content, maxLen);
+  }
+
+  // 标准化 keywords 用于匹配
+  const normalizedKws = keywords
+    .map((k) => normalizeForFocus(k))
+    .filter((k) => k.length >= (questionLang === "en" ? 4 : 2));
+
+  // 找出命中句子的索引
+  const hitIndices = new Set<number>();
+  sentences.forEach((sent, idx) => {
+    const norm = normalizeForFocus(sent);
+    if (normalizedKws.some((kw) => norm.includes(kw))) {
+      hitIndices.add(idx);
+    }
+  });
+
+  if (hitIndices.size === 0) {
+    // 无命中，回退截头
+    return truncatePromptContent(content, maxLen);
+  }
+
+  // 展开前后各1句上下文，收集有序索引集合
+  const expandedIndices = new Set<number>();
+  for (const idx of hitIndices) {
+    if (idx > 0) expandedIndices.add(idx - 1);
+    expandedIndices.add(idx);
+    if (idx < sentences.length - 1) expandedIndices.add(idx + 1);
+  }
+
+  // 按原顺序拼接，保留省略号标记不连续段落
+  const sortedIndices = Array.from(expandedIndices).sort((a, b) => a - b);
+  const parts: string[] = [];
+  let prevIdx = -1;
+  for (const idx of sortedIndices) {
+    if (prevIdx >= 0 && idx > prevIdx + 1) {
+      parts.push("……");
+    }
+    parts.push(sentences[idx]);
+    prevIdx = idx;
+  }
+
+  const joined = parts.join(questionLang === "zh" ? "。" : " ").trim();
+
+  // 若拼接结果超出限制，截断；若太短（<maxLen 的 30%），补充截头内容
+  if (joined.length >= maxLen * 0.3) {
+    return joined.length > maxLen ? `${joined.slice(0, maxLen).trim()}\n……` : joined;
+  }
+
+  // 证据句太少，直接用截头策略兜底
+  return truncatePromptContent(content, maxLen);
+}
+
 function preparePromptChunks(
   chunks: SearchResult[],
   questionLang: "zh" | "en",
-  analysis: QuestionAnalysis
+  analysis: QuestionAnalysis,
+  queryKeywords?: string[]
 ): SearchResult[] {
   const maxChunks = pickPromptChunkBudget(questionLang, analysis);
   const maxChars = pickPromptChunkCharLimit(questionLang, analysis);
+  const keywords = queryKeywords ?? analysis.keywords ?? [];
   return chunks
     .slice(0, Math.max(1, maxChunks))
     .map((row) => ({
       ...row,
-      content: truncatePromptContent(row.content, maxChars),
+      content: packEvidenceUnits(row.content, keywords, maxChars, questionLang),
     }));
 }
 
@@ -790,11 +1019,55 @@ function pickMainMaxTokens(questionLang: "zh" | "en", analysis: QuestionAnalysis
   return TOKEN_SAVER_MODE ? (questionLang === "en" ? 340 : 500) : (questionLang === "en" ? 520 : 680);
 }
 
+function isFollowUpQuestion(question: string, questionLang: "zh" | "en"): boolean {
+  if (questionLang === "zh") {
+    return /(^|[\s，。？！])(它|这|该|其|此|那|这种|这类|这些|那些|上述|前面|前者|后者|刚才|之前说的)/.test(question);
+  }
+  return /\b(it|its|this|that|these|those|the above|aforementioned|the former|the latter|previously mentioned)\b/i.test(question);
+}
+
+async function rewriteFollowUpQuestion(
+  question: string,
+  history: ConversationTurn[],
+  questionLang: "zh" | "en"
+): Promise<string> {
+  if (history.length === 0) return question;
+  const recentHistory = history.slice(-4); // 只用最近4轮
+  const historyText = recentHistory
+    .map(t => `${t.role === "user" ? (questionLang === "en" ? "User" : "用户") : (questionLang === "en" ? "Assistant" : "助手")}: ${t.content.slice(0, 200)}`)
+    .join("\n");
+
+  const systemPrompt = questionLang === "en"
+    ? "You are a query rewriting assistant. Given a conversation history and a follow-up question, rewrite the follow-up as a standalone, self-contained question. Output only the rewritten question, nothing else."
+    : "你是一个问题改写助手。根据对话历史和追问，把追问改写为完整独立的问题（不依赖上下文也能理解）。只输出改写后的问题，不要其他内容。";
+
+  const userPrompt = questionLang === "en"
+    ? `Conversation history:\n${historyText}\n\nFollow-up question: ${question}\n\nRewritten standalone question:`
+    : `对话历史：\n${historyText}\n\n追问：${question}\n\n改写后的独立问题：`;
+
+  try {
+    const result = await invokeLLMWithConfig(
+      [{ role: "user", content: userPrompt }],
+      systemPrompt,
+      { temperature: 0, maxTokens: 150 }
+    );
+    const rewritten = result.content.trim();
+    return rewritten.length > 5 ? rewritten : question;
+  } catch {
+    return question; // 失败时用原问题
+  }
+}
+
 export async function generateAnswer(req: QARequest): Promise<QAResponse> {
   const startTime = Date.now();
   const questionLanguage = detectLanguage(req.question);
   const questionAnalysis = detectQuestionIntent(req.question, questionLanguage);
   const materialIds = normalizeMaterialIds(req.materialIds);
+
+  let effectiveQuestion = req.question;
+  if (req.history && req.history.length > 0 && isFollowUpQuestion(req.question, questionLanguage)) {
+    effectiveQuestion = await rewriteFollowUpQuestion(req.question, req.history, questionLanguage);
+  }
 
   // 检查当前配置是否启用了 RAG 模式
   const activeConfig = await getActiveLlmConfig();
@@ -805,8 +1078,8 @@ export async function generateAnswer(req: QARequest): Promise<QAResponse> {
   let enSources: QuerySource[] | undefined;
   let fromCache = false;
 
-  // 检查缓存
-  const cached = getCachedAnswer(req.question, materialIds);
+  // 检查缓存（有 history 时跳过缓存，确保多轮对话不复用旧答案）
+  const cached = req.history && req.history.length > 0 ? null : getCachedAnswer(req.question, materialIds);
   if (cached) {
     mainResult = cached.mainResult;
     enAnswer = cached.enAnswer;
@@ -815,19 +1088,46 @@ export async function generateAnswer(req: QARequest): Promise<QAResponse> {
   } else {
     // useRAG=true: 关键词+向量混合检索; useRAG=false: 仅关键词检索（两者都搜教材）
     if (questionLanguage === "en") {
-      const enResults = await semanticSearch(req.question, materialIds, pickTopK("en", questionAnalysis), "en", useRAG);
-      mainResult = await callLLM(req.question, enResults, "en", "en", questionAnalysis, materialIds);
-    } else {
-      const zhResultsPromise = semanticSearch(req.question, materialIds, pickTopK("zh", questionAnalysis), "zh", useRAG);
-      const enResultsPromise = ENABLE_AUX_EN_ANSWER
-        ? semanticSearch(req.question, materialIds, pickTopK("en", questionAnalysis, true), "en", useRAG)
-        : Promise.resolve([] as SearchResult[]);
-      const [zhResults, enResults] = await Promise.all([zhResultsPromise, enResultsPromise]);
+      const mainResults = await semanticSearch(effectiveQuestion, materialIds, pickTopK("en", questionAnalysis), "en", useRAG);
 
-      mainResult = await callLLM(req.question, zhResults, "zh", "zh", questionAnalysis, materialIds);
+      // 分面检索（仅对复杂题型）
+      let allSearchResults = mainResults;
+      if (questionAnalysis.expectsComparisonTable || questionAnalysis.expectsFullCoverage) {
+        const facets = await generateFacets(effectiveQuestion, questionAnalysis, questionLanguage);
+        if (facets.length >= 2) {
+          const facetResults = await facetedSearch(effectiveQuestion, facets, materialIds, pickTopK("en", questionAnalysis), questionLanguage);
+          // 合并：把 facet 结果中主检索没有的 chunk 追加进去
+          const mainIds = new Set(mainResults.map(r => r.chunkId));
+          const extra = facetResults.filter(r => !mainIds.has(r.chunkId));
+          allSearchResults = [...mainResults, ...extra].slice(0, pickTopK("en", questionAnalysis) * 2);
+        }
+      }
+
+      mainResult = await callLLM(effectiveQuestion, allSearchResults, "en", "en", questionAnalysis, materialIds, req.history);
+    } else {
+      const zhMainResultsPromise = semanticSearch(effectiveQuestion, materialIds, pickTopK("zh", questionAnalysis), "zh", useRAG);
+      const enResultsPromise = ENABLE_AUX_EN_ANSWER
+        ? semanticSearch(effectiveQuestion, materialIds, pickTopK("en", questionAnalysis, true), "en", useRAG)
+        : Promise.resolve([] as SearchResult[]);
+      const [zhMainResults, enResults] = await Promise.all([zhMainResultsPromise, enResultsPromise]);
+
+      // 分面检索（仅对复杂题型）
+      let zhResults = zhMainResults;
+      if (questionAnalysis.expectsComparisonTable || questionAnalysis.expectsFullCoverage) {
+        const facets = await generateFacets(effectiveQuestion, questionAnalysis, questionLanguage);
+        if (facets.length >= 2) {
+          const facetResults = await facetedSearch(effectiveQuestion, facets, materialIds, pickTopK("zh", questionAnalysis), questionLanguage);
+          // 合并：把 facet 结果中主检索没有的 chunk 追加进去
+          const mainIds = new Set(zhMainResults.map(r => r.chunkId));
+          const extra = facetResults.filter(r => !mainIds.has(r.chunkId));
+          zhResults = [...zhMainResults, ...extra].slice(0, pickTopK("zh", questionAnalysis) * 2);
+        }
+      }
+
+      mainResult = await callLLM(effectiveQuestion, zhResults, "zh", "zh", questionAnalysis, materialIds, req.history);
 
       if (ENABLE_AUX_EN_ANSWER && enResults.length > 0) {
-        const enResult = await callLLM(req.question, enResults, "zh", "en", questionAnalysis, materialIds);
+        const enResult = await callLLM(effectiveQuestion, enResults, "zh", "en", questionAnalysis, materialIds, req.history);
         if (enResult.foundInMaterials) {
           enAnswer = enResult.answer;
           enSources = enResult.sources;
@@ -835,8 +1135,8 @@ export async function generateAnswer(req: QARequest): Promise<QAResponse> {
       }
     }
 
-    // 只缓存教材中找到内容的答案
-    if (mainResult.foundInMaterials) {
+    // 只缓存无 history 的教材中找到内容的答案
+    if (mainResult.foundInMaterials && !(req.history && req.history.length > 0)) {
       setCachedAnswer(req.question, { mainResult, enAnswer, enSources, questionLanguage }, materialIds);
     }
   }
@@ -849,6 +1149,7 @@ export async function generateAnswer(req: QARequest): Promise<QAResponse> {
     sources: mainResult.sources,
     modelUsed: fromCache ? `${mainResult.modelUsed}(cached)` : mainResult.modelUsed,
     responseTimeMs,
+    conversationId: req.conversationId,
     visitorIp: req.visitorIp,
     visitorCity: req.visitorCity,
     visitorRegion: req.visitorRegion,
@@ -872,13 +1173,91 @@ export async function generateAnswer(req: QARequest): Promise<QAResponse> {
   };
 }
 
+async function generateFacets(
+  question: string,
+  analysis: QuestionAnalysis,
+  questionLang: "zh" | "en"
+): Promise<string[]> {
+  // 只对比较/条件/需要全覆盖的题型生成 facets
+  if (!analysis.expectsComparisonTable && !analysis.expectsFullCoverage) return [];
+  if (analysis.conciseAnswer) return [];
+
+  const systemPrompt = questionLang === "en"
+    ? "You are a query decomposition assistant. Break the question into 2-4 specific sub-questions that together fully answer the original. Output one sub-question per line, nothing else."
+    : "你是一个问题拆解助手。把问题拆解为2-4个具体子问题，这些子问题合在一起能完整回答原问题。每行输出一个子问题，不要其他内容。";
+
+  const userPrompt = questionLang === "en"
+    ? `Question: ${question}\n\nSub-questions:`
+    : `问题：${question}\n\n子问题：`;
+
+  try {
+    const result = await invokeLLMWithConfig(
+      [{ role: "user", content: userPrompt }],
+      systemPrompt,
+      { temperature: 0, maxTokens: 200 }
+    );
+    const facets = result.content
+      .split("\n")
+      .map(l => l.replace(/^\d+[.)、．]\s*/, "").trim())
+      .filter(l => l.length > (questionLang === "en" ? 10 : 5))
+      .slice(0, 4);
+    return facets.length >= 2 ? facets : [];
+  } catch {
+    return [];
+  }
+}
+
+async function facetedSearch(
+  question: string,
+  facets: string[],
+  materialIds: number[] | undefined,
+  topK: number,
+  questionLang: "zh" | "en"
+): Promise<SearchResult[]> {
+  if (facets.length === 0) return [];
+
+  // 并行检索所有 facets
+  const facetResults = await Promise.all(
+    facets.map(facet =>
+      semanticSearch(facet, materialIds, Math.ceil(topK / 2), questionLang)
+        .catch(() => [] as SearchResult[])
+    )
+  );
+
+  // 合并去重（按 chunkId）
+  const seen = new Set<number>();
+  const merged: SearchResult[] = [];
+
+  // 先加入每个 facet 的 top 结果（交叉合并保证覆盖）
+  const maxPerFacet = Math.ceil(topK / facets.length);
+  for (let i = 0; i < maxPerFacet; i++) {
+    for (const results of facetResults) {
+      const r = results[i];
+      if (!r || seen.has(r.chunkId)) continue;
+      seen.add(r.chunkId);
+      merged.push(r);
+    }
+  }
+  // 再补充剩余
+  for (const results of facetResults) {
+    for (const r of results) {
+      if (seen.has(r.chunkId)) continue;
+      seen.add(r.chunkId);
+      merged.push(r);
+    }
+  }
+
+  return merged.slice(0, topK * 2); // 返回更多候选给后续打分
+}
+
 async function callLLM(
   question: string,
   searchResults: SearchResult[],
   questionLang: "zh" | "en",
   materialLang: "zh" | "en",
   analysis: QuestionAnalysis = detectQuestionIntent(question, questionLang),
-  materialIds?: number[]
+  materialIds?: number[],
+  history?: ConversationTurn[]
 ): Promise<CallLLMResult> {
   if (searchResults.length === 0) {
     const answer =
@@ -908,13 +1287,31 @@ async function callLLM(
       materialIds
     );
   }
-  const promptChunks = preparePromptChunks(effectiveResults, questionLang, analysis);
-  const reviewChunks = promptChunks.length > 0 ? promptChunks : effectiveResults;
+  const promptChunks = preparePromptChunks(effectiveResults, questionLang, analysis, keywords);
+  let reviewChunks = promptChunks.length > 0 ? promptChunks : effectiveResults;
   const sourceLimit = pickSourceLimit(questionLang, analysis);
   const materialTitles = Array.from(new Set(effectiveResults.map((r) => r.materialTitle)));
 
-  const systemPrompt = buildSystemPrompt(materialTitles, questionLang, materialLang, analysis);
-  const userMessage = buildUserPrompt(question, reviewChunks, questionLang, analysis);
+  const systemPrompt = buildSystemPrompt(materialTitles, questionLang, materialLang, analysis, history);
+
+  const needsTwoStage = (analysis.expectsEnumeration || analysis.expectsComparisonTable) && reviewChunks.length > 0;
+  let extractedFacts = "";
+  if (needsTwoStage) {
+    try {
+      const extraction = await invokeLLMWithConfig(
+        [{ role: "user", content: buildEvidenceExtractionPrompt(question, reviewChunks, questionLang) }],
+        questionLang === "en"
+          ? "You are an information extraction assistant. From the textbook excerpts provided, extract all facts, definitions, steps, or categories directly relevant to the question. Output one item per line in the format: [excerpt_number] fact content. Output only the list, no explanation."
+          : "你是信息抽取助手。从以下教材片段中，逐条抽取与问题直接相关的事实、定义、步骤或类别。每条一行，格式：[片段编号] 事实内容。只输出列表，不加解释。",
+        { temperature: 0, maxTokens: 800 }
+      );
+      extractedFacts = normalizeExtractedFacts(extraction.content);
+    } catch {
+      extractedFacts = "";
+    }
+  }
+
+  const userMessage = buildUserPrompt(question, reviewChunks, questionLang, analysis, extractedFacts || undefined, history);
 
   let llmResponse: { content: string; model: string };
   try {
@@ -981,7 +1378,31 @@ async function callLLM(
   answer = enforceReadableStructure(answer, analysis, questionLang);
 
   const localReview = assessAnswerLocally(answer, reviewChunks, analysis, questionLang);
-  const grounding = assessGrounding(answer, reviewChunks, questionLang);
+
+  // 本地审校发现漏项时，先补召回再重写
+  if (!localReview.complete && analysis.expectsEnumeration && reviewChunks.length < 12) {
+    try {
+      const supplementQuery = questionLang === "en"
+        ? `${question} complete list all types`
+        : `${question} 完整列举所有`;
+      const supplementResults = await semanticSearch(
+        supplementQuery, materialIds, 8, questionLang
+      );
+      const existingIds = new Set(reviewChunks.map(r => r.chunkId));
+      const newChunks = supplementResults.filter(r => !existingIds.has(r.chunkId));
+      if (newChunks.length > 0) {
+        reviewChunks = [...reviewChunks, ...newChunks].slice(0, 15);
+      }
+    } catch { /* 静默失败 */ }
+  }
+
+  const groundingResult = claimGroundingCheck(answer, reviewChunks, keywords, questionLang);
+  console.log(`[QA] Grounding check: ${groundingResult.groundedClaims}/${groundingResult.totalClaims} claims grounded (score: ${groundingResult.groundingScore.toFixed(2)})`);
+  if (groundingResult.ungroundedClaims.length > 0) {
+    console.log(`[QA] Ungrounded claims: ${groundingResult.ungroundedClaims.join(" | ")}`);
+  }
+  const isGrounded = groundingResult.groundingScore >= 0.4 || groundingResult.totalClaims === 0;
+  const grounding = { grounded: isGrounded, score: groundingResult.groundingScore };
 
   // V2: 统一质量管线（最多 1 次额外 LLM 调用，替代原来的多级串行调用）
   // 决策逻辑：
@@ -1083,9 +1504,40 @@ async function callLLM(
   const notFoundPhrases = ["未涉及", "not cover", "没有相关", "未找到", "not found"];
   const foundInMaterials = !notFoundPhrases.some((p) => answer.toLowerCase().includes(p));
 
-  const sources = buildSources(reviewChunks, foundInMaterials, keywords, sourceLimit);
+  let citationRepair = repairCitations(answer, reviewChunks, analysis);
+  if (citationRepair) {
+    answer = citationRepair.answer;
+  } else if (foundInMaterials && reviewChunks.length > 0) {
+    // 答案中没有任何 [n] 引用标记时，自动注入
+    const autoRepair = injectCitations(answer, reviewChunks);
+    if (autoRepair) {
+      answer = autoRepair.answer;
+      citationRepair = autoRepair;
+    }
+  }
 
-  const confidence = finalReview.complete ? 0.82 : localReview.shouldRetry ? 0.58 : 0.68;
+  // 枚举覆盖率校验：当答案涉及枚举型问题时，若覆盖率 < 60% 则追加警示
+  if (analysis.expectsEnumeration && reviewChunks.length > 0) {
+    const chunkItems = reviewChunks.flatMap(chunk =>
+      extractEnumeratedItems(chunk, questionLang).map(e => normalizeForFocus(e.item))
+    );
+    const uniqueChunkItems = [...new Set(chunkItems)].filter(Boolean);
+    if (uniqueChunkItems.length >= 3) {
+      const answerNorm = normalizeForFocus(answer);
+      const coveredCount = uniqueChunkItems.filter(item => answerNorm.includes(item)).length;
+      const coverageRate = coveredCount / uniqueChunkItems.length;
+      if (coverageRate < 0.6 && !finalReview.complete) {
+        const note = questionLang === "en"
+          ? `\n\n> Note: Additional items may exist in the source material (${Math.round(coverageRate * 100)}% covered).`
+          : `\n\n> 注：教材中可能还有更多条目，当前答案覆盖约 ${Math.round(coverageRate * 100)}%。`;
+        answer = answer.trimEnd() + note;
+      }
+    }
+  }
+
+  const sources = buildSources(reviewChunks, foundInMaterials, keywords, sourceLimit, citationRepair);
+
+  const confidence = finalReview.complete ? 0.82 : finalReview.shouldRetry ? 0.58 : 0.68;
 
   return {
     answer,
@@ -1148,6 +1600,196 @@ function parseLLMOutput(content: string): LLMStructuredOutput | null {
     }
   }
   return null;
+}
+
+function prioritizeCitationHints(searchResults: SearchResult[], citationIndices: number[]): SearchResult[] {
+  if (!Array.isArray(citationIndices) || citationIndices.length === 0) return searchResults;
+  const hinted: SearchResult[] = [];
+  const seen = new Set<number>();
+  for (const index of citationIndices) {
+    const row = searchResults[index - 1];
+    if (!row || seen.has(row.chunkId)) continue;
+    seen.add(row.chunkId);
+    hinted.push(row);
+  }
+  if (hinted.length === 0) return searchResults;
+  return [...hinted, ...searchResults.filter((row) => !seen.has(row.chunkId))];
+}
+
+function hasInlineCitation(text: string): boolean {
+  return /\[\d+\]/.test(text);
+}
+
+function stripInlineCitations(text: string): string {
+  return text.replace(/\[\d+\]/g, "").replace(/\s{2,}/g, " ").trim();
+}
+
+function stripMarkdownForAlignment(text: string): string {
+  return text
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/\*([^*]+)\*/g, "$1")
+    .replace(/__([^_]+)__/g, "$1")
+    .replace(/_([^_]+)_/g, "$1")
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$1")
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/^>\s*/gm, "")
+    .replace(/\|/g, " ")
+    .trim();
+}
+
+function splitLinePrefix(line: string): { prefix: string; content: string } {
+  const match = line.match(/^(\s*(?:>\s*)?(?:[-*•]|\d+[.)、．]|[一二三四五六七八九十]+[、.)．])\s+)(.*)$/);
+  if (!match) return { prefix: "", content: line };
+  return { prefix: match[1], content: match[2] };
+}
+
+function splitCitationSentences(line: string, questionLang: "zh" | "en"): string[] {
+  const punctuation = new Set((questionLang === "en" ? ".!?" : "。！？").split(""));
+  const rawSegments: string[] = [];
+  let buffer = "";
+  for (const ch of line) {
+    buffer += ch;
+    if (punctuation.has(ch)) { rawSegments.push(buffer.trim()); buffer = ""; }
+  }
+  if (buffer.trim()) rawSegments.push(buffer.trim());
+  if (rawSegments.length === 0) return [line];
+  const merged: string[] = [];
+  for (const segment of rawSegments) {
+    if (/^(?:\[\d+\]\s*)+$/.test(segment) && merged.length > 0) merged[merged.length - 1] += segment;
+    else merged.push(segment);
+  }
+  return merged;
+}
+
+function extractAlignmentTerms(text: string, questionLang: "zh" | "en"): string[] {
+  const cleaned = stripMarkdownForAlignment(stripInlineCitations(text));
+  const extracted = (questionLang === "en" ? extractKeywordsEn(cleaned) : extractKeywords(cleaned))
+    .map((term) => normalizeForFocus(term))
+    .filter((term) => term.length >= (questionLang === "en" ? 3 : 2));
+  if (extracted.length > 0) return [...new Set(extracted)].slice(0, 12);
+  if (questionLang === "en") {
+    const fallback = cleaned.toLowerCase().match(/[a-z]{3,}/g) ?? [];
+    return [...new Set(fallback)].slice(0, 12);
+  }
+  const normalized = normalizeForFocus(cleaned);
+  const grams: string[] = [];
+  for (let size = 4; size >= 2; size--) {
+    for (let i = 0; i <= normalized.length - size; i++) grams.push(normalized.slice(i, i + size));
+  }
+  return [...new Set(grams)].slice(0, 16);
+}
+
+function computeKeywordOverlap(sentenceTerms: string[], content: string): number {
+  if (sentenceTerms.length === 0) return 0;
+  const normalizedContent = normalizeForFocus(content);
+  let hit = 0;
+  for (const term of sentenceTerms) {
+    if (normalizeForFocus(term) && normalizedContent.includes(normalizeForFocus(term))) hit++;
+  }
+  return hit / sentenceTerms.length;
+}
+
+function appendSentenceCitations(sentence: string, citationNumbers: number[], questionLang: "zh" | "en"): string {
+  const bare = stripInlineCitations(sentence);
+  if (citationNumbers.length === 0) return bare;
+  const suffix = citationNumbers.map((num) => `[${num}]`).join("");
+  const trailingMatch = bare.match(/([。！？.!?]+)$/);
+  if (!trailingMatch) return `${bare}${questionLang === "en" ? " " : ""}${suffix}`.trim();
+  const punctuation = trailingMatch[1];
+  const body = bare.slice(0, -punctuation.length).trimEnd();
+  return `${body}${questionLang === "en" ? " " : ""}${suffix}${punctuation}`;
+}
+
+function repairCitations(answer: string, searchResults: SearchResult[], _analysis: QuestionAnalysis): CitationRepairResult | null {
+  if (!hasInlineCitation(answer) || searchResults.length === 0) return null;
+  const questionLang = detectLanguage(answer) === "en" ? "en" : "zh";
+  const citationThreshold = 0.25;
+  const citationMap = new Map<number, number>();
+  const orderedResults: SearchResult[] = [];
+  let sawCitedSentence = false;
+  let repairedAnySentence = false;
+  let repairFailed = false;
+
+  const repairedLines = answer.replace(/\r\n/g, "\n").split("\n").map((line) => {
+    if (!line.trim()) return line;
+    const { prefix, content } = splitLinePrefix(line);
+    const segments = splitCitationSentences(content, questionLang);
+    const repairedSegments = segments.map((segment) => {
+      if (!hasInlineCitation(segment)) return segment;
+      sawCitedSentence = true;
+      const sentenceTerms = extractAlignmentTerms(segment, questionLang);
+      if (sentenceTerms.length === 0) { repairFailed = true; return segment; }
+      const aligned = searchResults
+        .map((row) => ({ row, overlap: computeKeywordOverlap(sentenceTerms, row.content) }))
+        .filter((item) => item.overlap > citationThreshold)
+        .sort((a, b) => b.overlap !== a.overlap ? b.overlap - a.overlap : (b.row.similarity ?? 0) - (a.row.similarity ?? 0));
+      if (aligned.length === 0) { repairFailed = true; return segment; }
+      repairedAnySentence = true;
+      const citationNumbers: number[] = [];
+      const seenChunkIds = new Set<number>();
+      for (const item of aligned) {
+        if (seenChunkIds.has(item.row.chunkId)) continue;
+        seenChunkIds.add(item.row.chunkId);
+        if (!citationMap.has(item.row.chunkId)) { citationMap.set(item.row.chunkId, citationMap.size + 1); orderedResults.push(item.row); }
+        citationNumbers.push(citationMap.get(item.row.chunkId)!);
+      }
+      return appendSentenceCitations(segment, citationNumbers, questionLang);
+    });
+    const joined = repairedSegments.join(questionLang === "en" ? " " : "");
+    return prefix ? `${prefix}${joined}` : joined;
+  });
+
+  if (repairFailed || !sawCitedSentence || !repairedAnySentence || orderedResults.length === 0) return null;
+  const repairedAnswer = repairedLines.join("\n");
+  if (!hasInlineCitation(repairedAnswer)) return null;
+  return { answer: repairedAnswer, orderedResults };
+}
+
+/**
+ * 对没有任何 [n] 标记的答案自动注入引用。
+ * 逐句匹配检索结果，overlap > 0.2 则追加引用号。
+ */
+function injectCitations(answer: string, searchResults: SearchResult[]): CitationRepairResult | null {
+  if (hasInlineCitation(answer) || searchResults.length === 0) return null;
+  const questionLang = detectLanguage(answer) === "en" ? "en" : "zh";
+  const citationMap = new Map<number, number>();
+  const orderedResults: SearchResult[] = [];
+  let injectedAny = false;
+
+  const repairedLines = answer.replace(/\r\n/g, "\n").split("\n").map((line) => {
+    if (!line.trim()) return line;
+    const { prefix, content } = splitLinePrefix(line);
+    const segments = splitCitationSentences(content, questionLang);
+    const repairedSegments = segments.map((segment) => {
+      const segTerms = extractAlignmentTerms(segment, questionLang);
+      if (segTerms.length === 0) return segment;
+      const aligned = searchResults
+        .map((row) => ({ row, overlap: computeKeywordOverlap(segTerms, row.content) }))
+        .filter((item) => item.overlap > 0.2)
+        .sort((a, b) => b.overlap - a.overlap)
+        .slice(0, 2);
+      if (aligned.length === 0) return segment;
+      injectedAny = true;
+      const citationNumbers: number[] = [];
+      const seenChunkIds = new Set<number>();
+      for (const item of aligned) {
+        if (seenChunkIds.has(item.row.chunkId)) continue;
+        seenChunkIds.add(item.row.chunkId);
+        if (!citationMap.has(item.row.chunkId)) {
+          citationMap.set(item.row.chunkId, citationMap.size + 1);
+          orderedResults.push(item.row);
+        }
+        citationNumbers.push(citationMap.get(item.row.chunkId)!);
+      }
+      return appendSentenceCitations(segment, citationNumbers, questionLang);
+    });
+    const joined = repairedSegments.join(questionLang === "en" ? " " : "");
+    return prefix ? `${prefix}${joined}` : joined;
+  });
+
+  if (!injectedAny || orderedResults.length === 0) return null;
+  return { answer: repairedLines.join("\n"), orderedResults };
 }
 
 function isValidStructuredOutput(obj: unknown): obj is LLMStructuredOutput {
@@ -1646,9 +2288,40 @@ function buildSources(
   searchResults: SearchResult[],
   foundInMaterials: boolean,
   keywords: string[],
-  maxSources: number
+  maxSources: number,
+  citationRepair: CitationRepairResult | null = null
 ): QuerySource[] {
   if (!foundInMaterials || maxSources <= 0) return [];
+
+  const repairedResults = citationRepair?.orderedResults ?? [];
+  if (repairedResults.length > 0) {
+    // 使用修复后的有序结果
+    const deduped: QuerySource[] = [];
+    const seen = new Set<string>();
+    for (const row of repairedResults) {
+      const dedupeKey = [row.materialId, row.chunkIndex, row.chapter || "", row.pageStart ?? -1, row.pageEnd ?? -1].join("|");
+      if (seen.has(dedupeKey)) continue;
+      seen.add(dedupeKey);
+      const highlightSentence = extractHighlightSentence(row.content, keywords);
+      const excerpt = highlightSentence.length > 20
+        ? highlightSentence.substring(0, 300) + (highlightSentence.length > 300 ? "..." : "")
+        : row.content.substring(0, 200) + (row.content.length > 200 ? "..." : "");
+      deduped.push({
+        materialId: row.materialId,
+        materialTitle: row.materialTitle,
+        chapter: row.chapter,
+        pageStart: row.pageStart,
+        pageEnd: row.pageEnd,
+        excerpt,
+        highlightedExcerpt: highlightSentence,
+        chunkId: row.chunkId,
+        startOffset: row.startOffset ?? null,
+        endOffset: row.endOffset ?? null,
+        fileUrl: row.fileUrl ?? null,
+      });
+    }
+    if (deduped.length > 0) return deduped;
+  }
 
   const selected = searchResults.slice(0, Math.max(1, maxSources * 2));
   const deduped: QuerySource[] = [];
@@ -1665,14 +2338,22 @@ function buildSources(
     if (seen.has(dedupeKey)) continue;
     seen.add(dedupeKey);
 
+    const highlightSentence = extractHighlightSentence(row.content, keywords);
+    const excerpt = highlightSentence.length > 20
+      ? highlightSentence.substring(0, 300) + (highlightSentence.length > 300 ? "..." : "")
+      : row.content.substring(0, 200) + (row.content.length > 200 ? "..." : "");
     deduped.push({
       materialId: row.materialId,
       materialTitle: row.materialTitle,
       chapter: row.chapter,
       pageStart: row.pageStart,
       pageEnd: row.pageEnd,
-      excerpt: row.content.substring(0, 200) + (row.content.length > 200 ? "..." : ""),
-      highlightedExcerpt: extractHighlightSentence(row.content, keywords),
+      excerpt,
+      highlightedExcerpt: highlightSentence,
+      chunkId: row.chunkId,
+      startOffset: row.startOffset ?? null,
+      endOffset: row.endOffset ?? null,
+      fileUrl: row.fileUrl ?? null,
     });
 
     if (deduped.length >= maxSources) break;
@@ -1703,23 +2384,90 @@ function enforceConciseDefinition(answer: string, questionLang: "zh" | "en"): st
   return concise;
 }
 
+type ClaimGroundingResult = {
+  groundedClaims: number;
+  totalClaims: number;
+  groundingScore: number;       // 0~1
+  ungroundedClaims: string[];   // 无支撑的 claim 文本（用于日志）
+};
+
+function splitIntoClaims(answer: string, questionLang: "zh" | "en"): string[] {
+  // 按句子分割答案（去掉 markdown 结构、引用标记后）
+  const cleaned = answer
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/\[\d+\]/g, "")
+    .replace(/\|.*?\|/g, "") // 去表格
+    .trim();
+
+  const sentenceEnds = questionLang === "en" ? /[.!?]+\s+/g : /[。！？]+/g;
+  const sentences = cleaned.split(sentenceEnds)
+    .map(s => s.trim())
+    .filter(s => {
+      if (s.length < (questionLang === "en" ? 15 : 8)) return false;
+      // 过滤纯列表标记行
+      if (/^[-*•]\s*$/.test(s)) return false;
+      return true;
+    });
+  return sentences.slice(0, 20); // 最多校验20条
+}
+
+function claimGroundingCheck(
+  answer: string,
+  searchResults: SearchResult[],
+  keywords: string[],
+  questionLang: "zh" | "en"
+): ClaimGroundingResult {
+  const claims = splitIntoClaims(answer, questionLang);
+  if (claims.length === 0 || searchResults.length === 0) {
+    return { groundedClaims: 0, totalClaims: 0, groundingScore: 0.5, ungroundedClaims: [] };
+  }
+
+  let groundedCount = 0;
+  const ungroundedClaims: string[] = [];
+
+  for (const claim of claims) {
+    const claimTerms = (questionLang === "en" ? extractKeywordsEn(claim) : extractKeywords(claim))
+      .map(t => normalizeForFocus(t))
+      .filter(t => t.length >= (questionLang === "en" ? 3 : 2))
+      .slice(0, 8);
+
+    if (claimTerms.length === 0) { groundedCount++; continue; } // 无关键词的句子默认通过
+
+    // 在每个 chunk 中找命中率最高的
+    let bestOverlap = 0;
+    for (const result of searchResults) {
+      const chunkText = normalizeForFocus(result.content);
+      const hits = claimTerms.filter(t => chunkText.includes(t)).length;
+      const overlap = hits / claimTerms.length;
+      if (overlap > bestOverlap) bestOverlap = overlap;
+    }
+
+    if (bestOverlap >= 0.3) {
+      groundedCount++;
+    } else {
+      ungroundedClaims.push(claim.slice(0, 60));
+    }
+  }
+
+  const groundingScore = claims.length > 0 ? groundedCount / claims.length : 0.5;
+  return { groundedClaims: groundedCount, totalClaims: claims.length, groundingScore, ungroundedClaims };
+}
+
 function assessGrounding(
   answer: string,
   searchResults: SearchResult[],
   questionLang: "zh" | "en"
 ): { grounded: boolean; score: number } {
   if (searchResults.length === 0) return { grounded: true, score: 1 };
-  const sourceText = searchResults.map((s) => s.content).join("\n").toLowerCase();
   const keywords = (questionLang === "en" ? extractKeywordsEn(answer) : extractKeywords(answer))
     .filter((k) => k.length >= 2)
     .slice(0, 20);
-  if (keywords.length === 0) return { grounded: true, score: 1 };
-  let hit = 0;
-  for (const kw of keywords) {
-    if (sourceText.includes(kw.toLowerCase())) hit++;
-  }
-  const score = hit / keywords.length;
-  return { grounded: score >= 0.62, score };
+  const result = claimGroundingCheck(answer, searchResults, keywords, questionLang);
+  const { groundingScore, ungroundedClaims } = result;
+  // groundingScore >= 0.7 → 已接地；0.4~0.7 → 部分接地，不强制重写；< 0.4 且 ungroundedClaims >= 3 → 需要重写
+  const grounded = groundingScore >= 0.4 || ungroundedClaims.length < 3;
+  return { grounded, score: groundingScore };
 }
 
 function buildGroundedRewritePrompt(
@@ -2588,8 +3336,14 @@ export async function generateAnswerStream(
   const useRAG = activeConfig?.useRAG ?? false;
   const materialIds = normalizeMaterialIds(req.materialIds);
 
+  let effectiveQuestion = req.question;
+  if (req.history && req.history.length > 0 && isFollowUpQuestion(req.question, questionLanguage)) {
+    effectiveQuestion = await rewriteFollowUpQuestion(req.question, req.history, questionLanguage);
+  }
+
   try {
-    const cached = getCachedAnswer(req.question, materialIds);
+    // 有 history 时跳过缓存，确保多轮对话不复用旧答案
+    const cached = req.history && req.history.length > 0 ? null : getCachedAnswer(req.question, materialIds);
     if (cached) {
       const responseTimeMs = Date.now() - startTime;
       const queryId = await createQuery({
@@ -2598,6 +3352,7 @@ export async function generateAnswerStream(
         sources: cached.mainResult.sources,
         modelUsed: `${cached.mainResult.modelUsed}(cached)`,
         responseTimeMs,
+        conversationId: req.conversationId,
         visitorIp: req.visitorIp,
         visitorCity: req.visitorCity,
         visitorRegion: req.visitorRegion,
@@ -2620,23 +3375,40 @@ export async function generateAnswerStream(
       return;
     }
 
-    const langFilter = questionLanguage === "en" ? "en" : "zh";
-    const topK = questionLanguage === "en" ? pickTopK("en", questionAnalysis) : pickTopK("zh", questionAnalysis);
-    let searchResults: SearchResult[] = await semanticSearch(req.question, materialIds, topK, langFilter, useRAG);
-
-    // useRAG=false 且首次未命中时，允许尝试 embedding 检索兜底
-    if (searchResults.length === 0 && !useRAG && activeConfig?.embeddingModel) {
-      searchResults = await semanticSearch(req.question, materialIds, topK, langFilter, true);
+    let mainResult: CallLLMResult;
+    if (questionLanguage === "en") {
+      const topK = pickTopK("en", questionAnalysis);
+      let allSearchResults = await semanticSearch(effectiveQuestion, materialIds, topK, "en", useRAG);
+      if (allSearchResults.length === 0 && !useRAG && activeConfig?.embeddingModel) {
+        allSearchResults = await semanticSearch(effectiveQuestion, materialIds, topK, "en", true);
+      }
+      if (questionAnalysis.expectsComparisonTable || questionAnalysis.expectsFullCoverage) {
+        const facets = await generateFacets(effectiveQuestion, questionAnalysis, questionLanguage);
+        if (facets.length >= 2) {
+          const facetResults = await facetedSearch(effectiveQuestion, facets, materialIds, topK, questionLanguage);
+          const mainIds = new Set(allSearchResults.map(r => r.chunkId));
+          const extra = facetResults.filter(r => !mainIds.has(r.chunkId));
+          allSearchResults = [...allSearchResults, ...extra].slice(0, topK * 2);
+        }
+      }
+      mainResult = await callLLM(effectiveQuestion, allSearchResults, "en", "en", questionAnalysis, materialIds, req.history);
+    } else {
+      const topK = pickTopK("zh", questionAnalysis);
+      let zhResults = await semanticSearch(effectiveQuestion, materialIds, topK, "zh", useRAG);
+      if (zhResults.length === 0 && !useRAG && activeConfig?.embeddingModel) {
+        zhResults = await semanticSearch(effectiveQuestion, materialIds, topK, "zh", true);
+      }
+      if (questionAnalysis.expectsComparisonTable || questionAnalysis.expectsFullCoverage) {
+        const facets = await generateFacets(effectiveQuestion, questionAnalysis, questionLanguage);
+        if (facets.length >= 2) {
+          const facetResults = await facetedSearch(effectiveQuestion, facets, materialIds, topK, questionLanguage);
+          const mainIds = new Set(zhResults.map(r => r.chunkId));
+          const extra = facetResults.filter(r => !mainIds.has(r.chunkId));
+          zhResults = [...zhResults, ...extra].slice(0, topK * 2);
+        }
+      }
+      mainResult = await callLLM(effectiveQuestion, zhResults, "zh", "zh", questionAnalysis, materialIds, req.history);
     }
-
-    const mainResult = await callLLM(
-      req.question,
-      searchResults,
-      questionLanguage,
-      questionLanguage,
-      questionAnalysis,
-      materialIds
-    );
 
     const responseTimeMs = Date.now() - startTime;
     const queryId = await createQuery({
@@ -2645,6 +3417,7 @@ export async function generateAnswerStream(
       sources: mainResult.sources,
       modelUsed: mainResult.modelUsed,
       responseTimeMs,
+      conversationId: req.conversationId,
       visitorIp: req.visitorIp,
       visitorCity: req.visitorCity,
       visitorRegion: req.visitorRegion,
@@ -2663,7 +3436,8 @@ export async function generateAnswerStream(
       responseTimeMs,
     });
 
-    if (mainResult.foundInMaterials) {
+    // 只缓存无 history 的答案
+    if (mainResult.foundInMaterials && !(req.history && req.history.length > 0)) {
       setCachedAnswer(req.question, { mainResult, questionLanguage }, materialIds);
     }
 

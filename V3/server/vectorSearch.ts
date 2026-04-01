@@ -11,7 +11,7 @@
  */
 import { getDb } from "./db";
 import { materialChunks, materials } from "../drizzle/schema";
-import { eq, inArray, and, like, or, isNotNull, asc } from "drizzle-orm";
+import { eq, inArray, and, like, or, isNotNull, asc, gt } from "drizzle-orm";
 import { detectLanguage } from "./languageDetect";
 import { getEmbedding, cosineSimilarity } from "./llmDriver";
 
@@ -26,6 +26,9 @@ export type SearchResult = {
   pageEnd: number | null;
   content: string;
   similarity: number;
+  startOffset?: number | null;
+  endOffset?: number | null;
+  fileUrl?: string | null;
 };
 
 type RouteName = "strict" | "phrase" | "broad";
@@ -38,6 +41,8 @@ type CandidateRow = {
   chapter: string | null;
   pageStart: number | null;
   pageEnd: number | null;
+  startOffset?: number | null;
+  endOffset?: number | null;
 };
 
 type CandidateState = CandidateRow & {
@@ -78,9 +83,12 @@ const SEARCH_CONFIG = {
   phraseWeight: parseFloat(process.env.ROUTE_PHRASE_WEIGHT || "3.4"),
   broadWeight: parseFloat(process.env.ROUTE_BROAD_WEIGHT || "1.5"),
   // 多路召回上限
-  strictLimit: parseInt(process.env.ROUTE_STRICT_LIMIT || "100", 10),
-  phraseLimit: parseInt(process.env.ROUTE_PHRASE_LIMIT || "160", 10),
-  broadLimit: parseInt(process.env.ROUTE_BROAD_LIMIT || "260", 10),
+  strictLimit: parseInt(process.env.ROUTE_STRICT_LIMIT || "140", 10),
+  phraseLimit: parseInt(process.env.ROUTE_PHRASE_LIMIT || "220", 10),
+  broadLimit: parseInt(process.env.ROUTE_BROAD_LIMIT || "320", 10),
+  // 候选池收敛下限/上限（倍数 topK）
+  recallCandidateFloor: parseInt(process.env.RECALL_CANDIDATE_FLOOR || "50", 10),
+  recallCandidateCeil: parseInt(process.env.RECALL_CANDIDATE_CEIL || "80", 10),
   // 邻接块加权系数
   adjacencyBoost: parseFloat(process.env.ADJACENCY_BOOST || "0.82"),
   // 最终融合权重
@@ -242,34 +250,53 @@ async function loadRAMCache(): Promise<void> {
 
   // 只加载 embedding 和元数据，不加载 content（节省内存）
   // 同时加载 materials.language 用于后续 languageFilter
-  const rows = await db
-    .select({
-      id: materialChunks.id,
-      materialId: materialChunks.materialId,
-      chunkIndex: materialChunks.chunkIndex,
-      embedding: materialChunks.embedding,
-      language: materials.language,
-    })
-    .from(materialChunks)
-    .innerJoin(materials, eq(materialChunks.materialId, materials.id))
-    .where(and(
-      eq(materials.status, "published"),
-      eq(materialChunks.vectorId, "embedded"),
-      isNotNull(materialChunks.embedding)
-    ))
-    .limit(SEARCH_CONFIG.ramCacheMaxSize);
-
+  // 使用分页游标循环加载，避免单次 LIMIT 截断导致缓存不完整
+  const PAGE_SIZE = 2000;
   const entries: RAMEntry[] = [];
-  for (const row of rows) {
-    const emb = row.embedding as number[] | null;
-    if (!emb || !Array.isArray(emb) || emb.length === 0) continue;
-    entries.push({
-      chunkId: row.id,
-      materialId: row.materialId,
-      chunkIndex: row.chunkIndex,
-      language: (row.language as "zh" | "en") || "zh",
-      embedding: emb,
-    });
+  let cursorId = 0;
+
+  while (entries.length < SEARCH_CONFIG.ramCacheMaxSize) {
+    const rows = await db
+      .select({
+        id: materialChunks.id,
+        materialId: materialChunks.materialId,
+        chunkIndex: materialChunks.chunkIndex,
+        embedding: materialChunks.embedding,
+        language: materials.language,
+      })
+      .from(materialChunks)
+      .innerJoin(materials, eq(materialChunks.materialId, materials.id))
+      .where(and(
+        eq(materials.status, "published"),
+        eq(materialChunks.vectorId, "embedded"),
+        isNotNull(materialChunks.embedding),
+        // 按 chunkId 游标分页，每批从上次最大 id 之后开始
+        ...(cursorId > 0 ? [gt(materialChunks.id, cursorId)] : [])
+      ))
+      .orderBy(asc(materialChunks.id))
+      .limit(PAGE_SIZE);
+
+    const pageRows = rows;
+    if (pageRows.length === 0) break;
+
+    for (const row of pageRows) {
+      const emb = row.embedding as number[] | null;
+      if (!emb || !Array.isArray(emb) || emb.length === 0) continue;
+      entries.push({
+        chunkId: row.id,
+        materialId: row.materialId,
+        chunkIndex: row.chunkIndex,
+        language: (row.language as "zh" | "en") || "zh",
+        embedding: emb,
+      });
+      if (entries.length >= SEARCH_CONFIG.ramCacheMaxSize) break;
+    }
+
+    // 更新游标为本批最大 id
+    cursorId = pageRows[pageRows.length - 1].id;
+
+    // 如果本批实际返回不足 PAGE_SIZE，说明已无更多数据
+    if (rows.length < PAGE_SIZE) break;
   }
 
   _ramCache = entries;
@@ -354,6 +381,8 @@ async function fetchChunkDetails(
       chapter: materialChunks.chapter,
       pageStart: materialChunks.pageStart,
       pageEnd: materialChunks.pageEnd,
+      startOffset: materialChunks.startOffset,
+      endOffset: materialChunks.endOffset,
     })
     .from(materialChunks)
     .where(inArray(materialChunks.id, chunkIds));
@@ -485,7 +514,10 @@ async function keywordFallbackSearch(
         chapter: materialChunks.chapter,
         pageStart: materialChunks.pageStart,
         pageEnd: materialChunks.pageEnd,
+        startOffset: materialChunks.startOffset,
+        endOffset: materialChunks.endOffset,
         materialTitle: materials.title,
+        fileUrl: materials.fileUrl,
       })
       .from(materialChunks)
       .innerJoin(materials, eq(materialChunks.materialId, materials.id))
@@ -504,7 +536,10 @@ async function keywordFallbackSearch(
       chapter: row.chapter,
       pageStart: row.pageStart,
       pageEnd: row.pageEnd,
+      startOffset: row.startOffset,
+      endOffset: row.endOffset,
       materialTitle: row.materialTitle,
+      fileUrl: row.fileUrl,
     }));
   };
 
@@ -546,6 +581,9 @@ async function keywordFallbackSearch(
     pageEnd: row.pageEnd,
     content: row.content,
     similarity: score,
+    startOffset: row.startOffset ?? null,
+    endOffset: row.endOffset ?? null,
+    fileUrl: row.fileUrl ?? null,
   }));
 }
 
@@ -1227,6 +1265,31 @@ const EN_STOP_WORDS = new Set([
   "where", "why", "not", "no", "nor", "so", "yet", "both", "either",
 ]);
 
+function lemmatize(word: string): string {
+  // 常见后缀规则，顺序重要
+  if (word.length > 5 && word.endsWith("ation")) return word.slice(0, -5) + "ate";
+  if (word.length > 4 && word.endsWith("ing")) {
+    const stem = word.slice(0, -3);
+    // doubled consonant: running -> run
+    if (stem.length > 2 && stem[stem.length-1] === stem[stem.length-2]) return stem.slice(0, -1);
+    return stem.length >= 3 ? stem : word;
+  }
+  if (word.length > 4 && word.endsWith("tion")) return word.slice(0, -4);
+  if (word.length > 4 && word.endsWith("ness")) return word.slice(0, -4);
+  if (word.length > 3 && word.endsWith("ies")) return word.slice(0, -3) + "y";
+  if (word.length > 3 && word.endsWith("ied")) return word.slice(0, -3) + "y";
+  if (word.length > 3 && word.endsWith("ed")) {
+    const stem = word.slice(0, -2);
+    if (stem.length > 2 && stem[stem.length-1] === stem[stem.length-2]) return stem.slice(0, -1);
+    return stem.length >= 3 ? stem : word;
+  }
+  if (word.length > 2 && word.endsWith("es") && !word.endsWith("ies")) return word.slice(0, -2);
+  if (word.length > 2 && word.endsWith("s") && !word.endsWith("ss")) return word.slice(0, -1);
+  if (word.length > 4 && word.endsWith("ly")) return word.slice(0, -2);
+  if (word.length > 4 && word.endsWith("er")) return word.slice(0, -2);
+  return word;
+}
+
 export function extractKeywordsEn(text: string): string[] {
   const words = text
     .toLowerCase()
@@ -1234,7 +1297,14 @@ export function extractKeywordsEn(text: string): string[] {
     .split(/\s+/)
     .filter((w) => w.length >= 3 && !EN_STOP_WORDS.has(w));
 
-  const keywords = Array.from(new Set(words));
+  // 保留原词，同时加入词形还原后的词根（去重）
+  const expandedWords: string[] = [];
+  for (const w of words) {
+    expandedWords.push(w);
+    const lemma = lemmatize(w);
+    if (lemma !== w) expandedWords.push(lemma);
+  }
+  const keywords = Array.from(new Set(expandedWords));
 
   const wordArr = text
     .toLowerCase()
@@ -1485,7 +1555,23 @@ function sanitizeFulltextToken(term: string): string {
     .trim();
 }
 
-function buildFulltextBooleanQuery(terms: string[]): string {
+function containsCjk(text: string): boolean {
+  return /[\u4e00-\u9fa5\u3040-\u30ff\u31f0-\u31ff]/.test(text);
+}
+
+function buildFulltextBooleanQuery(terms: string[], questionLang: "zh" | "en" = "en"): string {
+  if (questionLang === "zh") {
+    // 中文：词语本身用双引号包裹进行精确 ngram 匹配，过滤长度 >= 2 的词
+    const zhCleaned = terms
+      .map((t) => t.trim())
+      .filter((t) => t.length >= 2)
+      .slice(0, 10);
+    if (zhCleaned.length === 0) return "";
+    const clauses = zhCleaned.map((term) => `+"${term}"`);
+    return clauses.join(" ");
+  }
+
+  // 英文：原有 term* / "phrase" 方式
   const cleaned = terms
     .map(sanitizeFulltextToken)
     .filter((term) => term.length >= 3)
@@ -1504,9 +1590,11 @@ async function fetchRouteCandidatesByFulltext(
   terms: string[],
   materialIds: number[] | undefined,
   languageFilter: "zh" | "en" | "all",
-  limit: number
+  limit: number,
+  route: RouteName = "broad",
+  questionLang: "zh" | "en" = "en"
 ): Promise<CandidateRow[]> {
-  const booleanQuery = buildFulltextBooleanQuery(terms);
+  const booleanQuery = buildFulltextBooleanQuery(terms, questionLang);
   if (!booleanQuery) return [];
 
   const whereClauses = ["m.`status` = 'published'", "MATCH(mc.`content`, mc.`chapter`) AGAINST (? IN BOOLEAN MODE)"];
@@ -1530,7 +1618,9 @@ async function fetchRouteCandidatesByFulltext(
       mc.content,
       mc.chapter,
       mc.\`pageStart\` AS pageStart,
-      mc.\`pageEnd\` AS pageEnd
+      mc.\`pageEnd\` AS pageEnd,
+      mc.\`startOffset\` AS startOffset,
+      mc.\`endOffset\` AS endOffset
     FROM material_chunks mc
     INNER JOIN materials m ON mc.\`materialId\` = m.id
     WHERE ${whereClauses.join(" AND ")}
@@ -1548,6 +1638,8 @@ async function fetchRouteCandidatesByFulltext(
     chapter: row.chapter ? String(row.chapter) : null,
     pageStart: row.pageStart === null || row.pageStart === undefined ? null : Number(row.pageStart),
     pageEnd: row.pageEnd === null || row.pageEnd === undefined ? null : Number(row.pageEnd),
+    startOffset: row.startOffset === null || row.startOffset === undefined ? null : Number(row.startOffset),
+    endOffset: row.endOffset === null || row.endOffset === undefined ? null : Number(row.endOffset),
   }));
 }
 
@@ -1693,18 +1785,20 @@ async function fetchRouteCandidates(
 ): Promise<CandidateRow[]> {
   if (terms.length === 0) return [];
 
-  const shouldUseFulltextBroadRoute =
+  // 所有路由优先走 FULLTEXT：中文词用 ngram 引号方式，英文用 term*/phrase 方式
+  // 失败或无命中时降级到 LIKE
+  const shouldUseFulltext =
     SEARCH_CONFIG.enableFulltextBroadRoute &&
-    route === "broad" &&
-    questionLang === "en" &&
-    terms.some((term) => /[a-z]{3,}/i.test(term));
+    (questionLang === "en"
+      ? terms.some((term) => /[a-z]{3,}/i.test(term))
+      : terms.some((term) => term.trim().length >= 2));
 
-  if (shouldUseFulltextBroadRoute) {
+  if (shouldUseFulltext) {
     try {
-      const fulltextRows = await fetchRouteCandidatesByFulltext(db, terms, materialIds, languageFilter, limit);
+      const fulltextRows = await fetchRouteCandidatesByFulltext(db, terms, materialIds, languageFilter, limit, route, questionLang);
       if (fulltextRows.length > 0) return fulltextRows;
     } catch (error) {
-      console.warn(`[HybridSearch] Fulltext broad route unavailable, fallback to LIKE route: ${error}`);
+      console.warn(`[HybridSearch] Fulltext route (${route}) unavailable, fallback to LIKE route: ${error}`);
     }
   }
 
@@ -1723,6 +1817,8 @@ async function fetchRouteCandidates(
       chapter: materialChunks.chapter,
       pageStart: materialChunks.pageStart,
       pageEnd: materialChunks.pageEnd,
+      startOffset: materialChunks.startOffset,
+      endOffset: materialChunks.endOffset,
     })
     .from(materialChunks)
     .innerJoin(materials, eq(materialChunks.materialId, materials.id))
@@ -1737,6 +1833,8 @@ async function fetchRouteCandidates(
     chapter: row.chapter,
     pageStart: row.pageStart,
     pageEnd: row.pageEnd,
+    startOffset: row.startOffset,
+    endOffset: row.endOffset,
   }));
 }
 
@@ -1779,6 +1877,8 @@ async function fetchNeighborCandidates(
           chapter: materialChunks.chapter,
           pageStart: materialChunks.pageStart,
           pageEnd: materialChunks.pageEnd,
+          startOffset: materialChunks.startOffset,
+          endOffset: materialChunks.endOffset,
         })
         .from(materialChunks)
         .innerJoin(materials, eq(materialChunks.materialId, materials.id))
@@ -1793,6 +1893,8 @@ async function fetchNeighborCandidates(
             chapter: row.chapter,
             pageStart: row.pageStart,
             pageEnd: row.pageEnd,
+            startOffset: row.startOffset,
+            endOffset: row.endOffset,
           }))
         )
     );
@@ -1800,6 +1902,46 @@ async function fetchNeighborCandidates(
 
   const results = await Promise.all(queryPromises);
   return results.flat();
+}
+
+// ─── Reranker（可选，通过环境变量配置）────────────────────────────────────────
+const RERANKER_API_URL = process.env.RERANKER_API_URL; // 如 http://localhost:8000/rerank
+const RERANKER_API_KEY = process.env.RERANKER_API_KEY;
+const RERANKER_ENABLED = Boolean(RERANKER_API_URL);
+
+async function rerankCandidates(
+  query: string,
+  candidates: CandidateState[],
+  topK: number
+): Promise<CandidateState[]> {
+  if (!RERANKER_ENABLED || candidates.length === 0) return candidates;
+  try {
+    const response = await fetch(RERANKER_API_URL!, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(RERANKER_API_KEY ? { Authorization: `Bearer ${RERANKER_API_KEY}` } : {}),
+      },
+      body: JSON.stringify({
+        query,
+        documents: candidates.map(c => c.content),
+        top_n: Math.min(topK * 3, candidates.length),
+      }),
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!response.ok) return candidates;
+    const data = await response.json() as { results: Array<{ index: number; relevance_score: number }> };
+    if (!Array.isArray(data.results)) return candidates;
+    // 把 reranker 分数混入 finalScore（权重 0.4）
+    const scoreMap = new Map(data.results.map(r => [r.index, r.relevance_score]));
+    const maxRerankScore = Math.max(...data.results.map(r => r.relevance_score), 1);
+    return candidates.map((c, idx) => {
+      const rerankScore = (scoreMap.get(idx) ?? 0) / maxRerankScore;
+      return { ...c, finalScore: (c.finalScore ?? 0) * 0.6 + rerankScore * 0.4 };
+    }).sort((a, b) => (b.finalScore ?? 0) - (a.finalScore ?? 0));
+  } catch {
+    return candidates; // 失败时静默降级
+  }
 }
 
 // ─── 混合检索 Top-K（纯关键词多路召回）──────────────────────────────────────
@@ -1960,6 +2102,17 @@ export async function semanticSearch(
   }
 
   let candidates = Array.from(candidateMap.values());
+
+  // 候选池收敛：按初步分数（recallScore）排序后截取，避免无限膨胀
+  const candidateCap = Math.max(SEARCH_CONFIG.recallCandidateFloor, topK * SEARCH_CONFIG.recallCandidateCeil);
+  if (candidates.length > candidateCap) {
+    candidates.sort((a, b) => b.recallScore - a.recallScore);
+    candidates = candidates.slice(0, candidateCap);
+    // 同步回写 candidateMap，使后续邻接块查找不超出收敛范围
+    candidateMap.clear();
+    for (const c of candidates) candidateMap.set(c.id, c);
+  }
+
   let stats = countTermStats(candidates, profile.scoringTerms);
 
   for (const candidate of candidates) {
@@ -2036,7 +2189,8 @@ export async function semanticSearch(
   }
 
   candidates.sort((a, b) => b.finalScore - a.finalScore);
-  const topResults = applyDiversitySelection(candidates, topK).filter((candidate) => candidate.finalScore > 0);
+  const rerankedCandidates = await rerankCandidates(question, candidates, topK);
+  const topResults = applyDiversitySelection(rerankedCandidates, topK).filter((candidate) => candidate.finalScore > 0);
 
   if (topResults.length === 0) {
     return keywordFallbackSearch(db, question, materialIds, topK, languageFilter, profile, questionLang, allowLanguageFallback);
@@ -2044,24 +2198,27 @@ export async function semanticSearch(
 
   const matIds = Array.from(new Set(topResults.map((c) => c.materialId)));
   const matDetails = await db
-    .select({ id: materials.id, title: materials.title })
+    .select({ id: materials.id, title: materials.title, fileUrl: materials.fileUrl })
     .from(materials)
     .where(inArray(materials.id, matIds));
 
-  const matMap = new Map<number, string>(
-    matDetails.map((m) => [m.id as number, String(m.title)] as [number, string])
+  const matMap = new Map<number, { title: string; fileUrl: string }>(
+    matDetails.map((m) => [m.id as number, { title: String(m.title), fileUrl: String(m.fileUrl) }] as [number, { title: string; fileUrl: string }])
   );
 
   return topResults.map(r => ({
     chunkId: r.id,
     chunkIndex: r.chunkIndex,
     materialId: r.materialId,
-    materialTitle: matMap.get(r.materialId) ?? "未知教材",
+    materialTitle: matMap.get(r.materialId)?.title ?? "未知教材",
     chapter: r.chapter,
     pageStart: r.pageStart,
     pageEnd: r.pageEnd,
     content: r.content,
     similarity: r.finalScore,
+    startOffset: r.startOffset ?? null,
+    endOffset: r.endOffset ?? null,
+    fileUrl: matMap.get(r.materialId)?.fileUrl ?? null,
   }));
 }
 

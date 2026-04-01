@@ -4,23 +4,21 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { Streamdown } from "streamdown";
-import { BookOpen, Search, Loader2, ChevronDown, ChevronUp, TreePine, GraduationCap } from "lucide-react";
+import { BookOpen, Search, Loader2, TreePine, GraduationCap, ExternalLink } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
 import type { QuerySource } from "@/types";
 
-type AnswerResult = {
-  answer: string;
-  sources: QuerySource[];
-  modelUsed: string;
-  responseTimeMs: number;
-  queryId: number;
-  foundInMaterials: boolean;
-  questionLanguage: "zh" | "en";
-  enAnswer?: string;
-  enSources?: QuerySource[];
+type ConversationMessage = {
+  role: "user" | "assistant";
+  content: string;
+  sources?: QuerySource[];
+  queryId?: number;
+};
+
+type QuerySourceWithLocator = QuerySource & {
+  fileUrl?: string | null;
 };
 
 type StreamMeta = {
@@ -61,14 +59,17 @@ function normalizeAnswerMarkdown(text: string): string {
     .trim();
 }
 
+function createConversationId(): string {
+  return `${Math.random().toString(36).slice(2)}-${Date.now().toString(36)}`;
+}
+
 export default function Home() {
   const { user } = useAuth();
   const { data: materials, isLoading: materialsLoading } = trpc.materials.list.useQuery();
   const [question, setQuestion] = useState("");
-  const [askedQuestion, setAskedQuestion] = useState("");
-  const [askedMaterialTitle, setAskedMaterialTitle] = useState("");
-  const [result, setResult] = useState<AnswerResult | null>(null);
-  const [showSources, setShowSources] = useState(true);
+  const [activeQuestion, setActiveQuestion] = useState("");
+  const [conversationHistory, setConversationHistory] = useState<ConversationMessage[]>([]);
+  const [conversationId, setConversationId] = useState<string>(() => createConversationId());
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
   const [feedbackValue, setFeedbackValue] = useState<boolean | null>(null);
   const [selectedMaterialId, setSelectedMaterialId] = useState<number | null>(null);
@@ -109,9 +110,8 @@ export default function Home() {
     // 中断之前的请求
     if (abortRef.current) abortRef.current.abort();
 
-    setAskedQuestion(q);
-    setAskedMaterialTitle(selectedMaterial.title);
-    setResult(null);
+    setActiveQuestion(q);
+    setQuestion("");
     setStreamAnswer("");
     setStreamMeta(null);
     setStreamError(null);
@@ -123,10 +123,17 @@ export default function Home() {
     const controller = new AbortController();
     abortRef.current = controller;
 
+    const historyPayload = conversationHistory.map(({ role, content }) => ({ role, content }));
+
     fetch("/api/stream/ask", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question: q, materialId: selectedMaterial.id }),
+      body: JSON.stringify({
+        question: q,
+        materialId: selectedMaterial.id,
+        conversationId,
+        history: historyPayload,
+      }),
       signal: controller.signal,
     })
       .then(async (resp) => {
@@ -141,6 +148,7 @@ export default function Home() {
         const decoder = new TextDecoder();
         let buffer = "";
         let accumulatedAnswer = "";
+        let currentMeta: StreamMeta | null = null;
 
         while (true) {
           const { done, value } = await reader.read();
@@ -159,9 +167,10 @@ export default function Home() {
               try {
                 const parsed = JSON.parse(data);
                 if (currentEvent === "meta") {
-                  setStreamMeta(parsed as StreamMeta);
+                  const meta = parsed as StreamMeta;
+                  currentMeta = meta;
+                  setStreamMeta(meta);
                   setIsSearching(false);
-                  setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
                 } else if (currentEvent === "token") {
                   accumulatedAnswer += parsed.t;
                   setStreamAnswer(normalizeAnswerMarkdown(accumulatedAnswer));
@@ -181,16 +190,33 @@ export default function Home() {
           }
         }
 
+        const finalAnswer = normalizeAnswerMarkdown(accumulatedAnswer).trim();
+        if (finalAnswer) {
+          setConversationHistory((prev) => [
+            ...prev,
+            { role: "user", content: q },
+            {
+              role: "assistant",
+              content: finalAnswer,
+              sources: currentMeta?.sources || [],
+              queryId: currentMeta?.queryId,
+            },
+          ]);
+        }
+
+        setActiveQuestion("");
+        setIsSearching(false);
         setIsStreaming(false);
       })
       .catch((err) => {
         if (err.name !== "AbortError") {
           setStreamError(err.message || "请求失败");
+          setActiveQuestion("");
         }
         setIsStreaming(false);
         setIsSearching(false);
       });
-  }, [question, isStreaming, selectedMaterial]);
+  }, [question, isStreaming, selectedMaterial, conversationHistory, conversationId]);
 
   // 计时器：显示已用时间
   useEffect(() => {
@@ -201,8 +227,10 @@ export default function Home() {
     return () => clearInterval(timer);
   }, [isStreaming, streamStartTime]);
 
+  const latestAssistantQueryId = [...conversationHistory].reverse().find((msg) => msg.role === "assistant")?.queryId;
+
   const handleFeedback = (helpful: boolean) => {
-    const qid = result?.queryId || streamMeta?.queryId;
+    const qid = latestAssistantQueryId || streamMeta?.queryId;
     if (!qid || feedbackSubmitted) return;
     submitFeedback.mutate({ queryId: qid, helpful });
     setFeedbackValue(helpful);
@@ -212,7 +240,7 @@ export default function Home() {
   useEffect(() => {
     setFeedbackSubmitted(false);
     setFeedbackValue(null);
-  }, [result?.queryId, streamMeta?.queryId]);
+  }, [latestAssistantQueryId, streamMeta?.queryId]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
@@ -220,14 +248,30 @@ export default function Home() {
     }
   };
 
+  useEffect(() => {
+    if (conversationHistory.length === 0 && !isStreaming) return;
+    resultRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [conversationHistory.length, streamAnswer, isStreaming]);
+
+  const handleNewConversation = () => {
+    if (abortRef.current) abortRef.current.abort();
+    setConversationHistory([]);
+    setConversationId(createConversationId());
+    setActiveQuestion("");
+    setStreamAnswer("");
+    setStreamMeta(null);
+    setStreamError(null);
+    setIsStreaming(false);
+    setIsSearching(false);
+    setStreamStartTime(0);
+    setStreamElapsed(0);
+    setFeedbackSubmitted(false);
+    setFeedbackValue(null);
+  };
+
   // 统一的结果显示状态
   const isPending = isStreaming && isSearching;
-  const hasAnswer = streamAnswer.length > 0 || result?.answer;
-  const displayAnswer = streamAnswer || result?.answer || "";
-  const displaySources = streamMeta?.sources || result?.sources || [];
-  const displayTime = streamMeta?.responseTimeMs || (streamElapsed > 0 ? streamElapsed : result?.responseTimeMs || 0);
-  const displayFoundInMaterials = streamMeta?.foundInMaterials ?? result?.foundInMaterials ?? true;
-  const showResult = hasAnswer || isPending || isStreaming;
+  const showResult = conversationHistory.length > 0 || isStreaming;
 
   // Forest background — place forest-bg.jpg in client/public/ or use a remote URL
   const FOREST_BG = "https://images.unsplash.com/photo-1448375240586-882707db888b?w=1920&q=80";
@@ -364,6 +408,17 @@ export default function Home() {
               </div>
             </div>
           </form>
+          <div className="mt-3 flex justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              className="bg-white/20 text-white border-white/40 hover:bg-white/30 hover:text-white"
+              onClick={handleNewConversation}
+              disabled={isStreaming && !streamError}
+            >
+              新对话
+            </Button>
+          </div>
 
           {/* 错误提示 */}
           {streamError && (
@@ -398,110 +453,165 @@ export default function Home() {
         <main className="flex-1 bg-[oklch(0.97_0.008_145)] py-8">
           <div className="container">
             <div ref={resultRef} className="max-w-4xl mx-auto space-y-4">
-              {isPending && (
-                <div className="text-center py-12 text-muted-foreground">
-                  <Loader2 className="h-8 w-8 animate-spin mx-auto mb-3 text-primary" />
-                  <p>正在检索教材并生成答案，请稍候...</p>
+              {conversationHistory.map((message, idx) => {
+                if (message.role === "user") {
+                  return (
+                    <div key={`user-${idx}`} className="flex justify-end">
+                      <div className="max-w-[90%] md:max-w-[80%] rounded-2xl bg-blue-600 text-white px-4 py-3 shadow-sm">
+                        <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
+                      </div>
+                    </div>
+                  );
+                }
+
+                const sources = message.sources || [];
+                const linkedQuestion = [...conversationHistory.slice(0, idx)]
+                  .reverse()
+                  .find((m) => m.role === "user")?.content || "";
+                const sourceIdPrefix = `turn-${idx}`;
+
+                return (
+                  <div key={`assistant-${idx}`} className="space-y-3">
+                    <div className="flex justify-start">
+                      <Card className="w-full max-w-[95%] md:max-w-[88%] bg-white shadow-sm">
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-base flex items-center gap-2">
+                            <BookOpen className="h-4 w-4 text-primary" />
+                            AI 回答
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="pt-0">
+                          <div className="notebook-answer">
+                            <CitedAnswer
+                              answer={message.content}
+                              sourceCount={sources.length}
+                              sourceIdPrefix={sourceIdPrefix}
+                            />
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    {sources.length > 0 ? (
+                      <details className="pl-0 md:pl-2 group">
+                        <summary className="list-none cursor-pointer select-none inline-flex items-center gap-2 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted/60">
+                          <span>引用来源（{sources.length}）</span>
+                          <span className="text-primary group-open:hidden">展开</span>
+                          <span className="text-primary hidden group-open:inline">收起</span>
+                        </summary>
+                        <div className="mt-2 space-y-3">
+                          {sources.map((source, sourceIdx) => (
+                            <SourceCard
+                              key={`${sourceIdPrefix}-${sourceIdx}`}
+                              source={source}
+                              index={sourceIdx + 1}
+                              idPrefix={sourceIdPrefix}
+                            />
+                          ))}
+                        </div>
+                      </details>
+                    ) : (
+                      <div className="text-xs text-muted-foreground pl-1">该回答未返回可引用教材来源。</div>
+                    )}
+                  </div>
+                );
+              })}
+
+              {isStreaming && activeQuestion && (
+                <div className="flex justify-end">
+                  <div className="max-w-[90%] md:max-w-[80%] rounded-2xl bg-blue-600 text-white px-4 py-3 shadow-sm">
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{activeQuestion}</p>
+                  </div>
                 </div>
               )}
 
-              {(hasAnswer || (isStreaming && !isSearching)) && (
-                <>
-                  {/* 主答案 */}
-                  <Card className="shadow-sm">
-                    <CardHeader className="pb-3">
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-lg flex items-center gap-2">
-                          <BookOpen className="h-5 w-5 text-primary" />
-                          Answer &nbsp;<span className="text-muted-foreground font-normal text-base">教材答案</span>
-                          {isStreaming && (
-                            <Loader2 className="h-4 w-4 animate-spin text-primary ml-1" />
-                          )}
-                        </CardTitle>
-                        <Badge variant="outline" className="text-xs text-muted-foreground">
-                          {(displayTime / 1000).toFixed(1)}s
-                        </Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="pt-0 sm:pt-1">
-                      {askedMaterialTitle && (
-                        <div className="mb-3 text-xs text-muted-foreground">
-                          当前检索教材：<span className="font-medium text-foreground/80">{askedMaterialTitle}</span>
-                        </div>
-                      )}
-                      <div className="notebook-answer">
-                        <CitedAnswer answer={displayAnswer} sourceCount={displaySources.length} />
-                      </div>
-
-                      {!isStreaming && displayFoundInMaterials && (
-                        <div className="mt-4 pt-3 border-t border-border flex items-center gap-3 flex-wrap">
-                          <span className="text-sm text-muted-foreground">这个答案对你有帮助吗？</span>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleFeedback(true)}
-                            disabled={feedbackSubmitted}
-                            className={feedbackSubmitted && feedbackValue === true ? "border-green-500 text-green-600" : ""}
-                          >
-                            👍 有帮助
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleFeedback(false)}
-                            disabled={feedbackSubmitted}
-                            className={feedbackSubmitted && feedbackValue === false ? "border-red-400 text-red-500" : ""}
-                          >
-                            👎 没帮助
-                          </Button>
-                          {feedbackSubmitted && (
-                            <span className="text-sm text-muted-foreground">感谢反馈！</span>
-                          )}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-
-                  {/* 引用来源 */}
-                  {displaySources.length > 0 && (
-                    <Card className="shadow-sm">
-                      <CardHeader className="pb-2 cursor-pointer" onClick={() => setShowSources(!showSources)}>
+              {isStreaming && (
+                <div className="space-y-3">
+                  <div className="flex justify-start">
+                    <Card className="w-full max-w-[95%] md:max-w-[88%] bg-white shadow-sm">
+                      <CardHeader className="pb-2">
                         <div className="flex items-center justify-between">
-                          <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                            <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary/10 text-primary text-xs font-bold">
-                              {displaySources.length}
-                            </span>
-                            Sources &nbsp;&middot;&nbsp; 引用教材来源
+                          <CardTitle className="text-base flex items-center gap-2">
+                            <BookOpen className="h-4 w-4 text-primary" />
+                            AI 回答
+                            <Loader2 className="h-4 w-4 animate-spin text-primary ml-1" />
                           </CardTitle>
-                          {showSources ? (
-                            <ChevronUp className="h-4 w-4 text-muted-foreground" />
-                          ) : (
-                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                          )}
+                          <Badge variant="outline" className="text-xs text-muted-foreground">
+                            {(streamElapsed / 1000).toFixed(1)}s
+                          </Badge>
                         </div>
                       </CardHeader>
-                      {showSources && (
-                        <CardContent className="pt-0 space-y-3">
-                          {displaySources.map((source, idx) => (
-                            <SourceCard
-                              key={idx}
-                              source={source}
-                              index={idx + 1}
-                              keywords={extractHighlightKeywords(askedQuestion)}
+                      <CardContent className="pt-0">
+                        {isPending && !streamAnswer && (
+                          <div className="text-sm text-muted-foreground flex items-center gap-2">
+                            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                            正在检索教材并生成答案...
+                          </div>
+                        )}
+                        {streamAnswer && (
+                          <div className="notebook-answer">
+                            <CitedAnswer
+                              answer={streamAnswer}
+                              sourceCount={streamMeta?.sources?.length || 0}
+                              sourceIdPrefix="streaming"
                             />
-                          ))}
-                        </CardContent>
-                      )}
+                          </div>
+                        )}
+                      </CardContent>
                     </Card>
-                  )}
+                  </div>
 
-                  {/* 无来源提示 */}
-                  {!isStreaming && displaySources.length === 0 && (
-                    <div className="text-center py-4 text-sm text-muted-foreground">
-                      本次回答未能匹配到具体教材片段，建议换一种问法或咨询教师。
-                    </div>
+                  {(streamMeta?.sources?.length || 0) > 0 && (
+                    <details className="pl-0 md:pl-2 group">
+                      <summary className="list-none cursor-pointer select-none inline-flex items-center gap-2 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted/60">
+                        <span>引用来源（{streamMeta?.sources?.length || 0}）</span>
+                        <span className="text-primary group-open:hidden">展开</span>
+                        <span className="text-primary hidden group-open:inline">收起</span>
+                      </summary>
+                      <div className="mt-2 space-y-3">
+                        {(streamMeta?.sources || []).map((source, sourceIdx) => (
+                          <SourceCard
+                            key={`streaming-${sourceIdx}`}
+                            source={source}
+                            index={sourceIdx + 1}
+                            idPrefix="streaming"
+                          />
+                        ))}
+                      </div>
+                    </details>
                   )}
-                </>
+                </div>
+              )}
+
+              {!isStreaming && latestAssistantQueryId && (
+                <Card className="shadow-sm">
+                  <CardContent className="pt-5 pb-5">
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <span className="text-sm text-muted-foreground">这个答案对你有帮助吗？</span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleFeedback(true)}
+                        disabled={feedbackSubmitted}
+                        className={feedbackSubmitted && feedbackValue === true ? "border-green-500 text-green-600" : ""}
+                      >
+                        👍 有帮助
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleFeedback(false)}
+                        disabled={feedbackSubmitted}
+                        className={feedbackSubmitted && feedbackValue === false ? "border-red-400 text-red-500" : ""}
+                      >
+                        👎 没帮助
+                      </Button>
+                      {feedbackSubmitted && (
+                        <span className="text-sm text-muted-foreground">感谢反馈！</span>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
               )}
             </div>
           </div>
@@ -527,7 +637,15 @@ export default function Home() {
 }
 
 // ─── NotebookLM 风格引用标注答案 ──────────────────────────────────────────────
-function CitedAnswer({ answer, sourceCount }: { answer: string; sourceCount: number }) {
+function CitedAnswer({
+  answer,
+  sourceCount,
+  sourceIdPrefix = "default",
+}: {
+  answer: string;
+  sourceCount: number;
+  sourceIdPrefix?: string;
+}) {
   // 将 [1] [2] 等引用标记渲染为可点击的角标
   const processedAnswer = answer.replace(
     /\[(\d+)\]/g,
@@ -558,8 +676,10 @@ function CitedAnswer({ answer, sourceCount }: { answer: string; sourceCount: num
           badge.textContent = idx;
           badge.title = `查看来源 ${idx}`;
           badge.onclick = () => {
-            const target = document.getElementById(`source-${idx}`);
+            const target = document.getElementById(`${sourceIdPrefix}-source-${idx}`);
             if (target) {
+              const collapsible = target.closest("details");
+              if (collapsible && !(collapsible as HTMLDetailsElement).open) (collapsible as HTMLDetailsElement).open = true;
               target.scrollIntoView({ behavior: "smooth", block: "center" });
               target.classList.add("ring-2", "ring-primary", "ring-offset-2");
               setTimeout(() => target.classList.remove("ring-2", "ring-primary", "ring-offset-2"), 2000);
@@ -578,25 +698,40 @@ function CitedAnswer({ answer, sourceCount }: { answer: string; sourceCount: num
 function SourceCard({
   source,
   index,
-  keywords,
+  idPrefix = "default",
 }: {
-  source: QuerySource;
+  source: QuerySourceWithLocator;
   index: number;
-  keywords: string[];
+  idPrefix?: string;
 }) {
   const [expanded, setExpanded] = useState(false);
 
   const pageLabel = source.pageStart
-    ? `第 ${source.pageStart}${source.pageEnd && source.pageEnd !== source.pageStart ? `–${source.pageEnd}` : ""} 页`
+    ? `第${source.pageStart}${source.pageEnd && source.pageEnd !== source.pageStart ? `-${source.pageEnd}` : ""}页`
+    : "页码未标注";
+  const chapterLabel = source.chapter || "章节未标注";
+  const excerptText = source.excerpt || source.highlightedExcerpt || "";
+  const canLocate = Boolean(source.fileUrl);
+  const locateUrl = canLocate
+    ? source.pageStart
+      ? `${String(source.fileUrl).split("#")[0]}#page=${source.pageStart}`
+      : String(source.fileUrl)
     : null;
-  const chapterPath = source.chapter
-    ? pageLabel
-      ? `${source.chapter} > ${pageLabel}`
-      : source.chapter
-    : pageLabel || "未标注章节";
+  const openLocate = () => {
+    if (!locateUrl) return;
+    window.open(locateUrl, "_blank", "noopener,noreferrer");
+  };
 
   return (
-    <div id={`source-${index}`} className="border-l-4 border-primary/50 bg-primary/5 rounded-r-lg p-3 transition-all duration-300">
+    <div
+      id={`${idPrefix}-source-${index}`}
+      className={`border-l-4 border-primary/50 bg-primary/5 rounded-r-lg p-3 transition-all duration-300 ${canLocate ? "cursor-pointer hover:bg-primary/10" : ""}`}
+      onClick={canLocate ? openLocate : undefined}
+      role={canLocate ? "button" : undefined}
+      tabIndex={canLocate ? 0 : undefined}
+      onKeyDown={canLocate ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openLocate(); } } : undefined}
+      title={canLocate ? "点击定位到教材原文" : undefined}
+    >
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -604,17 +739,18 @@ function SourceCard({
               {index}
             </span>
             <span className="text-xs text-muted-foreground truncate">
-              {source.materialTitle} · {chapterPath}
+              {source.materialTitle} · {chapterLabel} · {pageLabel}
             </span>
+            {canLocate && <ExternalLink className="h-3.5 w-3.5 text-primary/80 shrink-0" aria-label="可定位来源" />}
           </div>
           <p className={`text-xs text-foreground/80 leading-relaxed ${!expanded ? "line-clamp-2" : ""}`}>
-            {highlightKeywords(source.highlightedExcerpt || source.excerpt, keywords)}
+            {renderSourceExcerpt(excerptText, source.highlightedExcerpt)}
           </p>
         </div>
       </div>
-      {(source.highlightedExcerpt || source.excerpt) && (source.highlightedExcerpt || source.excerpt).length > 100 && (
+      {excerptText.length > 100 && (
         <button
-          onClick={() => setExpanded(!expanded)}
+          onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
           className="mt-1 text-xs text-primary hover:underline"
         >
           {expanded ? "收起" : "展开原文"}
@@ -624,32 +760,20 @@ function SourceCard({
   );
 }
 
-function extractHighlightKeywords(text: string): string[] {
-  return Array.from(
-    new Set(
-      text
-        .split(/[，。！？；、,\s]+/)
-        .map((s) => s.trim())
-        .filter((s) => s.length >= 2)
-    )
-  );
-}
-
-function escapeRegExp(input: string): string {
-  return input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function highlightKeywords(text: string, keywords: string[]): React.ReactNode {
-  if (!keywords.length) return text;
-  const pattern = new RegExp(`(${keywords.map((k) => escapeRegExp(k)).join("|")})`, "g");
-  const parts = text.split(pattern);
-  return parts.map((part, i) =>
-    keywords.includes(part) ? (
-      <mark key={i} className="bg-yellow-200 text-yellow-900 rounded px-0.5">
-        {part}
-      </mark>
-    ) : (
-      part
-    )
-  );
+function renderSourceExcerpt(excerpt: string, highlightedExcerpt?: string): React.ReactNode {
+  const needle = highlightedExcerpt?.trim();
+  if (!needle || !excerpt) return excerpt;
+  const lowerExcerpt = excerpt.toLowerCase();
+  const lowerNeedle = needle.toLowerCase();
+  const nodes: React.ReactNode[] = [];
+  let cursor = 0;
+  let key = 0;
+  while (cursor < excerpt.length) {
+    const foundAt = lowerExcerpt.indexOf(lowerNeedle, cursor);
+    if (foundAt === -1) { nodes.push(excerpt.slice(cursor)); break; }
+    if (foundAt > cursor) nodes.push(excerpt.slice(cursor, foundAt));
+    nodes.push(<mark key={`sm-${key++}`} className="bg-yellow-200 text-yellow-900 rounded px-0.5">{excerpt.slice(foundAt, foundAt + needle.length)}</mark>);
+    cursor = foundAt + needle.length;
+  }
+  return nodes;
 }

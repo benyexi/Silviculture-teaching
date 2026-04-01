@@ -4,7 +4,7 @@
  */
 import { getDb, getActiveLlmConfig } from "./db";
 import { materials, materialChunks } from "../drizzle/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { detectDocumentLanguage } from "./languageDetect";
 import { getEmbedding, getEmbeddings } from "./llmDriver";
 import mammoth from "mammoth";
@@ -17,7 +17,19 @@ type TextChunk = {
   pageStart: number | null;
   pageEnd: number | null;
   tokenCount: number;
+  startOffset?: number | null;
+  endOffset?: number | null;
 };
+
+type SectionSourceSpan = {
+  sectionStart: number;
+  sectionEnd: number;
+  pageNumber: number;
+  pageStartOffset: number;
+  pageEndOffset: number;
+};
+type SemanticBlock = { text: string; startOffset: number; endOffset: number };
+type ChunkSlice = { content: string; overlapContent: string; sourceStart: number; sourceEnd: number };
 
 const HEADING_PATTERN =
   /^(第[一二三四五六七八九十百零\d]+[章节篇部编]|[\d]+\.[\d]+[\s\S]{0,30}|[一二三四五六七八九十]+[、．.]\s*\S|Chapter\s+\d+(?:\.\d+)*|CHAPTER\s+\d+(?:\.\d+)*|Part\s+[IVX\d]+|Section\s+\d+(?:\.\d+)*|SECTION\s+\d+(?:\.\d+)*|\d+(?:\.\d+){0,3}\s+[A-Z][A-Za-z0-9 ,:;()\-]{2,90})$/i;
@@ -67,7 +79,7 @@ function mergeSectionText(a: string, b: string): string {
 }
 
 function mergeShortSections(
-  sections: { chapter: string | null; text: string; pageStart: number | null; pageEnd: number | null }[],
+  sections: { chapter: string | null; text: string; pageStart: number | null; pageEnd: number | null; spans?: SectionSourceSpan[] }[],
   minSize: number
 ) {
   const merged: typeof sections = [];
@@ -88,9 +100,19 @@ function mergeShortSections(
       last.text.length + current.text.length <= minSize * 1.8;
 
     if (shouldMerge) {
+      const offset = last.text.trim().length + 1; // +1 for the '\n' separator
       last.text = mergeSectionText(last.text, current.text);
       last.pageEnd = current.pageEnd ?? last.pageEnd;
       if (!last.chapter && current.chapter) last.chapter = current.chapter;
+      // Merge spans: offset the incoming section's spans by where it starts in the merged text
+      if (current.spans && current.spans.length > 0) {
+        const shiftedSpans = current.spans.map(s => ({
+          ...s,
+          sectionStart: s.sectionStart + offset,
+          sectionEnd: s.sectionEnd + offset,
+        }));
+        last.spans = [...(last.spans ?? []), ...shiftedSpans];
+      }
       continue;
     }
 
@@ -102,8 +124,17 @@ function mergeShortSections(
     if (tail) {
       const prev = merged[merged.length - 1];
       if (prev) {
+        const offset = prev.text.trim().length + 1;
         prev.text = mergeSectionText(prev.text, tail.text);
         prev.pageEnd = tail.pageEnd ?? prev.pageEnd;
+        if (tail.spans && tail.spans.length > 0) {
+          const shiftedSpans = tail.spans.map(s => ({
+            ...s,
+            sectionStart: s.sectionStart + offset,
+            sectionEnd: s.sectionEnd + offset,
+          }));
+          prev.spans = [...(prev.spans ?? []), ...shiftedSpans];
+        }
       } else {
         merged.push(tail);
       }
@@ -323,54 +354,16 @@ export async function processMaterial(
     const chunks = splitIntoChunks(text, pageTexts, detectedLanguage);
     console.log(`[Doc] 分块完成，共 ${chunks.length} 个块`);
 
-    // 3. 存储文本块到数据库 + 按需生成 Embedding
+    // 3. 存储文本块到数据库（不依赖 useRAG，先全部入库为 fulltext）
     const activeConfig = await getActiveLlmConfig();
-    const useRAG = activeConfig?.useRAG ?? false;
-
-    let embeddingEnabled = useRAG; // 只有开启语义检索模式才尝试生成 Embedding
     const BATCH_SIZE = Math.max(4, parseInt(process.env.DOC_EMBED_BATCH_SIZE || "16", 10));
-
-    if (!useRAG) {
-      console.log(`[Doc] 当前为关键词检索模式，跳过 Embedding 生成`);
-    } else {
-      // 先测试 Embedding 是否可用
-      try {
-        await getEmbeddings(["test"]);
-      } catch (err: any) {
-        embeddingEnabled = false;
-        const msg = err?.message || String(err);
-        if (msg.includes("401") || msg.includes("Authentication") || msg.includes("invalid")) {
-          console.warn(`[Doc] ⚠️ Embedding API Key 无效，降级为全文检索模式。请检查 API Key 配置。错误: ${msg}`);
-        } else if (msg.includes("未配置")) {
-          console.log(`[Doc] Embedding 未配置，仅使用全文检索模式`);
-        } else {
-          console.warn(`[Doc] Embedding 不可用（${msg}），降级为全文检索模式`);
-        }
-      }
-    }
 
     for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
       const batch = chunks.slice(i, i + BATCH_SIZE);
-      const embeddings: Array<number[] | undefined> = new Array(batch.length).fill(undefined);
-
-      // 先尝试批量 embedding，失败后再逐条补偿，减少 800 页教材导入时的 API 调用量
-      if (embeddingEnabled) {
-        const batched = await getEmbeddingsWithRetry(batch.map((chunk) => chunk.content), 2);
-        for (let j = 0; j < batched.length; j++) embeddings[j] = batched[j];
-
-        for (let j = 0; j < batch.length; j++) {
-          if (embeddings[j]) continue;
-          embeddings[j] = await getEmbeddingWithRetry(batch[j].content, 2);
-          if (!embeddings[j]) {
-            console.warn(`[Doc] 块 ${i + j} Embedding 生成失败，已降级为关键词检索块`);
-          }
-        }
-      }
 
       await Promise.all(
         batch.map(async (chunk, batchIdx) => {
           const idx = i + batchIdx;
-          const embedding = embeddings[batchIdx];
 
           await db.insert(materialChunks).values({
             materialId,
@@ -380,19 +373,27 @@ export async function processMaterial(
             pageStart: chunk.pageStart,
             pageEnd: chunk.pageEnd,
             tokenCount: chunk.tokenCount,
-            embedding: embedding || undefined,
-            vectorId: embedding ? "embedded" : "fulltext",
+            startOffset: chunk.startOffset ?? null,
+            endOffset: chunk.endOffset ?? null,
+            vectorId: "fulltext",
           });
         })
       );
-      console.log(`[Doc] 已处理 ${Math.min(i + BATCH_SIZE, chunks.length)}/${chunks.length} 个块`);
+      console.log(`[Doc] 已写入 ${Math.min(i + BATCH_SIZE, chunks.length)}/${chunks.length} 个块`);
     }
 
-    // 5. 更新教材状态为已发布
+    // 4. 更新教材状态为已发布
     await db
       .update(materials)
       .set({ status: "published", totalChunks: chunks.length, language: detectedLanguage })
       .where(eq(materials.id, materialId));
+
+    // 5. 如果配置了 embeddingModel 和 embeddingApiKey，异步回填 embedding
+    if (activeConfig?.embeddingModel && activeConfig?.embeddingApiKey) {
+      void backfillMaterialEmbeddings(materialId);
+    } else {
+      console.log(`[Doc] 未配置 embeddingModel/embeddingApiKey，跳过 Embedding 生成`);
+    }
 
     console.log(`[Doc] 教材 ${materialId} 处理完成！`);
   } catch (error) {
@@ -408,6 +409,64 @@ export async function processMaterial(
   }
 }
 
+// ─── PDF 结构化文本重建 ──────────────────────────────────────────────────────
+function buildStructuredPdfPageText(items: any[]): string {
+  const glyphs = (items || [])
+    .map((item: any) => ({
+      str: item.str || "",
+      x: item.transform?.[4] ?? 0,
+      y: item.transform?.[5] ?? 0,
+      width: item.width ?? 0,
+      height: Math.abs(item.height ?? item.transform?.[0] ?? 0) || 12,
+    }))
+    .filter(g => g.str.trim().length > 0);
+  if (!glyphs.length) return "";
+
+  glyphs.sort((a, b) => Math.abs(b.y - a.y) > 0.01 ? b.y - a.y : a.x - b.x);
+  const buckets: Array<{y:number; height:number; items:typeof glyphs}> = [];
+  for (const g of glyphs) {
+    const bucket = buckets.find(b => Math.abs(b.y - g.y) <= Math.max(2.5, Math.min(b.height, g.height) * 0.45));
+    if (bucket) { bucket.items.push(g); bucket.y = (bucket.y*(bucket.items.length-1)+g.y)/bucket.items.length; bucket.height = Math.max(bucket.height, g.height); }
+    else buckets.push({ y: g.y, height: g.height, items: [g] });
+  }
+
+  const lines = buckets
+    .sort((a,b) => Math.abs(b.y-a.y) > 0.01 ? b.y-a.y : 0)
+    .map(bucket => {
+      const sorted = [...bucket.items].sort((a,b) => a.x - b.x);
+      let line = ""; let prev: typeof glyphs[0] | null = null;
+      for (const item of sorted) {
+        const part = item.str.trim();
+        if (!part) continue;
+        if (prev) {
+          const gap = item.x - (prev.x + Math.max(prev.width, 0));
+          const cw = Math.max(1, Math.min(12, prev.width / Math.max(prev.str.length, 1)));
+          const isCjk = /[\u4e00-\u9fff]$/.test(line) || /^[\u4e00-\u9fff]/.test(part);
+          if (gap > Math.max(1.5, cw * 0.18) && !isCjk) line += " ";
+        }
+        line += part; prev = item;
+      }
+      return line.trim();
+    })
+    .filter(l => l.length > 0);
+
+  const paragraphs: string[] = [];
+  let cur: string[] = [];
+  let prevLine: {text:string; y:number; height:number} | null = null;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const bucket = buckets[i];
+    const gap = prevLine ? prevLine.y - bucket.y : 0;
+    const isHeading = line.length <= 36 && (HEADING_PATTERN.test(line) || /[:：]$/.test(line));
+    const breakPara = prevLine && (isHeading || gap > Math.max(prevLine.height, bucket.height) * 1.45);
+    if (breakPara && cur.length) { paragraphs.push(cur.join("\n")); cur = []; }
+    cur.push(line);
+    prevLine = { text: line, y: bucket.y, height: bucket.height };
+  }
+  if (cur.length) paragraphs.push(cur.join("\n"));
+  return paragraphs.filter(Boolean).join("\n\n");
+}
+
 // ─── PDF 文本提取（pdf-parse v1.1.1，支持 Buffer 输入）──────────────────────────
 async function extractPdfText(
   pdfBuffer: Buffer
@@ -421,15 +480,11 @@ async function extractPdfText(
   const pageTexts: string[] = [];
 
   const data = await pdfParse(pdfBuffer, {
-    // 逐页回调，收集每页文本
+    // 逐页回调，收集每页文本（基于 y 坐标聚类的结构化提取）
     pagerender: (pageData: any) => {
       return pageData.getTextContent().then((textContent: any) => {
         const items: any[] = textContent.items || [];
-        const pageText = items
-          .map((item: any) => item.str || "")
-          .join(" ")
-          .replace(/\s+/g, " ")
-          .trim();
+        const pageText = buildStructuredPdfPageText(items);
         pageTexts.push(pageText);
         return pageText;
       });
@@ -573,8 +628,8 @@ function splitTextWithOverlap(
   text: string,
   chapter: string | null,
   profile: ChunkingProfile
-): { content: string; overlapContent: string }[] {
-  const results: { content: string; overlapContent: string }[] = [];
+): ChunkSlice[] {
+  const results: ChunkSlice[] = [];
   const chapterPrefix = chapter ? `【${chapter}】\n` : "";
   const adjustedProfile = {
     ...profile,
@@ -587,6 +642,12 @@ function splitTextWithOverlap(
 
   let current = "";
 
+  const findSourceOffsets = (raw: string): { sourceStart: number; sourceEnd: number } => {
+    const idx = text.indexOf(raw);
+    if (idx >= 0) return { sourceStart: idx, sourceEnd: idx + raw.length };
+    return { sourceStart: 0, sourceEnd: text.length };
+  };
+
   const emitCurrent = () => {
     const trimmed = current.trim();
     if (!trimmed) {
@@ -596,14 +657,20 @@ function splitTextWithOverlap(
 
     if (trimmed.length < adjustedProfile.minSize && results.length > 0) {
       const merged = mergeSectionText(results[results.length - 1].overlapContent, trimmed);
+      const offsets = findSourceOffsets(merged);
       results[results.length - 1] = {
         content: chapterPrefix + merged,
         overlapContent: merged,
+        sourceStart: results[results.length - 1].sourceStart,
+        sourceEnd: offsets.sourceEnd,
       };
     } else {
+      const offsets = findSourceOffsets(trimmed);
       results.push({
         content: chapterPrefix + trimmed,
         overlapContent: trimmed,
+        sourceStart: offsets.sourceStart,
+        sourceEnd: offsets.sourceEnd,
       });
     }
 
@@ -621,14 +688,20 @@ function splitTextWithOverlap(
         if (!trimmedPiece) continue;
         if (results.length > 0 && trimmedPiece.length < adjustedProfile.minSize) {
           const merged = mergeSectionText(results[results.length - 1].overlapContent, trimmedPiece);
+          const mergedOffsets = findSourceOffsets(merged);
           results[results.length - 1] = {
             content: chapterPrefix + merged,
             overlapContent: merged,
+            sourceStart: results[results.length - 1].sourceStart,
+            sourceEnd: mergedOffsets.sourceEnd,
           };
         } else {
+          const pieceOffsets = findSourceOffsets(trimmedPiece);
           results.push({
             content: chapterPrefix + trimmedPiece,
             overlapContent: trimmedPiece,
+            sourceStart: pieceOffsets.sourceStart,
+            sourceEnd: pieceOffsets.sourceEnd,
           });
         }
       }
@@ -665,7 +738,7 @@ function splitIntoChunks(text: string, pageTexts: string[], language: "zh" | "en
   const sectionThreshold = Math.max(80, Math.floor(profile.minSize * 0.35));
 
   // 第一步：按章节/小节标题把全文分成 sections
-  type Section = { chapter: string | null; text: string; pageStart: number | null; pageEnd: number | null };
+  type Section = { chapter: string | null; text: string; pageStart: number | null; pageEnd: number | null; spans?: SectionSourceSpan[] };
   const sections: Section[] = [];
 
   if (pageTexts.length > 0) {
@@ -673,11 +746,16 @@ function splitIntoChunks(text: string, pageTexts: string[], language: "zh" | "en
     let currentText = "";
     let sectionPageStart: number | null = 1;
     let sectionPageEnd: number | null = 1;
+    let currentSpans: SectionSourceSpan[] = [];
+    let curPageContribStart = 0; // offset in currentText where current page started contributing
 
     for (let pageIdx = 0; pageIdx < pageTexts.length; pageIdx++) {
       const pageText = pageTexts[pageIdx].trim();
       if (!pageText) continue;
       const pageNum = pageIdx + 1;
+
+      // This page starts contributing at the current end of currentText
+      curPageContribStart = currentText.length;
 
       const lines = pageText.split("\n");
       for (const rawLine of lines) {
@@ -685,6 +763,16 @@ function splitIntoChunks(text: string, pageTexts: string[], language: "zh" | "en
         if (!line) continue;
 
         if (HEADING_PATTERN.test(line)) {
+          // Close this page's span contribution to the old section
+          if (currentText.length > curPageContribStart) {
+            currentSpans.push({
+              sectionStart: curPageContribStart,
+              sectionEnd: currentText.length,
+              pageNumber: pageNum,
+              pageStartOffset: 0,
+              pageEndOffset: currentText.length - curPageContribStart,
+            });
+          }
           // 遇到新标题，保存当前 section
           if (currentText.trim().length >= sectionThreshold) {
             sections.push({
@@ -692,16 +780,31 @@ function splitIntoChunks(text: string, pageTexts: string[], language: "zh" | "en
               text: currentText.trim(),
               pageStart: sectionPageStart,
               pageEnd: sectionPageEnd,
+              spans: currentSpans,
             });
           }
+          currentSpans = [];
           currentChapter = line.substring(0, 100);
           currentText = line + "\n";
           sectionPageStart = pageNum;
           sectionPageEnd = pageNum;
+          // Reset: this page now contributes to the new section from offset 0
+          curPageContribStart = 0;
         } else {
           currentText += line + "\n";
           sectionPageEnd = pageNum;
         }
+      }
+
+      // End of page: close the span for this page's contribution to the current section
+      if (currentText.length > curPageContribStart) {
+        currentSpans.push({
+          sectionStart: curPageContribStart,
+          sectionEnd: currentText.length,
+          pageNumber: pageNum,
+          pageStartOffset: 0,
+          pageEndOffset: currentText.length - curPageContribStart,
+        });
       }
     }
     // 最后一个 section
@@ -711,6 +814,7 @@ function splitIntoChunks(text: string, pageTexts: string[], language: "zh" | "en
         text: currentText.trim(),
         pageStart: sectionPageStart,
         pageEnd: sectionPageEnd,
+        spans: currentSpans,
       });
     }
   } else {
@@ -749,12 +853,21 @@ function splitIntoChunks(text: string, pageTexts: string[], language: "zh" | "en
   for (const section of normalizedSections) {
     const pieces = splitTextWithOverlap(section.text, section.chapter, profile);
     for (const piece of pieces) {
+      const pageRange = resolveChunkOffsetsFromSection(
+        section.spans ?? [],
+        piece.sourceStart,
+        piece.sourceEnd,
+        section.pageStart,
+        section.pageEnd,
+      );
       chunks.push({
         content: piece.content,
         chapter: section.chapter,
-        pageStart: section.pageStart,
-        pageEnd: section.pageEnd,
+        pageStart: pageRange.pageStart,
+        pageEnd: pageRange.pageEnd,
         tokenCount: estimateTokens(piece.content),
+        startOffset: pageRange.startOffset,
+        endOffset: pageRange.endOffset,
       });
     }
   }
@@ -771,4 +884,113 @@ function estimateTokens(text: string): number {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// ─── Offset 辅助函数 ─────────────────────────────────────────────────────────
+function getTrimmedSpan(text: string, start: number, end: number) {
+  let s = start, e = end;
+  while (s < e && /\s/.test(text[s] || "")) s++;
+  while (e > s && /\s/.test(text[e-1] || "")) e--;
+  if (s >= e) return null;
+  return { text: text.slice(s, e), startOffset: s, endOffset: e };
+}
+
+function splitLinesWithOffsets(text: string) {
+  const normalized = text.replace(/\r\n?/g, "\n");
+  const lines: Array<{text:string; startOffset:number; endOffset:number; isBlank:boolean}> = [];
+  let lineStart = 0;
+  for (let i = 0; i <= normalized.length; i++) {
+    if (i !== normalized.length && normalized[i] !== "\n") continue;
+    const span = getTrimmedSpan(normalized, lineStart, i);
+    lines.push(span
+      ? { text: span.text, startOffset: span.startOffset, endOffset: span.endOffset, isBlank: false }
+      : { text: "", startOffset: i, endOffset: i, isBlank: true });
+    lineStart = i + 1;
+  }
+  return lines;
+}
+
+function resolveChunkOffsetsFromSection(
+  spans: SectionSourceSpan[], sourceStart: number, sourceEnd: number,
+  fallbackPageStart: number | null, fallbackPageEnd: number | null
+) {
+  if (spans.length === 0) return { pageStart: fallbackPageStart, pageEnd: fallbackPageEnd, startOffset: null, endOffset: null };
+  const startSpan = spans.find(s => s.sectionEnd > sourceStart) ?? spans[0];
+  const endSpan = [...spans].reverse().find(s => s.sectionStart < sourceEnd) ?? spans[spans.length-1];
+  const startDelta = Math.max(0, Math.min(sourceStart - startSpan.sectionStart, startSpan.pageEndOffset - startSpan.pageStartOffset));
+  const endDelta = Math.max(0, Math.min(sourceEnd - endSpan.sectionStart, endSpan.pageEndOffset - endSpan.pageStartOffset));
+  return {
+    pageStart: startSpan.pageNumber ?? fallbackPageStart,
+    pageEnd: endSpan.pageNumber ?? fallbackPageEnd,
+    startOffset: startSpan.pageStartOffset + startDelta,
+    endOffset: endSpan.pageStartOffset + endDelta,
+  };
+}
+
+// ─── Embedding 回填（异步，不阻塞入库流程）────────────────────────────────────
+export async function backfillMaterialEmbeddings(materialId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  const BATCH_SIZE = Math.max(4, parseInt(process.env.DOC_EMBED_BATCH_SIZE || "16", 10));
+
+  console.log(`[Embed] 开始为教材 ${materialId} 回填 Embedding...`);
+
+  // 先测试 Embedding 是否可用
+  try {
+    await getEmbeddings(["test"]);
+  } catch (err: any) {
+    const msg = err?.message || String(err);
+    if (msg.includes("401") || msg.includes("Authentication") || msg.includes("invalid")) {
+      console.warn(`[Embed] ⚠️ Embedding API Key 无效，跳过回填。错误: ${msg}`);
+    } else if (msg.includes("未配置")) {
+      console.log(`[Embed] Embedding 未配置，跳过回填`);
+    } else {
+      console.warn(`[Embed] Embedding 不可用（${msg}），跳过回填`);
+    }
+    return;
+  }
+
+  // 查询所有 vectorId = "fulltext" 的 chunk
+  const rows = await db
+    .select({ id: materialChunks.id, content: materialChunks.content })
+    .from(materialChunks)
+    .where(and(eq(materialChunks.materialId, materialId), eq(materialChunks.vectorId, "fulltext")));
+
+  if (rows.length === 0) {
+    console.log(`[Embed] 教材 ${materialId} 无需回填`);
+    return;
+  }
+
+  console.log(`[Embed] 教材 ${materialId} 共 ${rows.length} 个 chunk 需要回填`);
+
+  for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+    const batch = rows.slice(i, i + BATCH_SIZE);
+    const embeddings: Array<number[] | undefined> = new Array(batch.length).fill(undefined);
+
+    const batched = await getEmbeddingsWithRetry(batch.map(r => r.content), 2);
+    for (let j = 0; j < batched.length; j++) embeddings[j] = batched[j];
+
+    for (let j = 0; j < batch.length; j++) {
+      if (embeddings[j]) continue;
+      embeddings[j] = await getEmbeddingWithRetry(batch[j].content, 2);
+      if (!embeddings[j]) {
+        console.warn(`[Embed] 块 ${batch[j].id} Embedding 生成失败，保持 fulltext`);
+      }
+    }
+
+    await Promise.all(
+      batch.map(async (row, batchIdx) => {
+        const embedding = embeddings[batchIdx];
+        if (!embedding) return;
+        await db
+          .update(materialChunks)
+          .set({ embedding, vectorId: "embedded" })
+          .where(eq(materialChunks.id, row.id));
+      })
+    );
+
+    console.log(`[Embed] 教材 ${materialId} 已回填 ${Math.min(i + BATCH_SIZE, rows.length)}/${rows.length}`);
+  }
+
+  console.log(`[Embed] 教材 ${materialId} Embedding 回填完成`);
 }

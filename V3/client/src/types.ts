@@ -8,6 +8,10 @@ export type QuerySource = {
   pageEnd: number | null;
   excerpt: string;
   highlightedExcerpt?: string;
+  chunkId?: number;
+  startOffset?: number | null;
+  endOffset?: number | null;
+  fileUrl?: string | null;
 };
 
 export type MaterialStatus = "uploading" | "processing" | "published" | "error";

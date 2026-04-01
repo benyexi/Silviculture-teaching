@@ -65,6 +65,8 @@ export const materialChunks = mysqlTable("material_chunks", {
   vectorId: varchar("vectorId", { length: 256 }),            // Milvus/向量库中的ID
   embedding: json("embedding").$type<number[]>(),           // Embedding 向量
   tokenCount: int("tokenCount"),
+  startOffset: int("startOffset"),                             // chunk在页文本中的起始字符偏移
+  endOffset: int("endOffset"),                                 // chunk在页文本中的结束字符偏移
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
@@ -80,6 +82,7 @@ export const queries = mysqlTable("queries", {
   sources: json("sources").$type<QuerySource[]>(),
   modelUsed: varchar("modelUsed", { length: 128 }),
   responseTimeMs: int("responseTimeMs"),
+  conversationId: varchar("conversationId", { length: 64 }),
   visitorIp: varchar("visitorIp", { length: 64 }),
   visitorCity: varchar("visitorCity", { length: 128 }),
   visitorRegion: varchar("visitorRegion", { length: 128 }),
@@ -97,6 +100,11 @@ export type QuerySource = {
   pageEnd: number | null;
   excerpt: string;
   highlightedExcerpt?: string;
+  // 精确位置信息
+  chunkId?: number;
+  startOffset?: number | null;
+  endOffset?: number | null;
+  fileUrl?: string | null;
 };
 
 export type Query = typeof queries.$inferSelect;

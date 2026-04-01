@@ -67,6 +67,11 @@ export const appRouter = router({
         z.object({
           question: z.string().min(2).max(1000),
           materialId: z.number().int().positive().optional(),
+          history: z.array(z.object({
+            role: z.enum(["user", "assistant"]),
+            content: z.string().max(2000),
+          })).max(20).optional(),
+          conversationId: z.string().max(64).optional(),
         })
       )
       .mutation(async ({ input, ctx }) => {
@@ -76,6 +81,8 @@ export const appRouter = router({
         return generateAnswer({
           question: input.question,
           materialIds: input.materialId ? [input.materialId] : undefined,
+          history: input.history,
+          conversationId: input.conversationId,
           visitorIp: ip,
           visitorCity: geo.city || undefined,
           visitorRegion: geo.region || undefined,

@@ -36,6 +36,20 @@
       "when": 1774200000000,
       "tag": "0004_add_useRAG_flag",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1743465600000,
+      "tag": "0005_add_chunk_offsets",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1743552000000,
+      "tag": "0006_add_conversation_id",
+      "breakpoints": true
     }
   ]
 }
