@@ -78,7 +78,8 @@ async function ensureSchemaColumns() {
   ];
 
   try {
-    const [rows] = await (db as any).$client.execute(`
+    // Use query() not execute() — DDL and INFORMATION_SCHEMA don't work with prepared statements
+    const [rows] = await (db as any).$client.query(`
       SELECT TABLE_NAME as t, COLUMN_NAME as c
       FROM INFORMATION_SCHEMA.COLUMNS
       WHERE TABLE_SCHEMA = DATABASE()
@@ -94,7 +95,7 @@ async function ensureSchemaColumns() {
     for (const item of wantedColumns) {
       if (existing.has(`${item.table}:${item.column}`)) continue;
       try {
-        await (db as any).$client.execute(item.ddl);
+        await (db as any).$client.query(item.ddl);
         console.log(`[Database] Added column ${item.table}.${item.column}`);
       } catch (err) {
         console.warn(`[Database] Failed to add column ${item.table}.${item.column}:`, err);
@@ -103,7 +104,7 @@ async function ensureSchemaColumns() {
     // Ensure index on queries.conversationId
     if (!existing.has("queries:conversationId")) {
       try {
-        await (db as any).$client.execute(
+        await (db as any).$client.query(
           "CREATE INDEX `queries_conversationId_idx` ON `queries` (`conversationId`)"
         );
       } catch (_e) { /* already exists */ }
@@ -141,7 +142,7 @@ async function ensureRetrievalIndexes() {
   ] as const;
 
   try {
-    const [rows] = await (db as any).$client.execute(`
+    const [rows] = await (db as any).$client.query(`
       SELECT TABLE_NAME as tableName, INDEX_NAME as indexName
       FROM INFORMATION_SCHEMA.STATISTICS
       WHERE TABLE_SCHEMA = DATABASE()
@@ -161,7 +162,7 @@ async function ensureRetrievalIndexes() {
       const key = `${item.table}:${item.name}`;
       if (existing.has(key)) continue;
       try {
-        await (db as any).$client.execute(item.ddl);
+        await (db as any).$client.query(item.ddl);
         console.log(`[Database] Created index ${item.name}`);
       } catch (error) {
         console.warn(`[Database] Failed to create index ${item.name}:`, error);
