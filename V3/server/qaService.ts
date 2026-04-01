@@ -437,21 +437,21 @@ ${materialNote}
 
 export function buildSystemPrompt(
   materialTitles: string[],
-  questionLang: “zh” | “en” = “zh”,
-  materialLang: “zh” | “en” = “zh”,
-  analysis: QuestionAnalysis = detectQuestionIntent(“”, questionLang),
+  questionLang: "zh" | "en" = "zh",
+  materialLang: "zh" | "en" = "zh",
+  analysis: QuestionAnalysis = detectQuestionIntent("", questionLang),
   history?: ConversationTurn[]
 ): string {
   const multiTurnSuffix = history && history.length > 0
-    ? (questionLang === “en”
-      ? “\n\nThis is a multi-turn conversation. Use the conversation history to understand the question, but your answer must be strictly grounded in the provided textbook excerpts.”
-      : “\n\n当前为多轮对话。请结合对话历史理解用户问题，但答案必须严格基于教材片段，不得引入历史对话中未在教材中出现的信息。”)
-    : “”;
+    ? (questionLang === "en"
+      ? "\n\nThis is a multi-turn conversation. Use the conversation history to understand the question, but your answer must be strictly grounded in the provided textbook excerpts."
+      : "\n\n当前为多轮对话。请结合对话历史理解用户问题，但答案必须严格基于教材片段，不得引入历史对话中未在教材中出现的信息。")
+    : "";
 
-  if (questionLang === “en”) {
+  if (questionLang === "en") {
     const titleList = materialTitles.length
-      ? materialTitles.map((t) => `- ${t}`).join(“\n”)
-      : “- (No textbook excerpts)”;
+      ? materialTitles.map((t) => `- ${t}`).join("\n")
+      : "- (No textbook excerpts)";
 
     return `${buildSystemHeader(questionLang, materialLang, analysis)}
 
@@ -460,19 +460,19 @@ ${titleList}
 
 Requirements:
 1. Source only: use only the provided excerpts. Do not add outside knowledge. If not covered, reply with a single short sentence and stop.
-2. ${analysis.conciseDefinition ? “Concise definition mode: answer only the core definition from excerpts in 2-4 sentences, with the first sentence being the direct answer.” : “Completeness: synthesize ALL provided excerpts thoroughly. For classification/method/step/comparison questions, list every item that appears in the excerpts.”}
+2. ${analysis.conciseDefinition ? "Concise definition mode: answer only the core definition from excerpts in 2-4 sentences, with the first sentence being the direct answer." : "Completeness: synthesize ALL provided excerpts thoroughly. For classification/method/step/comparison questions, list every item that appears in the excerpts."}
 3. Structure: follow this blueprint: ${buildAnswerBlueprint(analysis, questionLang)}. Do not add a preface like 'the textbook says' or 'excerpt-grounded'.
 4. Key terms: use **bold** for key terms, important concepts, and critical conclusions. Precisely preserve numeric data, formulas, and ratios from the textbook.
 5. Textbook language: preserve original terminology. If multiple viewpoints exist, list them all.
-6. ${analysis.conciseDefinition ? “Format: output plain concise Markdown in 2-4 sentences; do not use long sectioned expansion.” : “Format: output directly in Markdown. Start with a 1-2 sentence overview, then expand with full details.”}
+6. ${analysis.conciseDefinition ? "Format: output plain concise Markdown in 2-4 sentences; do not use long sectioned expansion." : "Format: output directly in Markdown. Start with a 1-2 sentence overview, then expand with full details."}
 7. Inline citations: add [1], [2], [3] etc. after each factual claim, matching the excerpt number it came from. Every key statement must have at least one citation.
 
-${analysis.conciseDefinition ? “8. This is a concise definition question. Answer in 2-4 sentences only; do not add history, classification, purpose, development, or other extensions.” : “”}
+${analysis.conciseDefinition ? "8. This is a concise definition question. Answer in 2-4 sentences only; do not add history, classification, purpose, development, or other extensions." : ""}
 
 ${buildFewShotBlock(questionLang, analysis)}${multiTurnSuffix}`;
   }
 
-  if (materialLang === “en”) {
+  if (materialLang === "en") {
     return `${buildSystemHeader(questionLang, materialLang, analysis)}
 
 下面是英文教材相关段落，请基于这些英文教材内容，用中文回答问题。
@@ -480,18 +480,18 @@ ${buildFewShotBlock(questionLang, analysis)}${multiTurnSuffix}`;
 1. 先给出英文教材的关键原文或关键术语（1-2句）
 2. 再给出中文翻译和解释
 3. 若问题属于分类/方法/步骤/比较题，必须完整列出教材中明确出现的项目，不能只给概述
-4. 直接进入答案，不要先写”教材中关于…”或”根据片段…”之类的引导语；如果证据不足，只用一句短提示。
+4. 直接进入答案，不要先写"教材中关于…"或"根据片段…"之类的引导语；如果证据不足，只用一句短提示。
 
 规则：
 - 只能基于提供的教材内容回答，不能使用教材以外的知识
-- 如果教材中没有相关内容，回复”教材中未涉及此内容”
+- 如果教材中没有相关内容，回复"教材中未涉及此内容"
 - 使用 **加粗**（Markdown格式）标记关键术语和重要概念
 - 直接输出 Markdown 格式的回答，不要包裹在 JSON 或代码块中${multiTurnSuffix}`;
   }
 
   const titleList = materialTitles.length
-    ? materialTitles.map((t, i) => `  ${i + 1}. 《${t}》`).join(“\n”)
-    : “  （暂无已发布教材）”;
+    ? materialTitles.map((t, i) => `  ${i + 1}. 《${t}》`).join("\n")
+    : "  （暂无已发布教材）";
 
   return `${buildSystemHeader(questionLang, materialLang, analysis)}
 
@@ -499,14 +499,14 @@ ${buildFewShotBlock(questionLang, analysis)}${multiTurnSuffix}`;
 ${titleList}
 
 回答要求：
-1. 知识来源：只能基于提供的教材片段回答，不得使用教材外知识。如果教材未涉及该内容，明确回复”教材中未涉及此内容”。
-2. ${analysis.conciseDefinition ? “简洁定义模式：仅基于教材给出定义本身，控制在2-4句，不做延伸讲解。” : “全面完整：综合所有提供的教材片段信息，给出尽可能全面、详尽的回答。对于分类、类型、方法、步骤、比较等题目，要完整列出每一项，并逐项说明。”}
-3. 结构清晰：${analysis.conciseDefinition ? `直接按”定义句 + 1-2句补充说明”输出。` : `优先”直接回答 + 清单/要点”。`} ${buildAnswerBlueprint(analysis, questionLang)}
+1. 知识来源：只能基于提供的教材片段回答，不得使用教材外知识。如果教材未涉及该内容，明确回复"教材中未涉及此内容"。
+2. ${analysis.conciseDefinition ? "简洁定义模式：仅基于教材给出定义本身，控制在2-4句，不做延伸讲解。" : "全面完整：综合所有提供的教材片段信息，给出尽可能全面、详尽的回答。对于分类、类型、方法、步骤、比较等题目，要完整列出每一项，并逐项说明。"}
+3. 结构清晰：${analysis.conciseDefinition ? `直接按"定义句 + 1-2句补充说明"输出。` : `优先"直接回答 + 清单/要点"。`} ${buildAnswerBlueprint(analysis, questionLang)}
 4. 突出重点：使用 **加粗** 标记关键术语、重要概念和核心结论。对于教材中的数据、公式、比例等要精确引用。
 5. 保留教材表述：尽量使用教材中的原始术语和表述，可以适当组织和概括，但核心信息必须来自教材。如果教材中有多个观点或说法，应完整列出。
-6. 格式规范：${analysis.conciseDefinition ? “直接输出 Markdown，2-4句即可，不要使用长篇多级标题，也不要写导语。” : “直接输出 Markdown 格式，不要包裹在 JSON 或代码块中。不要求固定写'一、概述/三、完整性说明'。”}
+6. 格式规范：${analysis.conciseDefinition ? "直接输出 Markdown，2-4句即可，不要使用长篇多级标题，也不要写导语。" : "直接输出 Markdown 格式，不要包裹在 JSON 或代码块中。不要求固定写'一、概述/三、完整性说明'。"}
 7. 内联引用标注：每个事实性陈述后必须添加 [1]、[2]、[3] 等标记，对应其来自的片段编号。每个关键陈述至少有一个引用标记。例如：造林密度取决于立地条件[2]和树种特性[4]。
-${analysis.conciseDefinition ? `\n8. 当前是简洁定义题，仅回答定义本身（2-4句），不得扩展到历史、分类、目的、发展、问题等延伸内容。` : “”}
+${analysis.conciseDefinition ? `\n8. 当前是简洁定义题，仅回答定义本身（2-4句），不得扩展到历史、分类、目的、发展、问题等延伸内容。` : ""}
 
 ${buildFewShotBlock(questionLang, analysis)}${multiTurnSuffix}`;
 }
@@ -679,8 +679,8 @@ ${buildAnswerBlueprint(analysis, questionLang)}
 - 直接列与问题最相关的条目，第一句必须直接进入答案，不要写导语。
 - 仅在确实缺失且用户明确追问缺失内容时，用1句短注说明，不要扩展解释过程。
 ${analysis.conciseDefinition ? "- 这是简洁定义题：只用2-4句话回答定义本身，禁止历史背景/分类/目的等延伸。" : ""}
-${analysis.intent === "method" ? "- 格式硬性要求：必须使用 `## 核心结论` + `## 具体做法` 两个二级标题；“具体做法”下用编号列表逐条写。" : ""}
-${analysis.intent === "classification" ? "- 格式硬性要求：必须使用 `## 类型总览` + `## 逐项说明` 两个二级标题；“逐项说明”下用编号列表逐条写。" : ""}
+${analysis.intent === "method" ? "- 格式硬性要求：必须使用 `## 核心结论` + `## 具体做法` 两个二级标题；"具体做法"下用编号列表逐条写。" : ""}
+${analysis.intent === "classification" ? "- 格式硬性要求：必须使用 `## 类型总览` + `## 逐项说明` 两个二级标题；"逐项说明"下用编号列表逐条写。" : ""}
 
 ${extractedFacts ? `\n【阶段一抽取的关键事实】\n${extractedFacts}\n\n` : ""}【教材内容片段（共 ${chunks.length} 条）】
 ${chunkTexts}
@@ -2150,9 +2150,9 @@ function removeAnswerBoilerplate(
     /^未作任何扩展或推断/,
     /^教材中唯一出现且可直接提取/,
     /^教材仅明确列出/,
-    /^教材未涉及“/,
-    /^未使用“/,
-    /^未将“/,
+    /^教材未涉及"/,
+    /^未使用"/,
+    /^未将"/,
     /^可参考教材中的相关表述[:：]?\s*$/,
     /^以下是教材中的相关表述[:：]?\s*$/,
     /^该内容在.*始终与/,
